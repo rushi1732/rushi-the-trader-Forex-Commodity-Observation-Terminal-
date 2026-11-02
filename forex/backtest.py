@@ -14,7 +14,7 @@ import math
 from .pairs import normalize_symbol, get_pair_info, to_pips, from_pips
 from .pricing import execution_price
 from .sizer import size_position
-from .data import fetch_chart
+from .data import fetch_chart, fetch_twelve_data_chart
 
 
 def calculate_ema(values: List[float], period: int) -> List[Optional[float]]:
@@ -43,6 +43,7 @@ def run_backtest(
     offline_data: Optional[Dict[str, Any]] = None,
     max_loss_usd: float = 50.0,
     lookback_window: int = 15,
+    twelve_data_api_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Execute historical bar-by-bar backtest of range breakout + 2R exit strategy.
     
@@ -58,20 +59,43 @@ def run_backtest(
     slippage_pips = 0.5
 
     # 1. Fetch candles
-    try:
-        chart = fetch_chart(
-            symbol=canon,
-            interval=interval,
-            range_period=range_period,
-            offline_data=offline_data,
-        )
-    except Exception as e:
-        return {
-            "symbol": canon,
-            "status": "ERROR",
-            "error": f"Failed to load chart data for backtest: {str(e)}",
-            "trades": [],
-        }
+    chart = None
+    if is_gold and twelve_data_api_key:
+        try:
+            chart = fetch_twelve_data_chart(
+                symbol=canon,
+                interval=interval,
+                api_key=twelve_data_api_key,
+                offline_data=offline_data,
+            )
+        except Exception:
+            chart = None
+
+    if chart is None:
+        try:
+            chart = fetch_chart(
+                symbol=canon,
+                interval=interval,
+                range_period=range_period,
+                offline_data=offline_data,
+            )
+        except Exception as e:
+            return {
+                "symbol": canon,
+                "status": "ERROR",
+                "error": f"Failed to load chart data for backtest: {str(e)}",
+                "trades": [],
+                "metrics": {
+                    "total_trades": 0,
+                    "wins": 0,
+                    "losses": 0,
+                    "win_rate_pct": None,
+                    "win_rate_label": "N/A (Error)",
+                    "net_pnl_usd": 0.0,
+                    "profit_factor": 1.0,
+                    "max_drawdown_usd": 0.0,
+                },
+            }
 
     candles = chart.get("candles", [])
     if len(candles) < lookback_window + 5:

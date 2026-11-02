@@ -3305,8 +3305,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
 
                 const m = data.metrics || {};
-                document.getElementById('btWinRate').textContent = (m.win_rate_pct || 0) + '%';
-                document.getElementById('btTotalTrades').textContent = (m.total_trades || 0) + ` (${m.wins}W / ${m.losses}L)`;
+                const hasTrades = (m.total_trades || 0) > 0;
+                document.getElementById('btWinRate').textContent = hasTrades ? ((m.win_rate_pct !== null && m.win_rate_pct !== undefined) ? m.win_rate_pct + '%' : '0%') : 'N/A (No Setups)';
+                document.getElementById('btTotalTrades').textContent = hasTrades ? `${m.total_trades} (${m.wins || 0}W / ${m.losses || 0}L)` : '0 Trades (Waiting for Setup)';
                 document.getElementById('btNetPnl').textContent = '$' + Number(m.net_pnl_usd || 0).toFixed(2);
                 document.getElementById('btNetPnl').style.color = (m.net_pnl_usd >= 0) ? 'var(--accent-green)' : 'var(--accent-rose)';
                 document.getElementById('btProfitFactor').textContent = m.profit_factor || '1.0';
@@ -4361,12 +4362,14 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             range_period = params.get("range", ["5d"])[0]
             canon = normalize_symbol(sym)
             try:
+                td_key = TWELVE_DATA_CONFIG.get("api_key") if TWELVE_DATA_CONFIG.get("enabled") else None
                 res = run_backtest(
                     symbol=canon,
                     interval=interval,
                     range_period=range_period,
                     offline_data=self.OFFLINE_DATA,
                     max_loss_usd=RISK_CONFIG.get("max_risk_per_trade_usd", 50.0),
+                    twelve_data_api_key=td_key,
                 )
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
