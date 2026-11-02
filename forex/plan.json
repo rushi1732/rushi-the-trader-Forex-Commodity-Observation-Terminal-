@@ -1,0 +1,17 @@
+{
+  "symbol": "EUR/USD",
+  "side": "BUY",
+  "entry_price": 1.086,
+  "stop_price": 1.0835,
+  "target_price": 1.091,
+  "stop_rule": "pips:25",
+  "stop_description": "25.0 Pips Fixed Stop",
+  "target_rule": "2R",
+  "target_description": "2.0R (50.0 pips)",
+  "risk_pips": 25.0,
+  "reward_pips": 50.0,
+  "reward_risk_ratio": 2.0,
+  "flat_by": "Fri 16:30 ET",
+  "asian_range": null,
+  "disclaimer": "INDICATIVE ONLY: Yahoo Finance Forex quotes are aggregate bank indicators, not real-time broker-executable prices. Spreads and fills vary by broker."
+}

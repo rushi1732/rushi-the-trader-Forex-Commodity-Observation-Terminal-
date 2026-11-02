@@ -1,0 +1,28 @@
+{
+  "budget": 5000,
+  "account_currency": "USD",
+  "leverage": 30,
+  "max_loss_per_trade_usd": 50,
+  "max_daily_loss_usd": 150,
+  "max_trades_per_day": 5,
+  "min_reward_risk": 1.0,
+  "require_stop": true,
+  "paper": true,
+  "allow_short": true,
+  "min_lot_size": 0.01,
+  "max_lot_size": 5.0,
+  "max_currency_exposure_pct": 50.0,
+  "weekend_flat_by": "Fri 16:30",
+  "default_spread_pips": {
+    "EUR/USD": 0.8,
+    "GBP/USD": 1.2,
+    "USD/JPY": 0.9,
+    "USD/CHF": 1.2,
+    "USD/CAD": 1.4,
+    "AUD/USD": 1.1,
+    "NZD/USD": 1.5,
+    "EUR/GBP": 1.4,
+    "EUR/JPY": 1.5,
+    "GBP/JPY": 2.2
+  }
+}
