@@ -2578,6 +2578,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         if (normalizeSym(tickSym) === normalizeSym(curSym)) {
                             renderLiveRealtimeTick(tick);
                             checkLivePaperPositions(tick);
+                            checkLiveSignalInvalidation(tick);
                             updateChartWithLiveTick(tick);
                             if (currentObservation) updateStrategyMatrix(currentObservation, tick);
                         }
@@ -2996,23 +2997,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     elTime.textContent = autoSig.timestamp_et || autoSig.timestamp_utc || '--';
                 }
             } else {
-                // WAITING FOR ENTRY ZONE / NO SIGNAL: Keep all signal-related fields completely blank (--)
+                // WAITING FOR ENTRY ZONE vs NO SIGNAL (Req 8)
+                const statusLbl = autoSig.status_label || '';
+                const isWaiting = statusLbl.includes('WAITING') || (autoSig.reason && autoSig.reason.toLowerCase().includes('waiting')) || (autoSig.reason && autoSig.reason.includes('Entry Zone'));
+                const displayStatus = isWaiting ? 'WAITING FOR ENTRY ZONE' : 'NO SIGNAL';
+
                 if (autoBadge) {
-                    autoBadge.textContent = 'WAITING FOR ENTRY ZONE';
+                    autoBadge.textContent = displayStatus;
                     autoBadge.className = 'badge badge-amber';
                 }
                 if (autoAction) {
-                    autoAction.textContent = 'WAITING FOR ENTRY ZONE';
+                    autoAction.textContent = displayStatus;
                 }
                 if (autoReason) {
-                    autoReason.textContent = autoSig.reason || 'Waiting for market price to reach valid entry zone...';
+                    autoReason.textContent = autoSig.reason || (isWaiting ? 'Waiting for market price to reach valid entry zone...' : 'No valid institutional setup detected.');
                 }
                 if (autoHero) {
                     autoHero.className = 'signal-hero no-signal';
                 }
                 if (btnLogSignal) {
                     btnLogSignal.disabled = true;
-                    btnLogSignal.textContent = 'Waiting for Entry Zone (No Signal)';
+                    btnLogSignal.textContent = isWaiting ? 'Waiting for Entry Zone (No Signal)' : 'No Signal (Consolidation)';
                     btnLogSignal.style.background = 'rgba(245, 158, 11, 0.15)';
                     btnLogSignal.style.border = '1px dashed #f59e0b';
                     btnLogSignal.style.color = '#fbbf24';
@@ -3847,6 +3852,41 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             });
 
             renderJournalTable(cachedJournal);
+
+        function checkLiveSignalInvalidation(tick) {
+            if (!currentObservation || !currentObservation.auto_signal) return;
+            const sig = currentObservation.auto_signal;
+            if (sig.action !== 'BUY' && sig.action !== 'SELL') return;
+
+            const p = tick.mid;
+            let invalidated = false;
+            let invReason = '';
+
+            if (sig.action === 'BUY') {
+                if (sig.stop_loss && p <= sig.stop_loss) {
+                    invalidated = true;
+                    invReason = `Previous BUY signal invalidated (Stop Loss hit at ${sig.stop_loss}). Waiting for new setup.`;
+                } else if (sig.take_profit_2 && p >= sig.take_profit_2) {
+                    invalidated = true;
+                    invReason = `Previous BUY target achieved (TP2 reached at ${sig.take_profit_2}). Waiting for new setup.`;
+                }
+            } else if (sig.action === 'SELL') {
+                if (sig.stop_loss && p >= sig.stop_loss) {
+                    invalidated = true;
+                    invReason = `Previous SELL signal invalidated (Stop Loss hit at ${sig.stop_loss}). Waiting for new setup.`;
+                } else if (sig.take_profit_2 && p <= sig.take_profit_2) {
+                    invalidated = true;
+                    invReason = `Previous SELL target achieved (TP2 reached at ${sig.take_profit_2}). Waiting for new setup.`;
+                }
+            }
+
+            if (invalidated) {
+                sig.action = 'NO SIGNAL';
+                sig.status_label = 'WAITING FOR ENTRY ZONE';
+                sig.reason = invReason;
+                renderDashboard(currentObservation);
+            }
+        }
 
             // Sync with backend every 2s or immediately on closure
             if (changed || (Date.now() - lastServerTickSync > 2000)) {

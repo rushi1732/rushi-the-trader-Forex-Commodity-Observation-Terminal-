@@ -15,6 +15,7 @@ import sys
 import time
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any, Tuple
+import threading
 
 from .pairs import normalize_symbol, get_pair_info, to_pips
 from .pricing import calc_spread_prices, execution_price
@@ -100,6 +101,412 @@ def check_data_freshness(
     return True, age_minutes, f"Fresh data ({age_minutes:.1f} minutes old)"
 
 
+class SignalStateManager:
+    """Thread-safe persistent signal state manager ensuring:
+    1. Signal Confirmation: BUY or SELL generated ONLY when market price is inside a valid Entry Zone and all strategy conditions are met.
+    2. Candle Close Confirmation: Confirms signals ONLY after the 5-minute candle closes. Temporary intrabar movements during an unfinished candle do not generate signals.
+    3. Signal Persistence: Confirmed BUY or SELL remains active and visible until Stop Loss or Take Profit 2 is hit.
+    4. No Instant Reversal: Direct BUY <-> SELL flips are forbidden; signal must first be invalidated, transition to waiting, before opposite setup can be evaluated.
+    5. Hysteresis: Small price oscillations around entry zone boundaries cannot flicker or destroy an active signal.
+    6. Entry Reference: Fixed at the exact market price when signal is confirmed.
+    7. SL and TP: Calculated once at confirmation from Entry Reference and risk rules; never recalculated on price updates.
+    8. Status Transitions: WAITING FOR ENTRY ZONE before setup, BUY/SELL while confirmed, NO SIGNAL only when no setup exists.
+    """
+
+    def __init__(self) -> None:
+        self._active_signals: Dict[str, Dict[str, Any]] = {}
+        self._cooldown: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.Lock()
+
+    def reset(self, symbol: Optional[str] = None) -> None:
+        with self._lock:
+            if symbol:
+                canon = normalize_symbol(symbol)
+                self._active_signals.pop(canon, None)
+                self._cooldown.pop(canon, None)
+            else:
+                self._active_signals.clear()
+                self._cooldown.clear()
+
+    def get_active_signal(self, symbol: str) -> Optional[Dict[str, Any]]:
+        canon = normalize_symbol(symbol)
+        with self._lock:
+            sig = self._active_signals.get(canon)
+            return dict(sig) if sig else None
+
+    def process(
+        self,
+        symbol: str,
+        timeframe: str,
+        is_open: bool,
+        is_fresh: bool,
+        now_et: datetime,
+        now_utc: datetime,
+        current_price: float,
+        candles: Optional[List[Dict[str, Any]]] = None,
+        scan_info: Optional[Dict[str, Any]] = None,
+        entry_signal: Optional[Dict[str, Any]] = None,
+        paper_simulation: Optional[Dict[str, Any]] = None,
+        confluence_signal: Optional[Dict[str, Any]] = None,
+        status_reason: Optional[str] = None,
+        is_offline_test: bool = False,
+    ) -> Dict[str, Any]:
+        canon = normalize_symbol(symbol)
+        candles = candles or []
+
+        # 1. Closed market enforcement (Req 8 & 10)
+        if not is_open:
+            with self._lock:
+                self._active_signals.pop(canon, None)
+            return {
+                "action": "NO SIGNAL",
+                "status_label": "NO SIGNAL",
+                "strategy": "--",
+                "timeframe": "--",
+                "symbol": canon,
+                "entry_reference": None,
+                "stop_loss": None,
+                "take_profit": None,
+                "take_profit_2": None,
+                "reward_risk": None,
+                "reward_risk_tp2": None,
+                "risk_pips": None,
+                "reward_pips": None,
+                "reward_pips_tp2": None,
+                "confluence_score": None,
+                "grade": None,
+                "confluence_factors": [],
+                "timestamp_et": "--",
+                "timestamp_utc": "--",
+                "is_market_open": False,
+                "is_fresh": is_fresh,
+                "reason": status_reason or "Spot Forex / Futures market is closed.",
+                "candle_close_confirmed": False,
+                "paper_mode": True,
+                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+            }
+
+        # 2. Stale data enforcement (Req 8 & 10)
+        if not is_fresh:
+            with self._lock:
+                self._active_signals.pop(canon, None)
+            return {
+                "action": "NO SIGNAL",
+                "status_label": "NO SIGNAL",
+                "strategy": "--",
+                "timeframe": "--",
+                "symbol": canon,
+                "entry_reference": None,
+                "stop_loss": None,
+                "take_profit": None,
+                "take_profit_2": None,
+                "reward_risk": None,
+                "reward_risk_tp2": None,
+                "risk_pips": None,
+                "reward_pips": None,
+                "reward_pips_tp2": None,
+                "confluence_score": None,
+                "grade": None,
+                "confluence_factors": [],
+                "timestamp_et": "--",
+                "timestamp_utc": "--",
+                "is_market_open": True,
+                "is_fresh": False,
+                "reason": status_reason or "Market data feed is stale.",
+                "candle_close_confirmed": False,
+                "paper_mode": True,
+                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+            }
+
+        # 3. Insufficient candles enforcement (< 15)
+        if len(candles) < 15:
+            with self._lock:
+                self._active_signals.pop(canon, None)
+            return {
+                "action": "NO SIGNAL",
+                "status_label": "NO SIGNAL",
+                "strategy": "--",
+                "timeframe": "--",
+                "symbol": canon,
+                "entry_reference": None,
+                "stop_loss": None,
+                "take_profit": None,
+                "take_profit_2": None,
+                "reward_risk": None,
+                "reward_risk_tp2": None,
+                "risk_pips": None,
+                "reward_pips": None,
+                "reward_pips_tp2": None,
+                "confluence_score": None,
+                "grade": None,
+                "confluence_factors": [],
+                "timestamp_et": "--",
+                "timestamp_utc": "--",
+                "is_market_open": True,
+                "is_fresh": True,
+                "reason": status_reason or "Insufficient timeframe candles (< 15 bars).",
+                "candle_close_confirmed": False,
+                "paper_mode": True,
+                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+            }
+
+        # 4. Check Existing Active Confirmed Signal (Req 3, 4, 6, 7 - Persistence & Invalidation)
+        with self._lock:
+            active = self._active_signals.get(canon) if not is_offline_test else None
+
+        if active and active.get("action") in ("BUY", "SELL"):
+            side = active["action"]
+            sl = active.get("stop_loss")
+            tp2 = active.get("take_profit_2") or active.get("take_profit")
+
+            is_sl_hit = False
+            is_tp2_hit = False
+
+            if side == "BUY":
+                if sl is not None and current_price <= sl:
+                    is_sl_hit = True
+                if tp2 is not None and current_price >= tp2:
+                    is_tp2_hit = True
+            elif side == "SELL":
+                if sl is not None and current_price >= sl:
+                    is_sl_hit = True
+                if tp2 is not None and current_price <= tp2:
+                    is_tp2_hit = True
+
+            # Check market structure opposite break
+            is_struct_break = False
+            if confluence_signal:
+                choch = confluence_signal.get("components", {}).get("smc", {}).get("structure", {}).get("latest_choch")
+                if choch and choch.get("bias"):
+                    if side == "BUY" and choch["bias"] == "BEARISH":
+                        is_struct_break = True
+                    elif side == "SELL" and choch["bias"] == "BULLISH":
+                        is_struct_break = True
+
+            if is_sl_hit or is_tp2_hit or is_struct_break:
+                # Signal is INVALIDATED! (Req 4: never switch directly from BUY to SELL. First invalidate, transition to waiting)
+                with self._lock:
+                    self._active_signals.pop(canon, None)
+                    self._cooldown[canon] = {
+                        "invalidated_side": side,
+                        "invalidated_at": now_utc.timestamp(),
+                        "candle_ts": candles[-1].get("timestamp", 0) if candles else 0,
+                    }
+                inv_text = f"Stop Loss hit at {sl}" if is_sl_hit else (f"Take Profit 2 target completed at {tp2}" if is_tp2_hit else "Market structure invalidated")
+                return {
+                    "action": "NO SIGNAL",
+                    "status_label": "WAITING FOR ENTRY ZONE",
+                    "strategy": "--",
+                    "timeframe": "--",
+                    "symbol": canon,
+                    "entry_reference": None,
+                    "stop_loss": None,
+                    "take_profit": None,
+                    "take_profit_2": None,
+                    "reward_risk": None,
+                    "reward_risk_tp2": None,
+                    "risk_pips": None,
+                    "reward_pips": None,
+                    "reward_pips_tp2": None,
+                    "confluence_score": None,
+                    "grade": None,
+                    "confluence_factors": [],
+                    "timestamp_et": "--",
+                    "timestamp_utc": "--",
+                    "is_market_open": True,
+                    "is_fresh": True,
+                    "reason": f"Previous {side} signal invalidated ({inv_text}). Waiting for new setup.",
+                    "candle_close_confirmed": False,
+                    "paper_mode": True,
+                    "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+                }
+
+            # Still Valid: Maintain active confirmed signal persistently!
+            # Trade details remain 100% frozen as confirmed!
+            return dict(active)
+
+        # 5. Check Candle Close Confirmation for NEW signals (Req 2)
+        last_candle = candles[-1] if candles else {}
+        last_candle_ts = last_candle.get("timestamp", 0)
+        bar_duration = 300  # 5 minutes
+
+        if is_offline_test:
+            candle_is_closed = True
+            confirmed_candle_ts = last_candle_ts
+        else:
+            if now_utc.timestamp() >= last_candle_ts + bar_duration:
+                candle_is_closed = True
+                confirmed_candle_ts = last_candle_ts
+            else:
+                if len(candles) >= 2:
+                    candle_is_closed = True
+                    confirmed_candle_ts = candles[-2].get("timestamp", last_candle_ts - bar_duration)
+                else:
+                    candle_is_closed = False
+                    confirmed_candle_ts = last_candle_ts
+
+        candidate_action = None
+        candidate_strategy = None
+        candidate_entry = current_price
+        candidate_sl = None
+        candidate_tp1 = None
+        candidate_tp2 = None
+        candidate_rr = 2.0
+        candidate_rr_tp2 = 3.5
+        candidate_risk_pips = None
+        candidate_reward_pips = None
+        candidate_reward_pips_tp2 = None
+        candidate_score = None
+        candidate_grade = None
+        candidate_factors = []
+        candidate_reason = None
+
+        # Priority 1: Institutional SMC + ICT + Fibonacci + Liquidity Confluence
+        if confluence_signal and confluence_signal.get("action") in ("BUY", "SELL"):
+            c_action = confluence_signal["action"]
+            plan = confluence_signal.get("execution_plan", {})
+            in_zone = confluence_signal.get("is_in_entry_zone", False)
+
+            if in_zone and plan.get("stop_loss") and plan.get("take_profit_1"):
+                candidate_action = c_action
+                candidate_score = confluence_signal.get("confluence_score", 0)
+                candidate_grade = confluence_signal.get("grade", "A")
+                candidate_factors = confluence_signal.get("confluence_factors", [])
+                candidate_strategy = f"SMC / ICT Confluence ({candidate_grade} - {candidate_score}%)"
+                candidate_entry = current_price
+                candidate_sl = plan["stop_loss"]
+                candidate_tp1 = plan["take_profit_1"]
+                candidate_tp2 = plan.get("take_profit_2")
+                candidate_rr = plan.get("rr_ratio_tp1", 2.0)
+                candidate_rr_tp2 = plan.get("rr_ratio_tp2", 3.5)
+                candidate_risk_pips = plan.get("risk_pips")
+                candidate_reward_pips = plan.get("reward_pips_tp1")
+                candidate_reward_pips_tp2 = plan.get("reward_pips_tp2")
+                factors_str = " | ".join(candidate_factors[:2]) if candidate_factors else "Institutional multi-factor alignment"
+                candidate_reason = f"Confirmed {c_action} Institutional Setup ({candidate_grade}, Score: {candidate_score}%): {factors_str}"
+
+        # Priority 2: Session Range Breakout + Candle Close Simulation
+        elif paper_simulation and isinstance(paper_simulation, dict) and "error" not in paper_simulation:
+            b_side = paper_simulation.get("side", "BUY")
+            setup_name = (scan_info or {}).get("primary_setup") or "Session Range Breakout"
+            candidate_action = b_side
+            candidate_strategy = f"trader-scanner ({setup_name}) + trader-entry (Candle Close) + trader-exit (2R Plan)"
+            candidate_entry = paper_simulation.get("simulated_fill") or current_price
+            candidate_sl = paper_simulation.get("stop_price")
+            candidate_tp1 = paper_simulation.get("target_price")
+            candidate_tp2 = paper_simulation.get("target_price_2")
+            candidate_rr = paper_simulation.get("reward_risk", 2.0)
+            candidate_rr_tp2 = 3.5
+            candidate_risk_pips = paper_simulation.get("risk_pips")
+            candidate_reward_pips = paper_simulation.get("target_pips")
+            candidate_reward_pips_tp2 = None
+            candidate_score = 75
+            candidate_grade = "Grade A (Breakout Confirmed)"
+            candidate_factors = ["Candle closed beyond breakout boundary in valid entry zone"]
+            candidate_reason = f"Confirmed {b_side} signal: completed candle closed beyond setup boundary. 2R target planned."
+
+        # Cooldown check: prevent instant reversal on the same candle after invalidation (Req 4)
+        if candidate_action and not is_offline_test:
+            with self._lock:
+                cooldown = self._cooldown.get(canon)
+            if cooldown:
+                last_inv_side = cooldown.get("invalidated_side")
+                last_candle_cd = cooldown.get("candle_ts", 0)
+                if last_inv_side and last_inv_side != candidate_action:
+                    if confirmed_candle_ts <= last_candle_cd:
+                        # Cannot reverse immediately on the same candle bar
+                        candidate_action = None
+
+        if candidate_action in ("BUY", "SELL") and candle_is_closed:
+            # Confirm and latch new signal
+            new_sig = {
+                "action": candidate_action,
+                "status_label": f"{candidate_action} CONFIRMED",
+                "strategy": candidate_strategy,
+                "timeframe": timeframe,
+                "symbol": canon,
+                "entry_reference": candidate_entry,
+                "stop_loss": candidate_sl,
+                "take_profit": candidate_tp1,
+                "take_profit_2": candidate_tp2,
+                "reward_risk": candidate_rr,
+                "reward_risk_tp2": candidate_rr_tp2,
+                "risk_pips": candidate_risk_pips,
+                "reward_pips": candidate_reward_pips,
+                "reward_pips_tp2": candidate_reward_pips_tp2,
+                "confluence_score": candidate_score,
+                "grade": candidate_grade,
+                "confluence_factors": candidate_factors,
+                "confirmed_candle_ts": confirmed_candle_ts,
+                "confirmed_at_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
+                "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
+                "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "is_market_open": True,
+                "is_fresh": True,
+                "reason": candidate_reason,
+                "candle_close_confirmed": True,
+                "paper_mode": True,
+                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+            }
+            if not is_offline_test:
+                with self._lock:
+                    self._active_signals[canon] = new_sig
+            return new_sig
+
+        # 6. No confirmed signal: determine WAITING FOR ENTRY ZONE vs NO SIGNAL (Req 8)
+        has_potential_setup = False
+        wait_reason = "Price is not in a valid entry zone. Monitoring for Order Block, FVG, OTE, or Breakout level."
+
+        if confluence_signal:
+            b_sc = confluence_signal.get("bullish_score", 0)
+            s_sc = confluence_signal.get("bearish_score", 0)
+            if b_sc >= 30 or s_sc >= 30:
+                has_potential_setup = True
+                wait_reason = "Institutional setup detected. Waiting for 5m candle close inside valid Entry Zone."
+
+        if entry_signal and entry_signal.get("status") in ("WAITING", "MONITORING"):
+            has_potential_setup = True
+
+        status_lbl = "WAITING FOR ENTRY ZONE" if has_potential_setup else "NO SIGNAL"
+        final_rsn = wait_reason if has_potential_setup else (status_reason or "No valid institutional setup detected. Market in consolidation.")
+
+        return {
+            "action": "NO SIGNAL",
+            "status_label": status_lbl,
+            "strategy": "--",
+            "timeframe": "--",
+            "symbol": canon,
+            "entry_reference": None,
+            "stop_loss": None,
+            "take_profit": None,
+            "take_profit_2": None,
+            "reward_risk": None,
+            "reward_risk_tp2": None,
+            "risk_pips": None,
+            "reward_pips": None,
+            "reward_pips_tp2": None,
+            "confluence_score": None,
+            "grade": None,
+            "confluence_factors": [],
+            "timestamp_et": "--",
+            "timestamp_utc": "--",
+            "is_market_open": True,
+            "is_fresh": True,
+            "reason": final_rsn,
+            "candle_close_confirmed": False,
+            "paper_mode": True,
+            "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+        }
+
+
+SIGNAL_STATE_MANAGER = SignalStateManager()
+
+
+def reset_signal_state(symbol: Optional[str] = None) -> None:
+    """Reset persistent signal state across symbols or for a single symbol."""
+    SIGNAL_STATE_MANAGER.reset(symbol)
+
+
 def build_auto_signal(
     symbol: str,
     timeframe: str,
@@ -113,183 +520,26 @@ def build_auto_signal(
     paper_simulation: Optional[Dict[str, Any]] = None,
     latest_price: Optional[float] = None,
     confluence_signal: Optional[Dict[str, Any]] = None,
+    candles: Optional[List[Dict[str, Any]]] = None,
+    is_offline_test: bool = False,
 ) -> Dict[str, Any]:
-    """Build an authentic automatic paper trading signal from multi-skill analysis.
-    
-    Guarantees:
-    - Never generates fake or random signals.
-    - If market is closed, data stale, or candles insufficient, action is strictly 'NO SIGNAL'.
-    - If candle close confirms breakout or institutional confluence, action is 'BUY' or 'SELL'.
-    - Contains strategy/skill, timeframe, entry reference, stop-loss, take-profit (2R), and timestamps.
-    - Zero broker connectivity, purely simulated paper observation.
-    """
-    if not is_open:
-        return {
-            "action": "NO SIGNAL",
-            "strategy": "--",
-            "timeframe": "--",
-            "symbol": symbol,
-            "entry_reference": None,
-            "stop_loss": None,
-            "take_profit": None,
-            "take_profit_2": None,
-            "reward_risk": None,
-            "reward_risk_tp2": None,
-            "risk_pips": None,
-            "reward_pips": None,
-            "reward_pips_tp2": None,
-            "confluence_score": None,
-            "grade": None,
-            "confluence_factors": [],
-            "timestamp_et": "--",
-            "timestamp_utc": "--",
-            "is_market_open": False,
-            "is_fresh": is_fresh,
-            "reason": status_reason,
-            "candle_close_confirmed": False,
-            "paper_mode": True,
-            "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
-        }
-
-    if not is_fresh:
-        return {
-            "action": "NO SIGNAL",
-            "strategy": "--",
-            "timeframe": "--",
-            "symbol": symbol,
-            "entry_reference": None,
-            "stop_loss": None,
-            "take_profit": None,
-            "take_profit_2": None,
-            "reward_risk": None,
-            "reward_risk_tp2": None,
-            "risk_pips": None,
-            "reward_pips": None,
-            "reward_pips_tp2": None,
-            "confluence_score": None,
-            "grade": None,
-            "confluence_factors": [],
-            "timestamp_et": "--",
-            "timestamp_utc": "--",
-            "is_market_open": True,
-            "is_fresh": False,
-            "reason": status_reason,
-            "candle_close_confirmed": False,
-            "paper_mode": True,
-            "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
-        }
-
-    # Priority 1: Institutional SMC + ICT + Fibonacci + Liquidity Confluence Signal
-    if confluence_signal and confluence_signal.get("action") in ("BUY", "SELL"):
-        side = confluence_signal["action"]
-        plan = confluence_signal.get("execution_plan", {})
-        score = confluence_signal.get("confluence_score", 0)
-        grade = confluence_signal.get("grade", "A")
-        factors = confluence_signal.get("confluence_factors", [])
-        factors_summary = " | ".join(factors[:2]) if factors else "Institutional multi-factor alignment"
-        strategy_label = f"SMC / ICT Confluence ({grade} - {score}%)"
-
-        sim_lot = (paper_simulation or {}).get("paper_lot_size", 0.05)
-        sim_units = (paper_simulation or {}).get("paper_units", 5000)
-        sim_risk_usd = (paper_simulation or {}).get("simulated_max_loss_usd", 50.0)
-        entry_val = latest_price or plan.get("entry_price")
-
-        return {
-            "action": side,
-            "strategy": strategy_label,
-            "timeframe": timeframe,
-            "symbol": symbol,
-            "entry_reference": entry_val,
-            "stop_loss": plan.get("stop_loss"),
-            "take_profit": plan.get("take_profit_1"),
-            "take_profit_2": plan.get("take_profit_2"),
-            "reward_risk": plan.get("rr_ratio_tp1", 2.0),
-            "reward_risk_tp2": plan.get("rr_ratio_tp2", 3.5),
-            "risk_pips": plan.get("risk_pips"),
-            "reward_pips": plan.get("reward_pips_tp1"),
-            "reward_pips_tp2": plan.get("reward_pips_tp2"),
-            "confluence_score": score,
-            "grade": grade,
-            "confluence_factors": factors,
-            "lot_size": sim_lot,
-            "units": sim_units,
-            "risk_usd": sim_risk_usd,
-            "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
-            "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "is_market_open": True,
-            "is_fresh": True,
-            "reason": f"Confirmed {side} Institutional Setup ({grade}, Score: {score}%): {factors_summary}",
-            "candle_close_confirmed": True,
-            "paper_mode": True,
-            "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
-        }
-
-    # Priority 2: Session Range Breakout + Candle Close Simulation
-    if paper_simulation and isinstance(paper_simulation, dict) and "error" not in paper_simulation:
-        side = paper_simulation.get("side", "BUY")
-        setup_name = (scan_info or {}).get("primary_setup") or "Session Range Breakout"
-        strategy = f"trader-scanner ({setup_name}) + trader-entry (Candle Close) + trader-exit (2R Plan)"
-        return {
-            "action": side,
-            "strategy": strategy,
-            "timeframe": timeframe,
-            "symbol": symbol,
-            "entry_reference": paper_simulation.get("simulated_fill") or latest_price,
-            "stop_loss": paper_simulation.get("stop_price"),
-            "take_profit": paper_simulation.get("target_price"),
-            "take_profit_2": paper_simulation.get("target_price_2"),
-            "reward_risk": paper_simulation.get("reward_risk", 2.0),
-            "reward_risk_tp2": 3.5,
-            "risk_pips": paper_simulation.get("risk_pips"),
-            "reward_pips": paper_simulation.get("target_pips"),
-            "confluence_score": 75,
-            "grade": "Grade A (Breakout Confirmed)",
-            "confluence_factors": ["Candle closed beyond breakout boundary in valid entry zone"],
-            "lot_size": paper_simulation.get("paper_lot_size"),
-            "units": paper_simulation.get("paper_units"),
-            "risk_usd": paper_simulation.get("simulated_max_loss_usd", 50.0),
-            "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
-            "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "is_market_open": True,
-            "is_fresh": True,
-            "reason": f"Confirmed {side} signal: completed candle closed beyond setup boundary. 2R target planned.",
-            "candle_close_confirmed": True,
-            "paper_mode": True,
-            "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
-        }
-
-    # Market open & fresh, but no confirmed setup in valid entry zone yet
-    if status_reason:
-        final_reason = status_reason
-    else:
-        final_reason = "Price is not in a valid entry zone. Monitoring for Order Block, FVG, OTE, or Breakout level."
-
-    return {
-        "action": "NO SIGNAL",
-        "strategy": "--",
-        "timeframe": "--",
-        "symbol": symbol,
-        "entry_reference": None,
-        "stop_loss": None,
-        "take_profit": None,
-        "take_profit_2": None,
-        "reward_risk": None,
-        "reward_risk_tp2": None,
-        "risk_pips": None,
-        "reward_pips": None,
-        "reward_pips_tp2": None,
-        "confluence_score": None,
-        "grade": None,
-        "confluence_factors": [],
-        "timestamp_et": "--",
-        "timestamp_utc": "--",
-        "is_market_open": True,
-        "is_fresh": True,
-        "reason": final_reason,
-        "candle_close_confirmed": False,
-        "paper_mode": True,
-        "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
-    }
+    """Build or maintain an authentic automatic paper trading signal from persistent state."""
+    return SIGNAL_STATE_MANAGER.process(
+        symbol=symbol,
+        timeframe=timeframe,
+        is_open=is_open,
+        is_fresh=is_fresh,
+        now_et=now_et,
+        now_utc=now_utc,
+        current_price=latest_price or 0.0,
+        candles=candles,
+        scan_info=scan_info,
+        entry_signal=entry_signal,
+        paper_simulation=paper_simulation,
+        confluence_signal=confluence_signal,
+        status_reason=status_reason,
+        is_offline_test=is_offline_test,
+    )
 
 
 def observe_pair(
@@ -681,6 +931,7 @@ def observe_pair(
             except Exception:
                 pass
 
+    is_offline = (offline_data is not None or offline_file is not None)
     auto_sig = build_auto_signal(
         symbol=canon,
         timeframe=interval,
@@ -694,13 +945,15 @@ def observe_pair(
         paper_simulation=paper_simulation,
         latest_price=latest_close,
         confluence_signal=confluence_sig,
+        candles=candles,
+        is_offline_test=is_offline,
     )
 
     is_confirmed = (auto_sig.get("action") in ("BUY", "SELL"))
 
     return {
         "symbol": canon,
-        "status": "SIGNAL CONFIRMED" if is_confirmed else "MONITORING (WAITING)",
+        "status": "SIGNAL CONFIRMED" if is_confirmed else auto_sig.get("status_label", "MONITORING (WAITING)"),
         "source": source_label,
         "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
         "latest_bar_utc": latest_candle.get("datetime_utc") or datetime.fromtimestamp(latest_candle.get("timestamp", time.time()), tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),

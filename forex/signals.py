@@ -208,10 +208,10 @@ def evaluate_confluence_signal(
         elif inside_ob.get("type") == "BEARISH_OB":
             bearish_entry_zones.append(f"Bearish Order Block ({inside_ob['bottom']} - {inside_ob['top']})")
     else:
-        # Near Demand / Supply boundary (within 3 pips of the active zone edge)
-        if nearest_demand and (nearest_demand["bottom"] - pip_size * 1.5) <= current_price <= (nearest_demand["top"] + pip_size * 2.5):
+        # Inside Demand / Supply zone boundary (Strict Entry Zone without fuzzy external jitter)
+        if nearest_demand and nearest_demand["bottom"] <= current_price <= nearest_demand["top"]:
             bullish_entry_zones.append(f"Bullish Demand Zone ({nearest_demand['bottom']} - {nearest_demand['top']})")
-        if nearest_supply and (nearest_supply["bottom"] - pip_size * 2.5) <= current_price <= (nearest_supply["top"] + pip_size * 1.5):
+        if nearest_supply and nearest_supply["bottom"] <= current_price <= nearest_supply["top"]:
             bearish_entry_zones.append(f"Bearish Supply Zone ({nearest_supply['bottom']} - {nearest_supply['top']})")
 
     # B. Fair Value Gap (FVG) Entry Zones
