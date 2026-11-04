@@ -31,16 +31,6 @@ INDICATIVE_DISCLAIMER = INDICATIVE_DISCLAIMER_FOREX
 MAJOR_PAIRS = [
     "XAU/USD",
     "BTC/USD",
-    "EUR/USD",
-    "GBP/USD",
-    "USD/JPY",
-    "USD/CHF",
-    "USD/CAD",
-    "AUD/USD",
-    "NZD/USD",
-    "EUR/GBP",
-    "EUR/JPY",
-    "GBP/JPY",
 ]
 
 

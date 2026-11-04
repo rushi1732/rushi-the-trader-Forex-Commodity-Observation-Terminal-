@@ -1688,16 +1688,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <select id="pairSelect" class="pair-select" onchange="onPairChange()">
                     <option value="XAU/USD">XAU/USD (Spot Gold / US Dollar)</option>
                     <option value="BTC/USD">BTC/USD (Bitcoin / US Dollar)</option>
-                    <option value="EUR/USD">EUR/USD (Euro / US Dollar)</option>
-                    <option value="GBP/USD">GBP/USD (British Pound / US Dollar)</option>
-                    <option value="USD/JPY">USD/JPY (US Dollar / Japanese Yen)</option>
-                    <option value="AUD/USD">AUD/USD (Australian Dollar / US Dollar)</option>
-                    <option value="USD/CAD">USD/CAD (US Dollar / Canadian Dollar)</option>
-                    <option value="USD/CHF">USD/CHF (US Dollar / Swiss Franc)</option>
-                    <option value="NZD/USD">NZD/USD (New Zealand Dollar / US Dollar)</option>
-                    <option value="EUR/GBP">EUR/GBP (Euro / British Pound)</option>
-                    <option value="EUR/JPY">EUR/JPY (Euro / Japanese Yen)</option>
-                    <option value="GBP/JPY">GBP/JPY (British Pound / Japanese Yen)</option>
                 </select>
 
                 <button id="btnNotif" class="btn" onclick="toggleNotifications()">
@@ -2527,11 +2517,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let tdWs = null;
         let tdWsReconnectTimer = null;
         let tdWsReconnectAttempts = 0;
-        let tdLiveTick = null;
-        let goldLiveTick = null; // Alias for backward compatibility
+        let tdLiveTicks = {}; // Per-symbol dictionary: { "XAUUSD": tick, "BTCUSD": tick }
+        let tdLiveTick = null; // Current active pair live tick
+        let goldLiveTick = null; // Strictly XAU/USD live tick
         let lastLiveTickTime = 0;
-        let lastGoldTickTime = 0; // Alias
-        let lastServerTickSync = 0;
+        let lastGoldTickTime = 0;
+        let lastServerTickSyncBySym = {};
         let cachedJournal = [];
 
         function initTwelveDataWebSocket() {
@@ -2594,21 +2585,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             provider: 'Twelve Data'
                         };
 
-                        tdLiveTick = tick;
-                        goldLiveTick = tick;
-                        lastLiveTickTime = Date.now();
-                        lastGoldTickTime = Date.now();
+                        const normKey = normalizeSym(tickSym);
+                        tdLiveTicks[normKey] = tick;
 
-                        // Update Calibration modal display if open
-                        const calibRawEl = document.getElementById('calibRawPrice');
-                        if (calibRawEl) calibRawEl.textContent = lastP.toFixed(decimals);
-                        const calibEffEl = document.getElementById('calibEffectivePrice');
-                        if (calibEffEl) calibEffEl.textContent = effLast.toFixed(decimals);
+                        if (isGold) {
+                            goldLiveTick = tick;
+                            lastGoldTickTime = Date.now();
+                        }
+
+                        // Check paper positions & sync tick with backend under its own symbol
+                        checkLivePaperPositions(tick);
 
                         const curSym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
-                        if (normalizeSym(tickSym) === normalizeSym(curSym)) {
+                        if (normKey === normalizeSym(curSym)) {
+                            tdLiveTick = tick;
+                            lastLiveTickTime = Date.now();
+
+                            // Update Calibration modal display if open
+                            const calibRawEl = document.getElementById('calibRawPrice');
+                            if (calibRawEl) calibRawEl.textContent = lastP.toFixed(decimals);
+                            const calibEffEl = document.getElementById('calibEffectivePrice');
+                            if (calibEffEl) calibEffEl.textContent = effLast.toFixed(decimals);
+
                             renderLiveRealtimeTick(tick);
-                            checkLivePaperPositions(tick);
                             checkLiveSignalInvalidation(tick);
                             updateChartWithLiveTick(tick);
                             if (currentObservation) updateStrategyMatrix(currentObservation, tick);
@@ -2643,7 +2642,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function subscribeActiveSymbols() {
             if (!tdWs || tdWs.readyState !== WebSocket.OPEN) return;
             const activeSym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
-            const symbolsList = [activeSym, 'XAU/USD', 'BTC/USD', 'EUR/USD', 'GBP/USD', 'USD/JPY'];
+            const symbolsList = [activeSym, 'XAU/USD', 'BTC/USD'];
             const uniqueSyms = Array.from(new Set(symbolsList)).join(',');
             try {
                 tdWs.send(JSON.stringify({
@@ -2660,7 +2659,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function renderLiveRealtimeTick(tick) {
+            if (!tick || !tick.symbol) return;
             const sym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
+            if (normalizeSym(tick.symbol) !== normalizeSym(sym)) return;
             const isGold = sym.includes('XAU');
             const isBtc = sym.includes('BTC');
             const isJpy = sym.includes('JPY');
@@ -2781,6 +2782,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function onPairChange() {
             const sym = document.getElementById('pairSelect').value;
+            const normSym = normalizeSym(sym);
+            tdLiveTick = tdLiveTicks[normSym] || null;
+            if (tdLiveTick) {
+                renderLiveRealtimeTick(tdLiveTick);
+            }
             subscribeActiveSymbols();
             fetchHealth();
             fetchObservation();
@@ -2802,8 +2808,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const res = await fetch('/api/health?symbol=' + encodeURIComponent(sym));
                 const data = await res.json();
                 document.getElementById('healthTime').textContent = data.system_time_utc || '--';
-                if (!sym.includes('XAU') || !goldLiveTick) {
-                    document.getElementById('healthFeed').textContent = data.status === 'HEALTHY' ? 'Healthy (200 OK)' : 'Degraded';
+                const curLive = tdLiveTicks[normalizeSym(sym)];
+                if (!curLive) {
+                    document.getElementById('healthFeed').textContent = data.status && data.status.includes('HEALTHY') ? 'Healthy (200 OK)' : 'Degraded';
                     document.getElementById('healthSession').textContent = data.active_sessions && data.active_sessions.length ? data.active_sessions.join(', ') : (data.market_open ? 'Open' : 'Closed');
                     document.getElementById('healthBenchmark').textContent = data.futures_benchmark || (sym + ' Indicative');
                     document.getElementById('healthDot').className = 'pulse-dot ' + (data.market_open ? 'green' : 'red');
@@ -2840,16 +2847,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             }
 
-            // Decouple stale polling: if live WebSocket is streaming, preserve live tick data
-            const isLiveStreaming = tdLiveTick && (Date.now() - lastLiveTickTime < 30000);
-            if (isLiveStreaming && normalizeSym(tdLiveTick.symbol) === normalizeSym(sym)) {
-                data.indicative_mid = tdLiveTick.mid;
-                data.indicative_bid = tdLiveTick.bid;
-                data.indicative_ask = tdLiveTick.ask;
-                data.spread_pips = tdLiveTick.spread_pips;
-                data.source = tdLiveTick.offset ? ("Twelve Data Real-Time [Calibrated " + (tdLiveTick.offset >= 0 ? '+' : '') + tdLiveTick.offset.toFixed(2) + "]") : "Twelve Data Real-Time (Retail Spot Feed)";
+            // Decouple stale polling: if live WebSocket is streaming for this symbol, preserve live tick data
+            const normSym = normalizeSym(sym);
+            const activeTick = tdLiveTicks[normSym] || (tdLiveTick && normalizeSym(tdLiveTick.symbol) === normSym ? tdLiveTick : null);
+            const isLiveStreaming = activeTick && (Date.now() - (activeTick.received_at || 0) < 30000);
+            if (isLiveStreaming && activeTick) {
+                data.indicative_mid = activeTick.mid;
+                data.indicative_bid = activeTick.bid;
+                data.indicative_ask = activeTick.ask;
+                data.spread_pips = activeTick.spread_pips;
+                data.source = activeTick.offset ? ("Twelve Data Real-Time [Calibrated " + (activeTick.offset >= 0 ? '+' : '') + activeTick.offset.toFixed(2) + "]") : "Twelve Data Real-Time (Retail Spot Feed)";
                 data.data_freshness = "LIVE (0s ago)";
-                data.timestamp_et = new Date(tdLiveTick.event_time).toLocaleTimeString() + " (Twelve Data WS)";
+                data.timestamp_et = new Date(activeTick.event_time).toLocaleTimeString() + " (Twelve Data WS)";
                 if (data.status === 'NO SIGNAL' && data.reason && (data.reason.includes('closed') || data.reason.includes('stale'))) {
                     data.reason = "Twelve Data Real-Time spot feed active. Direct retail spot prices with zero crypto basis.";
                 }
@@ -2877,7 +2886,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             const mid = data.indicative_mid || data.latest_price;
             // Prevent polling from overwriting live Twelve Data WebSocket streaming price
-            if (!isLiveStreaming || !tdLiveTick) {
+            if (!isLiveStreaming) {
                 if (mid !== undefined && mid !== null) {
                     if (priceMid) priceMid.textContent = Number(mid).toFixed(decimals);
                 } else {
@@ -3023,9 +3032,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
                 if (elEntry) {
                     let entryP = autoSig.entry_reference;
-                    if (isLiveStreaming && tdLiveTick && tdLiveTick.mid) {
-                        if (!entryP || Math.abs(entryP - tdLiveTick.mid) > 10.0) {
-                            entryP = tdLiveTick.mid;
+                    if (isLiveStreaming && activeTick && activeTick.mid && normalizeSym(activeTick.symbol) === normSym) {
+                        if (!entryP || Math.abs(entryP - activeTick.mid) > (isBtc ? 1000.0 : 10.0)) {
+                            entryP = activeTick.mid;
                         }
                     } else if (!entryP && mid) {
                         entryP = mid;
@@ -3034,8 +3043,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
                 const activeEntry = (elEntry && elEntry.textContent !== '--') ? Number(elEntry.textContent) : (mid || 0);
 
+                const stopDist = isBtc ? 200.0 : (decimals === 2 ? 5.0 : 0.0025);
+                const tp1Dist = isBtc ? 400.0 : (decimals === 2 ? 10.0 : 0.0050);
+                const tp2Dist = isBtc ? 700.0 : (decimals === 2 ? 17.5 : 0.0087);
+
                 if (elStop) {
-                    const fallbackStop = action === 'BUY' ? (Number(activeEntry) - (decimals === 2 ? 5.0 : 0.0025)) : (Number(activeEntry) + (decimals === 2 ? 5.0 : 0.0025));
+                    const fallbackStop = action === 'BUY' ? (Number(activeEntry) - stopDist) : (Number(activeEntry) + stopDist);
                     let stopVal = autoSig.stop_loss;
                     if (!stopVal || (action === 'BUY' && stopVal >= activeEntry) || (action === 'SELL' && stopVal <= activeEntry)) {
                         stopVal = confPlan.stop_loss || fallbackStop;
@@ -3047,7 +3060,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     elStop.textContent = (stopVal !== null && stopVal !== undefined) ? Number(stopVal).toFixed(decimals) + diffPips : '--';
                 }
                 if (elTarget) {
-                    const fallbackTp1 = action === 'BUY' ? (Number(activeEntry) + (decimals === 2 ? 10.0 : 0.0050)) : (Number(activeEntry) - (decimals === 2 ? 10.0 : 0.0050));
+                    const fallbackTp1 = action === 'BUY' ? (Number(activeEntry) + tp1Dist) : (Number(activeEntry) - tp1Dist);
                     let tpVal = autoSig.take_profit;
                     if (!tpVal || (action === 'BUY' && tpVal <= activeEntry) || (action === 'SELL' && tpVal >= activeEntry)) {
                         tpVal = confPlan.take_profit_1 || fallbackTp1;
@@ -3058,7 +3071,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     elTarget.textContent = (tpVal !== null && tpVal !== undefined) ? Number(tpVal).toFixed(decimals) : '--';
                 }
                 if (elTarget2) {
-                    const fallbackTp2 = action === 'BUY' ? (Number(activeEntry) + (decimals === 2 ? 17.5 : 0.0087)) : (Number(activeEntry) - (decimals === 2 ? 17.5 : 0.0087));
+                    const fallbackTp2 = action === 'BUY' ? (Number(activeEntry) + tp2Dist) : (Number(activeEntry) - tp2Dist);
                     let tp2Val = autoSig.take_profit_2;
                     if (!tp2Val || (action === 'BUY' && tp2Val <= activeEntry) || (action === 'SELL' && tp2Val >= activeEntry)) {
                         tp2Val = confPlan.take_profit_2 || fallbackTp2;
@@ -3133,7 +3146,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
 
             // Update Strategy Intelligence & Decision Matrix
-            updateStrategyMatrix(data, isLiveStreaming ? goldLiveTick : null);
+            updateStrategyMatrix(data, isLiveStreaming ? activeTick : null);
         }
 
         /* -------------------------------------------------------------
@@ -3894,61 +3907,68 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function checkLivePaperPositions(tick) {
-            if (!cachedJournal || !cachedJournal.length) return;
+            if (!tick || !tick.symbol) return;
+            const tickSym = tick.symbol;
+            const normTickSym = normalizeSym(tickSym);
             let changed = false;
 
-            cachedJournal.forEach(item => {
-                if (item.status !== 'OPEN' || !item.symbol.includes('XAU')) return;
+            if (cachedJournal && cachedJournal.length) {
+                cachedJournal.forEach(item => {
+                    if (item.status !== 'OPEN' || normalizeSym(item.symbol) !== normTickSym) return;
 
-                const side = item.side;
-                const entry = Number(item.simulated_fill);
-                const stop = Number(item.stop_price);
-                const target = Number(item.target_price);
-                const risk = Number(item.risk_usd || 50.0);
+                    const side = item.side;
+                    const entry = Number(item.simulated_fill);
+                    const stop = Number(item.stop_price);
+                    const target = Number(item.target_price);
+                    const risk = Number(item.risk_usd || 50.0);
 
-                if (side === 'BUY') {
-                    if (tick.bid <= stop) {
-                        item.status = 'CLOSED (HIT SL)';
-                        item.exit_price = stop;
-                        item.pnl_usd = -risk;
-                        changed = true;
-                    } else if (tick.bid >= target) {
-                        item.status = 'CLOSED (HIT TP)';
-                        item.exit_price = target;
-                        item.pnl_usd = risk * 2.0;
-                        changed = true;
+                    if (side === 'BUY') {
+                        if (tick.bid <= stop) {
+                            item.status = 'CLOSED (HIT SL)';
+                            item.exit_price = stop;
+                            item.pnl_usd = -risk;
+                            changed = true;
+                        } else if (tick.bid >= target) {
+                            item.status = 'CLOSED (HIT TP)';
+                            item.exit_price = target;
+                            item.pnl_usd = risk * 2.0;
+                            changed = true;
+                        } else {
+                            const distPct = Math.abs(entry - stop) > 0 ? (tick.bid - entry) / Math.abs(entry - stop) : 0;
+                            item.pnl_usd = distPct * risk;
+                        }
                     } else {
-                        const distPct = Math.abs(entry - stop) > 0 ? (tick.bid - entry) / Math.abs(entry - stop) : 0;
-                        item.pnl_usd = distPct * risk;
+                        if (tick.ask >= stop) {
+                            item.status = 'CLOSED (HIT SL)';
+                            item.exit_price = stop;
+                            item.pnl_usd = -risk;
+                            changed = true;
+                        } else if (tick.ask <= target) {
+                            item.status = 'CLOSED (HIT TP)';
+                            item.exit_price = target;
+                            item.pnl_usd = risk * 2.0;
+                            changed = true;
+                        } else {
+                            const distPct = Math.abs(entry - stop) > 0 ? (entry - tick.ask) / Math.abs(entry - stop) : 0;
+                            item.pnl_usd = distPct * risk;
+                        }
                     }
-                } else {
-                    if (tick.ask >= stop) {
-                        item.status = 'CLOSED (HIT SL)';
-                        item.exit_price = stop;
-                        item.pnl_usd = -risk;
-                        changed = true;
-                    } else if (tick.ask <= target) {
-                        item.status = 'CLOSED (HIT TP)';
-                        item.exit_price = target;
-                        item.pnl_usd = risk * 2.0;
-                        changed = true;
-                    } else {
-                        const distPct = Math.abs(entry - stop) > 0 ? (entry - tick.ask) / Math.abs(entry - stop) : 0;
-                        item.pnl_usd = distPct * risk;
-                    }
+                });
+
+                if (changed) {
+                    renderJournalTable(cachedJournal);
                 }
-            });
+            }
 
-            renderJournalTable(cachedJournal);
-
-            // Sync with backend every 2s or immediately on closure
-            if (changed || (Date.now() - lastServerTickSync > 2000)) {
-                lastServerTickSync = Date.now();
+            // Sync with backend every 2s per symbol or immediately on closure
+            const lastSync = lastServerTickSyncBySym[normTickSym] || 0;
+            if (changed || (Date.now() - lastSync > 2000)) {
+                lastServerTickSyncBySym[normTickSym] = Date.now();
                 fetch('/api/tick', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        symbol: 'XAU/USD',
+                        symbol: tickSym,
                         bid: tick.bid,
                         ask: tick.ask,
                         mid: tick.mid,
@@ -3960,6 +3980,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function checkLiveSignalInvalidation(tick) {
+            if (!tick || !tick.symbol) return;
+            const curSym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
+            if (normalizeSym(tick.symbol) !== normalizeSym(curSym)) return;
             if (!currentObservation || !currentObservation.auto_signal) return;
             const sig = currentObservation.auto_signal;
             if (sig.action !== 'BUY' && sig.action !== 'SELL') return;
@@ -4009,9 +4032,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
 
-            // If Gold and live WebSocket tick is active, snap entry to live stream price
-            if (sig.symbol && sig.symbol.includes('XAU') && goldLiveTick) {
-                sig.entry_reference = sig.action === 'BUY' ? goldLiveTick.ask : goldLiveTick.bid;
+            // If live WebSocket tick is active for this signal's symbol, snap entry to live stream price
+            const sigNorm = normalizeSym(sig.symbol);
+            const sigTick = tdLiveTicks[sigNorm];
+            if (sigTick && normalizeSym(sigTick.symbol) === sigNorm) {
+                sig.entry_reference = sig.action === 'BUY' ? sigTick.ask : sigTick.bid;
             }
 
             try {
@@ -4039,9 +4064,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const target = parseFloat(document.getElementById('simTarget').value);
 
             // If live WebSocket stream is active, use live bid/ask if user hasn't overridden
-            if (tdLiveTick && normalizeSym(tdLiveTick.symbol) === normalizeSym(sym)) {
-                if (isNaN(entry) || Math.abs(entry - tdLiveTick.mid) > (sym.includes('BTC') ? 1000 : 50)) {
-                    entry = side === 'BUY' ? tdLiveTick.ask : tdLiveTick.bid;
+            const symNorm = normalizeSym(sym);
+            const curTick = tdLiveTicks[symNorm];
+            if (curTick && normalizeSym(curTick.symbol) === symNorm) {
+                if (isNaN(entry) || Math.abs(entry - curTick.mid) > (sym.includes('BTC') ? 1000 : 50)) {
+                    entry = side === 'BUY' ? curTick.ask : curTick.bid;
                 }
             }
 
@@ -4739,10 +4766,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 live = None
                 if self.OFFLINE_DATA is None:
                     live = LIVE_TICKS.get(canon)
-                    if not live and ("XAU" in canon and "XAU/USD" in LIVE_TICKS):
-                        live = LIVE_TICKS["XAU/USD"]
                     if not live:
                         live = load_cached_live_tick(canon)
+                    if live and normalize_symbol(live.get("symbol", "")) != canon:
+                        live = None
                     if not live or (time.time() - live.get("received_at", 0) >= 60):
                         td_quote = fetch_twelve_data_quote(canon)
                         if td_quote:
@@ -5095,9 +5122,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             active_sessions = get_active_sessions(now_et) if is_open else []
 
             is_live_ws = False
-            if self.OFFLINE_DATA is None and (canon in LIVE_TICKS or ("XAU" in canon and "XAU/USD" in LIVE_TICKS)):
-                live = LIVE_TICKS.get(canon, LIVE_TICKS.get("XAU/USD"))
-                if live and time.time() - live.get("received_at", 0) < 30:
+            if self.OFFLINE_DATA is None and canon in LIVE_TICKS:
+                live = LIVE_TICKS[canon]
+                if live and normalize_symbol(live.get("symbol", "")) == canon and time.time() - live.get("received_at", 0) < 30:
                     is_live_ws = True
                     is_open = True
                     open_reason = "Twelve Data Real-Time direct feed active (Institutional stream)"

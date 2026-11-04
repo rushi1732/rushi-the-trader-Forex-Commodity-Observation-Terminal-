@@ -125,7 +125,8 @@ class TestForexDashboard(unittest.TestCase):
             self.assertEqual(resp.status, 200)
             pairs = json.loads(resp.read().decode("utf-8"))
             self.assertIn("XAU/USD", pairs)
-            self.assertIn("EUR/USD", pairs)
+            self.assertIn("BTC/USD", pairs)
+            self.assertEqual(len(pairs), 2)
 
     def test_api_observe_xau_gold(self):
         """Verify /api/observe for XAU/USD identifies GC=F futures benchmark and paper mode."""
@@ -766,6 +767,51 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("toggleFVG", html)
         self.assertIn("toggleFib", html)
         self.assertIn("toggleLiq", html)
+
+
+    def test_symbol_isolation_and_pair_pruning(self):
+        """Verify only XAU/USD and BTC/USD exist and live ticks never bleed across symbols."""
+        # 1. API pairs is strictly XAU/USD and BTC/USD
+        url_pairs = f"http://127.0.0.1:{self.port}/api/pairs"
+        with urllib.request.urlopen(url_pairs, timeout=5) as resp:
+            pairs = json.loads(resp.read().decode("utf-8"))
+            self.assertEqual(pairs, ["XAU/USD", "BTC/USD"])
+
+        # 2. Main HTML pair select contains only XAU/USD and BTC/USD
+        url_html = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url_html, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        self.assertIn('<option value="XAU/USD">', html)
+        self.assertIn('<option value="BTC/USD">', html)
+        self.assertNotIn('<option value="EUR/USD">', html)
+        self.assertNotIn('<option value="GBP/USD">', html)
+
+        # 3. Post BTC tick and verify XAU does not take BTC price
+        btc_tick = {
+            "symbol": "BTC/USD",
+            "mid": 78549.99,
+            "bid": 78545.0,
+            "ask": 78555.0,
+            "last": 78549.99,
+            "timestamp": int(time.time() * 1000)
+        }
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/tick",
+            data=json.dumps(btc_tick).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+
+        # Query Gold observation and verify BTC price never leaked into Gold
+        url_gold = f"http://127.0.0.1:{self.port}/api/observe?symbol=XAU/USD"
+        with urllib.request.urlopen(url_gold, timeout=5) as resp:
+            gold_obs = json.loads(resp.read().decode("utf-8"))
+        self.assertEqual(gold_obs["symbol"], "XAU/USD")
+        self.assertNotEqual(gold_obs.get("indicative_mid"), 78549.99)
+        auto_sig = gold_obs.get("auto_signal", {})
+        if auto_sig and auto_sig.get("entry_reference"):
+            self.assertNotEqual(auto_sig.get("entry_reference"), 78549.99)
 
 
 if __name__ == "__main__":
