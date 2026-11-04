@@ -4650,7 +4650,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         params = urllib.parse.parse_qs(parsed.query)
 
         # 1. Main Dashboard UI
-        if path == "/" or path == "/index.html":
+        if path in ("/", "/index.html", "/api", "/api/", "/api/index.py", "/api/index"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("X-Paper-Trading-Only", "true")
@@ -5400,4 +5400,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-.
