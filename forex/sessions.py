@@ -108,9 +108,16 @@ def is_gold_futures_market_open(dt_et: datetime) -> Tuple[bool, str]:
     return True, "Market open (CME Globex Gold regular trading)"
 
 
+def is_crypto_market_open(dt_et: datetime) -> Tuple[bool, str]:
+    """Cryptocurrency markets (BTC/USD) trade 24/7/365 with zero weekend or holiday halts."""
+    return True, "Market open (Crypto 24/7/365 continuous trading)"
+
+
 def is_market_open_for_symbol(symbol: str, dt_et: datetime) -> Tuple[bool, str]:
-    """Check market open status respecting asset class (Forex 24/5 vs COMEX Gold Futures)."""
+    """Check market open status respecting asset class (Crypto 24/7 vs Forex 24/5 vs COMEX Gold Futures)."""
     s = symbol.upper()
+    if "BTC" in s or "CRYPTO" in s:
+        return is_crypto_market_open(dt_et)
     if "XAU" in s or "GOLD" in s or "GC=F" in s or s == "GC":
         return is_gold_futures_market_open(dt_et)
     return is_forex_market_open(dt_et)

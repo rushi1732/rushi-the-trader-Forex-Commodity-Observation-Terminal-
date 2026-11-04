@@ -38,14 +38,27 @@ PAIRS: Dict[str, Dict[str, Any]] = {
         "default_spread": 2.5,     # 2.5 pips = $0.25 spread
         "asset_type": "metal",
     },
+
+    # Cryptocurrencies (Spot vs USD)
+    "BTC/USD": {
+        "base": "BTC",
+        "quote": "USD",
+        "pip_size": 1.0,           # 1 pip = $1.00 move in Bitcoin price
+        "decimals": 2,             # 2 decimal places (e.g. 77066.00)
+        "contract_size": 1,        # 1 Bitcoin per standard lot
+        "default_spread": 5.0,     # 5 pips = $5.00 spread typical
+        "asset_type": "crypto",
+    },
 }
 
 
 def normalize_symbol(symbol: str) -> str:
-    """Normalize symbols like 'EURUSD', 'GC=F', 'XAUUSD', 'eur/usd' to canonical format."""
+    """Normalize symbols like 'EURUSD', 'GC=F', 'XAUUSD', 'BTCUSD', 'eur/usd' to canonical format."""
     s = symbol.strip().upper()
     if s in ("GC=F", "GOLD", "XAUUSD", "XAU-USD", "XAU_USD"):
         return "XAU/USD"
+    if s in ("BTCUSD", "BTC-USD", "BTC_USD", "XBT/USD", "XBTUSD", "BITCOIN"):
+        return "BTC/USD"
     if s.endswith("=X"):
         s = s[:-2]
     s = s.replace("-", "/").replace("_", "/")

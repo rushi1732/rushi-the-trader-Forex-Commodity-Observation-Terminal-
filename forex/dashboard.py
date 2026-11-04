@@ -24,8 +24,13 @@ from .sizer import size_position
 from .risk import validate_forex_trade
 from .sessions import is_market_open_for_symbol, get_active_sessions, utc_to_et
 from .observe import observe_pair, format_observation_report
-from .data import INDICATIVE_DISCLAIMER_GOLD, INDICATIVE_DISCLAIMER_FOREX, MAJOR_PAIRS, fetch_chart, fetch_binance_paxg_ticker, fetch_twelve_data_chart
+from .data import INDICATIVE_DISCLAIMER_GOLD, INDICATIVE_DISCLAIMER_FOREX, MAJOR_PAIRS, fetch_chart, fetch_twelve_data_quote, fetch_twelve_data_chart, load_twelve_data_config
 from .backtest import calculate_ema, run_backtest
+from .signals import evaluate_confluence_signal, scan_all_pairs_confluence
+from .smc import analyze_smc
+from .fibonacci import analyze_fibonacci
+from .liquidity import analyze_liquidity
+from .ict import analyze_ict, get_ict_killzone_status
 
 DEFAULT_PORT = 8765
 
@@ -37,7 +42,7 @@ RISK_CONFIG: Dict[str, Any] = {
     "paper": True,
 }
 
-# Twelve Data direct retail spot forex & gold provider configuration
+# Twelve Data direct retail spot forex, crypto & gold provider configuration
 TWELVE_DATA_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "twelvedata_config.json")
 TWELVE_DATA_CONFIG: Dict[str, Any] = {
     "api_key": "73345dbfbdc94360af524b86732676d2",
@@ -51,7 +56,7 @@ if os.path.exists(TWELVE_DATA_CONFIG_PATH):
     except Exception:
         pass
 
-# In-memory live WebSocket tick cache for 24/7 streams (e.g. Binance PAXG/USDT)
+# In-memory live WebSocket tick cache for real-time streams (Twelve Data Real-Time)
 LIVE_TICKS: Dict[str, Dict[str, Any]] = {}
 
 # Spot Gold (XAU/USD) live price calibration / offset settings
@@ -596,7 +601,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forex & Gold Paper Observation Dashboard</title>
+    <title>RUSHI THE TRADER — Forex & Commodity Observation Terminal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -845,6 +850,57 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .badge-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
         .badge-rose { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
         .badge-blue { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.3); }
+        .badge-purple { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+        .badge-cyan { background: rgba(6, 182, 212, 0.15); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.3); }
+        .badge-gold { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
+
+        .legend-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            background: rgba(15, 23, 42, 0.7);
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-subtle);
+            user-select: none;
+            transition: all 0.15s ease;
+        }
+        .legend-toggle:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+        }
+        .legend-toggle input {
+            cursor: pointer;
+            accent-color: var(--accent-blue);
+        }
+
+        .confluence-meter-wrap {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-card);
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--border-subtle);
+            margin-top: 6px;
+        }
+        .confluence-meter-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.4s ease, background 0.4s ease;
+            background: linear-gradient(90deg, #f59e0b, #10b981);
+        }
+
+        .scanner-table th, .scanner-table td {
+            padding: 10px 12px;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .scanner-table tr:hover td {
+            background: rgba(30, 41, 59, 0.5);
+        }
 
         /* Price Hero Section */
         .price-hero {
@@ -1588,6 +1644,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
                 </div>
                 <div>
+                    <div style="font-size: 13px; font-weight: 800; letter-spacing: 0.12em; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
+                        <span>RUSHI THE TRADER</span>
+                        <span style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 700; letter-spacing: 0.05em; color: var(--accent-blue);">PRO</span>
+                    </div>
                     <div class="brand-title">Forex & Commodity Observation Terminal</div>
                     <div class="brand-subtitle">Indicative Feed Monitor & Candle-Close Paper Simulator</div>
                 </div>
@@ -1595,7 +1655,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             <div class="controls-block">
                 <select id="pairSelect" class="pair-select" onchange="onPairChange()">
-                    <option value="XAU/USD">XAU/USD (PAXG 24/7 Spot Gold / COMEX GC=F)</option>
+                    <option value="XAU/USD">XAU/USD (Spot Gold / US Dollar)</option>
+                    <option value="BTC/USD">BTC/USD (Bitcoin / US Dollar)</option>
                     <option value="EUR/USD">EUR/USD (Euro / US Dollar)</option>
                     <option value="GBP/USD">GBP/USD (British Pound / US Dollar)</option>
                     <option value="USD/JPY">USD/JPY (US Dollar / Japanese Yen)</option>
@@ -1618,14 +1679,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     Risk Settings
                 </button>
 
-                <button id="btnTwelveData" class="btn" onclick="openTwelveDataModal()" title="Twelve Data Direct Retail Spot Gold & Forex API" style="border-color:rgba(16,185,129,0.5); color:var(--accent-green); display:inline-flex; align-items:center; gap:6px;">
+                <button id="btnTwelveData" class="btn" onclick="openTwelveDataModal()" title="Twelve Data Direct Retail Spot Gold, Crypto & Forex API" style="border-color:rgba(16,185,129,0.5); color:var(--accent-green); display:inline-flex; align-items:center; gap:6px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                    Twelve Data Spot: <span id="tdStatusLabel" style="font-weight:700;">Connected</span>
-                </button>
-
-                <button id="btnCalibrate" class="btn" onclick="openCalibrateModal()" title="Calibrate Spot Gold to match your Broker/TradingView price" style="border-color:rgba(56,189,248,0.4); color:var(--accent-blue);">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-6M6 20V10M18 20V4"/><circle cx="12" cy="14" r="2"/><circle cx="6" cy="10" r="2"/><circle cx="18" cy="4" r="2"/></svg>
-                    Calibrate Spot (<span id="offsetBadge">0.00</span>)
+                    Twelve Data Real-Time: <span id="tdStatusLabel" style="font-weight:700;">Connected</span>
                 </button>
 
                 <button class="btn" onclick="fetchObservation(); fetchChart();">
@@ -1634,14 +1690,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </button>
             </div>
         </header>
-
-        <!-- Gold Callout -->
-        <div id="goldBanner" class="gold-banner active">
-            <span class="gold-badge" style="background:#10b981;">Futures Benchmark & 24/7 Spot Stream</span>
-            <span id="tdBannerBadge" class="gold-badge" style="background:#059669; cursor:pointer;" onclick="openTwelveDataModal()">Twelve Data API: <span id="tdKeyDisplay">7334...76d2</span> (Spot Active)</span>
-            <span id="goldCalibBadge" class="gold-badge" style="background:#0284c7; cursor:pointer;" onclick="openCalibrateModal()">Spot Calibrated: <span id="goldOffsetDisplay">0.00</span> (<span id="goldBrokerDisplay">Exact Spot</span>)</span>
-            <span><strong>Twelve Data Spot Gold & COMEX Gold Futures (GC=F):</strong> Direct retail Spot Gold rates with zero crypto basis matching TradingView, benchmarked against COMEX Gold Futures (GC=F) & 24/7 Spot Stream — not OTC spot/interbank aggregate feeds.</span>
-        </div>
 
         <!-- Data Health Status Bar -->
         <div class="health-bar">
@@ -1796,8 +1844,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <span id="autoSignalStop" class="meta-v">--</span>
                         </div>
                         <div class="meta-item">
-                            <span class="meta-k">Take Profit (2R)</span>
+                            <span class="meta-k">Take Profit 1 (2R)</span>
                             <span id="autoSignalTarget" class="meta-v">--</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-k">Take Profit 2 (3.5R+)</span>
+                            <span id="autoSignalTarget2" class="meta-v">--</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-k">Confluence Grade</span>
+                            <span id="autoSignalConfluence" class="meta-v">--</span>
                         </div>
                         <div class="meta-item">
                             <span class="meta-k">Reward : Risk</span>
@@ -1869,20 +1925,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- Strategy Decision Matrix & Trade Rationale (का BUY/SELL करायचे? स्ट्रॅटेजी आणि विश्लेषण) -->
+            <!-- Strategy Decision Matrix & Trade Rationale (SMC, ICT, Fibonacci, Session & Liquidity Analysis) -->
             <div class="col-12">
                 <div class="card matrix-card">
                     <div class="card-header">
                         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                             <span class="card-title" style="margin:0; font-size:14px; color:var(--text-primary);">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                                Strategy Intelligence & Trade Decision Matrix (स्ट्रॅटेजी आणि ट्रेड विश्लेषण)
+                                Institutional Strategy Decision Matrix (संस्थात्मक स्ट्रॅटेजी आणि ट्रेड विश्लेषण)
                             </span>
-                            <span id="matrixStrategyBadge" class="badge badge-blue">Session Range Breakout + EMA 9/21 Trend</span>
-                            <span class="badge badge-amber" style="font-size:10px;">Paper Observation Only</span>
+                            <span id="matrixStrategyBadge" class="badge badge-purple">SMC + ICT + Fibonacci + Liquidity Hunt</span>
+                            <span id="matrixConfluenceBadge" class="badge badge-amber">Confluence: 0% [Grade C]</span>
+                            <span class="badge badge-blue" style="font-size:10px;">Paper Observation Only</span>
                         </div>
                         <div style="font-size:11px; color:var(--text-secondary);">
-                            Decision Engine: <strong style="color:var(--text-primary);">100% Rule-Based (No Guesswork)</strong>
+                            Engine: <strong style="color:var(--text-primary);">Smart Money & Institutional Order Flow (Zero Guesswork)</strong>
                         </div>
                     </div>
 
@@ -1893,65 +1950,96 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             MONITORING / WAITING (प्रतीक्षा करा - सेटअप रेंजमध्ये आहे)
                         </div>
                         <div id="matrixDecisionSummary" class="decision-summary-text">
-                            Analyzing candle price structure, session range, and EMA momentum...
+                            Analyzing Market Structure (BOS/CHoCH), Order Blocks, Fair Value Gaps, ICT Killzones, and Liquidity Sweeps...
+                        </div>
+                        <div class="confluence-meter-wrap">
+                            <div id="matrixConfluenceFill" class="confluence-meter-fill" style="width: 25%;"></div>
                         </div>
                     </div>
 
-                    <!-- 4-Pillar Strategy Verification Checklist -->
+                    <!-- 6-Pillar Institutional Strategy Verification Checklist -->
                     <div class="checklist-grid">
-                        <!-- Rule 1: Session & Liquidity -->
-                        <div class="check-card">
-                            <div class="check-card-header">
-                                <span class="check-card-title">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                    1. Session & Volume
-                                </span>
-                                <span id="chkSessionStatus" class="badge badge-green">PASS</span>
-                            </div>
-                            <div id="chkSessionDetail" class="check-card-detail">
-                                24/7 Spot Benchmark Active (High Liquidity)
-                            </div>
-                        </div>
-
-                        <!-- Rule 2: Trend & EMA Alignment -->
+                        <!-- Pillar 1: SMC Market Structure -->
                         <div class="check-card">
                             <div class="check-card-header">
                                 <span class="check-card-title">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-                                    2. EMA 9/21 Trend Filter
+                                    1. SMC Structure (BOS / CHoCH)
                                 </span>
-                                <span id="chkTrendStatus" class="badge badge-green">BULLISH</span>
+                                <span id="chkSmcStatus" class="badge badge-amber"><span id="chkTrendStatus">NEUTRAL</span></span>
                             </div>
-                            <div id="chkTrendDetail" class="check-card-detail">
-                                EMA 9 > EMA 21 confirming upward momentum
+                            <div id="chkSmcDetail" class="check-card-detail">
+                                Higher Highs / Lower Lows fractal tracking
                             </div>
                         </div>
 
-                        <!-- Rule 3: Candle-Close Confirmation -->
+                        <!-- Pillar 2: Order Blocks & FVGs -->
+                        <div class="check-card">
+                            <div class="check-card-header">
+                                <span class="check-card-title">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                                    2. Order Blocks & FVG
+                                </span>
+                                <span id="chkObStatus" class="badge badge-purple"><span id="chkBreakoutStatus">UNMITIGATED</span></span>
+                            </div>
+                            <div id="chkObDetail" class="check-card-detail">
+                                Institutional supply / demand & fair value gaps
+                            </div>
+                        </div>
+
+                        <!-- Pillar 3: ICT Session & Killzones -->
+                        <div class="check-card">
+                            <div class="check-card-header">
+                                <span class="check-card-title">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    3. ICT Killzone & Sessions
+                                </span>
+                                <span id="chkSessionStatus" class="badge badge-blue">SESSION</span>
+                            </div>
+                            <div id="chkSessionDetail" class="check-card-detail">
+                                London / NY Killzone & Silver Bullet timing
+                            </div>
+                        </div>
+
+                        <!-- Pillar 4: Fibonacci & OTE (0.618 - 0.707) -->
+                        <div class="check-card">
+                            <div class="check-card-header">
+                                <span class="check-card-title">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/></svg>
+                                    4. Fibonacci OTE (0.618-0.707)
+                                </span>
+                                <span id="chkFibStatus" class="badge badge-gold">EQUILIBRIUM</span>
+                            </div>
+                            <div id="chkFibDetail" class="check-card-detail">
+                                Discount (<50%) for Buys / Premium (>50%) for Sells
+                            </div>
+                        </div>
+
+                        <!-- Pillar 5: Liquidity & Stop-Loss Hunt -->
+                        <div class="check-card">
+                            <div class="check-card-header">
+                                <span class="check-card-title">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m4.93 19.07 4.24-4.24"/></svg>
+                                    5. Stop-Loss Hunt (Turtle Soup)
+                                </span>
+                                <span id="chkLiqStatus" class="badge badge-cyan">POOLS MAPPED</span>
+                            </div>
+                            <div id="chkLiqDetail" class="check-card-detail">
+                                BSL / SSL sweep detection & stop runs
+                            </div>
+                        </div>
+
+                        <!-- Pillar 6: Multi-Target R:R Capital Protection -->
                         <div class="check-card">
                             <div class="check-card-header">
                                 <span class="check-card-title">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                    3. Bar Close (Wicks Filter)
+                                    6. Multi-Target R:R Plan
                                 </span>
-                                <span id="chkBreakoutStatus" class="badge badge-amber">WAITING</span>
-                            </div>
-                            <div id="chkBreakoutDetail" class="check-card-detail">
-                                Bar close required beyond range (Wicks ignored)
-                            </div>
-                        </div>
-
-                        <!-- Rule 4: 2.0R Capital Protection -->
-                        <div class="check-card">
-                            <div class="check-card-header">
-                                <span class="check-card-title">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
-                                    4. 2.0R Risk / Reward
-                                </span>
-                                <span id="chkRiskStatus" class="badge badge-green">2.0R PLAN</span>
+                                <span id="chkRiskStatus" class="badge badge-green">1:2 & 1:3.5+</span>
                             </div>
                             <div id="chkRiskDetail" class="check-card-detail">
-                                Fixed 1:2 R:R | Strictly $50.00 Max Risk Cap
+                                Invalidation SL beyond sweep/OB | Max $50 risk cap
                             </div>
                         </div>
                     </div>
@@ -1959,52 +2047,58 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <!-- Key Strategy Decision Levels -->
                     <div class="levels-bar">
                         <div class="level-metric">
-                            <span class="level-metric-label">Breakout Resistance (BUY Trigger)</span>
-                            <span id="matrixLevelHigh" class="level-metric-val" style="color:var(--accent-green);">--</span>
+                            <span class="level-metric-label">Demand Order Block (Buy Zone)</span>
+                            <span id="matrixLevelDemand" class="level-metric-val" style="color:var(--accent-green);">--</span>
+                            <span id="matrixLevelLow" style="display:none;">--</span>
                         </div>
                         <div class="level-metric">
-                            <span class="level-metric-label">Breakdown Support (SELL Trigger)</span>
-                            <span id="matrixLevelLow" class="level-metric-val" style="color:var(--accent-rose);">--</span>
+                            <span class="level-metric-label">Supply Order Block (Sell Zone)</span>
+                            <span id="matrixLevelSupply" class="level-metric-val" style="color:var(--accent-rose);">--</span>
+                            <span id="matrixLevelHigh" style="display:none;">--</span>
                         </div>
                         <div class="level-metric">
-                            <span class="level-metric-label">Dynamic Trend EMAs</span>
-                            <span id="matrixLevelEma" class="level-metric-val" style="color:var(--accent-blue); font-size:12px;">--</span>
+                            <span class="level-metric-label">Fibonacci 70.7% OTE Sweet Spot</span>
+                            <span id="matrixLevelOte" class="level-metric-val" style="color:var(--accent-gold); font-size:12px;">--</span>
                         </div>
                         <div class="level-metric">
-                            <span class="level-metric-label">Simulated Risk & Reward</span>
-                            <span id="matrixLevelRR" class="level-metric-val" style="color:var(--accent-amber); font-size:12px;">Risk: $50.00 | 2.0R</span>
+                            <span class="level-metric-label">Liquidity Targets (BSL / SSL)</span>
+                            <span id="matrixLevelLiq" class="level-metric-val" style="color:var(--accent-blue); font-size:12px;">--</span>
+                        </div>
+                        <div class="level-metric">
+                            <span class="level-metric-label">Simulated Multi-Target R:R</span>
+                            <span id="matrixLevelRR" class="level-metric-val" style="color:var(--accent-amber); font-size:12px;">TP1: 2.0R | TP2: 3.5R</span>
                         </div>
                     </div>
 
-                    <!-- Strategy Rules Guide Drawer -->
+                    <!-- Educational Strategy Rules Guide Drawer -->
                     <details style="margin-top:14px; font-size:12px; color:var(--text-secondary); border-top:1px solid var(--border-subtle); padding-top:10px;">
                         <summary style="cursor:pointer; font-weight:600; color:var(--accent-blue); display:flex; align-items:center; gap:6px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                            वापरलेली स्ट्रॅटेजी कशी काम करते? (Detailed Strategy Rules & Explanation)
+                            संस्थात्मक ट्रेडिंग संकल्पना कशा काम करतात? (Detailed SMC, ICT, Fib & Liquidity Rules)
                         </summary>
                         <div style="margin-top:10px; display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; line-height:1.6;">
                             <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
-                                <strong style="color:var(--text-primary);">१. रेंज निश्चित करणे (Range Definition):</strong>
-                                <p style="font-size:11px; margin-top:4px;">मार्केट सुरू झाल्यावर पहिली Asian Session किंवा ठराविक रेंजचा High आणि Low स्वयंचलित मार्क केला जातो.</p>
+                                <strong style="color:var(--text-primary);">१. स्मार्ट मनी संकल्पना (SMC):</strong>
+                                <p style="font-size:11px; margin-top:4px;">मार्केट स्ट्रक्चरमधील <strong>BOS (Break of Structure)</strong> आणि <strong>CHoCH (Change of Character)</strong> ओळखून ट्रेंडची दिशा निश्चित केली जाते. बँक आणि संस्थांचे <strong>Order Blocks</strong> व <strong>Fair Value Gaps (FVG)</strong> शोधून त्यावरच एन्ट्री घेतली जाते.</p>
                             </div>
                             <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
-                                <strong style="color:var(--text-primary);">२. 9/21 EMA ट्रेंड फिल्टर:</strong>
-                                <p style="font-size:11px; margin-top:4px;">9 EMA हा 21 EMA च्या वर असेल तर फक्त BUY ट्रेड्स, आणि खाली असेल तर फक्त SELL ट्रेड्स शोधले जातात.</p>
+                                <strong style="color:var(--text-primary);">२. ICT आणि सेशन स्ट्रॅटेजी (Killzones):</strong>
+                                <p style="font-size:11px; margin-top:4px;">Asian सेशनमध्ये लिक्विडिटी तयार होते. London Open (02:00-05:00 ET) मध्ये <strong>Judas Swing</strong> होतो जो दिशा दाखवतो. New York Open (07:00-10:00 ET) आणि <strong>Silver Bullet</strong> काळात अचूक ब्रेकआऊट होतात.</p>
                             </div>
                             <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
-                                <strong style="color:var(--text-primary);">३. कँडल क्लोज नियम (फेक ब्रेकआउट संरक्षण):</strong>
-                                <p style="font-size:11px; margin-top:4px;">कँडलची फक्त सुई (Wick) बाहेर जाऊन चालत नाही; पूर्ण 5m कँडलची बॉडी लेव्हलच्या बाहेर क्लोज झाल्यावरच सिग्नल मिळतो.</p>
+                                <strong style="color:var(--text-primary);">३. फिबोनॅची ओटे (ICT OTE 61.8% - 70.7%):</strong>
+                                <p style="font-size:11px; margin-top:4px;">इंपल्स मुव्हनंतर किंमत 50% च्या खाली <strong>Discount Zone</strong> मध्ये आल्यावरच BUY, आणि 50% च्या वर <strong>Premium Zone</strong> मध्ये आल्यावरच SELL केले जाते. <strong>70.7% OTE Sweet Spot</strong> हा सर्वात अचूक एन्ट्री पॉईंट असतो.</p>
                             </div>
                             <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
-                                <strong style="color:var(--text-primary);">४. २.०R टार्गेट व भांडवल संरक्षण:</strong>
-                                <p style="font-size:11px; margin-top:4px;">स्टॉप लॉस रेंजच्या मध्यावर असतो आणि टार्गेट जोखमीच्या दुप्पट (2.0R) असते. प्रत्येक ट्रेडवर जास्तीत जास्त $50 चेच नुकसान होते.</p>
+                                <strong style="color:var(--text-primary);">४. लिक्विडिटी आणि स्टॉपलॉस हंट (Turtle Soup):</strong>
+                                <p style="font-size:11px; margin-top:4px;">ऑपरेटर रीटेल ट्रेडर्सचे स्टॉपलॉस उडवण्यासाठी Equal Highs (BSL) किंवा Equal Lows (SSL) च्या पलीकडे फक्त सुई (Wick) नेतात आणि लगेच उलटी कँडल क्लोज करतात. हा फेक ब्रेकआउट (Stop Hunt) ओळखून रिव्हर्सल ट्रेड केला जातो.</p>
                             </div>
                         </div>
                     </details>
                 </div>
             </div>
 
-            <!-- Card 4: Interactive Candlestick Chart (OHLCV + EMAs + Levels + Signal Markers) -->
+            <!-- Card 4: Interactive Candlestick Chart (OHLCV + SMC + FVG + Fib + Liquidity Overlays) -->
             <div class="col-12">
                 <div class="card chart-card">
                     <div class="chart-header">
@@ -2022,24 +2116,91 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             </div>
                         </div>
 
-                        <div class="chart-legend">
-                            <div class="legend-item"><span class="legend-color" style="background:#38bdf8;"></span> EMA 9</div>
-                            <div class="legend-item"><span class="legend-color" style="background:#f59e0b;"></span> EMA 21</div>
-                            <div class="legend-item"><span class="legend-color" style="background:#60a5fa; border-top:1px dashed #60a5fa;"></span> Entry Ref</div>
-                            <div class="legend-item"><span class="legend-color" style="background:#f43f5e; border-top:1px dashed #f43f5e;"></span> Stop Loss</div>
-                            <div class="legend-item"><span class="legend-color" style="background:#10b981; border-top:1px dashed #10b981;"></span> Take Profit (2R)</div>
-                            <button class="btn" style="padding:4px 10px; font-size:11px;" onclick="fetchChart()">Refresh Chart</button>
+                        <!-- Chart Overlays and Toggles -->
+                        <div class="chart-legend" style="flex-wrap:wrap; gap:8px;">
+                            <label class="legend-toggle" title="Toggle Smart Money Concept Order Blocks">
+                                <input type="checkbox" id="toggleSMC" checked onchange="renderCanvasChart()">
+                                <span class="legend-color" style="background:rgba(16,185,129,0.5);"></span> SMC Order Blocks
+                            </label>
+                            <label class="legend-toggle" title="Toggle Fair Value Gaps (FVG)">
+                                <input type="checkbox" id="toggleFVG" checked onchange="renderCanvasChart()">
+                                <span class="legend-color" style="background:rgba(168,85,247,0.5);"></span> FVG Imbalances
+                            </label>
+                            <label class="legend-toggle" title="Toggle Fibonacci Retracements & ICT OTE">
+                                <input type="checkbox" id="toggleFib" checked onchange="renderCanvasChart()">
+                                <span class="legend-color" style="background:#eab308;"></span> Fib / OTE (61.8%-70.7%)
+                            </label>
+                            <label class="legend-toggle" title="Toggle Buy-Side & Sell-Side Liquidity Sweeps">
+                                <input type="checkbox" id="toggleLiq" checked onchange="renderCanvasChart()">
+                                <span class="legend-color" style="background:#ec4899; border-top:1px dashed #ec4899;"></span> Liquidity Sweeps (BSL/SSL)
+                            </label>
+                            <label class="legend-toggle" title="Toggle 9/21 Trend EMAs">
+                                <input type="checkbox" id="toggleEMA" checked onchange="renderCanvasChart()">
+                                <span class="legend-color" style="background:#38bdf8;"></span> EMAs (9/21)
+                            </label>
+                            <button class="btn" style="padding:4px 10px; font-size:11px;" onclick="fetchChart()">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                                Refresh Chart
+                            </button>
                         </div>
                     </div>
 
                     <!-- Live Hover Bar -->
                     <div id="chartStatsBar" class="chart-stats-bar">
-                        Hover over chart candles for precise OHLCV and indicator data
+                        Hover over chart candles for precise OHLCV, indicator data, and institutional zones
                     </div>
 
                     <!-- Canvas Wrapper -->
                     <div class="chart-canvas-wrap">
                         <canvas id="chartCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4b: Multi-Pair Institutional Market Scanner (SMC, ICT, Fib & Stop-Loss Hunt) -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                            <span class="card-title" style="margin:0; font-size:14px;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20"/><path d="M20 12v8H4v-8"/><path d="m4 4 8 8 8-8"/></svg>
+                                Multi-Pair Institutional Market Scanner (सर्व जोड्यांचे लाईव्ह विश्लेषण व स्वयंचलित सिग्नल्स)
+                            </span>
+                            <span class="badge badge-purple">SMC + ICT + Fib + Stop Hunt</span>
+                            <span id="scannerCountBadge" class="badge badge-green">8 Pairs Monitored</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span id="scannerStatusText" style="font-size:11px; color:var(--text-secondary);">Scanning active...</span>
+                            <button class="btn btn-primary" style="padding:4px 12px; font-size:11px;" onclick="fetchScannerSignals()">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                                Scan All Pairs Now
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="max-height: 320px; overflow-y:auto; overflow-x:auto; width:100%; border:1px solid var(--border-subtle); border-radius:6px;">
+                        <table class="journal-table scanner-table" style="font-size:12px; min-width:850px; width:100%;">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Price</th>
+                                    <th>SMC Structure</th>
+                                    <th>Liquidity / Stop Hunt</th>
+                                    <th>Fibonacci / Zone</th>
+                                    <th>Active Killzone</th>
+                                    <th>Confluence Score</th>
+                                    <th>Auto Signal</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scannerTableBody">
+                                <tr>
+                                    <td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted);">
+                                        Loading live institutional multi-pair scan...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -2192,7 +2353,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="disclaimer-box">
                     <strong>LEGAL & SAFETY NOTICE — PAPER OBSERVATION ONLY:</strong><br>
                     1. This software runs strictly in educational observation / paper mode. It contains zero brokerage connector modules, holds no API trading credentials, and possesses no live order routing capabilities.<br>
-                    2. <strong>Commodity Benchmarks:</strong> Gold (XAU/USD) quotes are sourced from COMEX Gold Futures (GC=F) continuous contracts and are not retail spot OTC/interbank feeds.<br>
+                    2. <strong>Futures Benchmark:</strong> Gold (XAU/USD) continuous benchmark based on COMEX Gold Futures (GC=F) & Twelve Data Direct Feed — not OTC spot/interbank aggregate feeds.<br>
                     3. <strong>Indicative Pricing:</strong> All quotes are indicative and bank/exchange approximations for paper analysis. Spreads, execution latency, and slippage in real market conditions differ significantly.
                 </div>
             </div>
@@ -2236,7 +2397,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 Spot Gold (XAU/USD) Price Calibration
             </h3>
             <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px; line-height:1.5;">
-                Crypto-backed PAXG/USDT trades with a slight basis/premium compared to retail spot forex (TradingView, Exness, OANDA, MT4/MT5). Synchronize this terminal to match your broker's exact live price in real time.
+                Retail spot brokers (TradingView, Exness, OANDA, MT4/MT5) may show slight spread variations. Synchronize this terminal to match your broker's exact live price in real time if desired.
             </p>
             <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:6px; padding:12px; margin-bottom:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -2328,136 +2489,150 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let notifiedTrades = new Set();
 
         /* -------------------------------------------------------------
-           Binance WebSocket Client: Uncapped 24/7 Real-Time Gold Stream (PAXG/USDT)
+           Twelve Data Real-Time WebSocket Client (XAU/USD, BTC/USD & Forex)
            ------------------------------------------------------------- */
-        let goldWs = null;
-        let goldWsReconnectTimer = null;
-        let goldWsReconnectAttempts = 0;
-        let goldLiveTick = null;
-        let lastGoldTickTime = 0;
+        let tdApiKey = localStorage.getItem('twelve_data_api_key') || '73345dbfbdc94360af524b86732676d2';
+        let tdEnabled = localStorage.getItem('twelve_data_enabled') !== 'false';
+        let tdWs = null;
+        let tdWsReconnectTimer = null;
+        let tdWsReconnectAttempts = 0;
+        let tdLiveTick = null;
+        let goldLiveTick = null; // Alias for backward compatibility
+        let lastLiveTickTime = 0;
+        let lastGoldTickTime = 0; // Alias
         let lastServerTickSync = 0;
         let cachedJournal = [];
 
-        function initGoldWebSocket() {
-            const sym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
-            if (!sym.includes('XAU')) {
-                if (goldWs) {
-                    try { goldWs.close(); } catch (e) {}
-                    goldWs = null;
-                }
+        function initTwelveDataWebSocket() {
+            if (tdWs && (tdWs.readyState === WebSocket.OPEN || tdWs.readyState === WebSocket.CONNECTING)) {
                 return;
             }
-
-            if (goldWs && (goldWs.readyState === WebSocket.OPEN || goldWs.readyState === WebSocket.CONNECTING)) {
-                return;
+            if (!tdApiKey) {
+                tdApiKey = "73345dbfbdc94360af524b86732676d2";
             }
 
-            const wsUrl = 'wss://stream.binance.com:9443/ws/paxgusdt@ticker';
+            const wsUrl = `wss://ws.twelvedata.com/v1/quotes/price?apikey=${encodeURIComponent(tdApiKey)}`;
             try {
-                goldWs = new WebSocket(wsUrl);
+                tdWs = new WebSocket(wsUrl);
             } catch (err) {
-                console.warn('[WebSocket] Binance init error:', err);
-                scheduleGoldWsReconnect();
+                console.warn('[Twelve Data WS] Init error:', err);
+                scheduleTwelveDataWsReconnect();
                 return;
             }
 
-            goldWs.onopen = function() {
-                console.log('[WebSocket] Connected to Binance PAXG/USDT 24/7 Spot Gold stream');
-                goldWsReconnectAttempts = 0;
+            tdWs.onopen = function() {
+                console.log('[Twelve Data WS] Connected to Twelve Data Real-Time Spot Stream');
+                tdWsReconnectAttempts = 0;
                 const healthFeed = document.getElementById('healthFeed');
-                if (healthFeed) healthFeed.innerHTML = '<span style="color:var(--accent-green)">● Live WS Connected (PAXG/USDT)</span>';
+                if (healthFeed) healthFeed.innerHTML = '<span style="color:var(--accent-green);">● Twelve Data Connected</span>';
+                subscribeActiveSymbols();
             };
 
-            goldWs.onmessage = function(event) {
+            tdWs.onmessage = function(event) {
                 try {
                     const data = JSON.parse(event.data);
-                    console.log("[Binance WS Tick]", data.c);
+                    if (data && (data.price || data.close)) {
+                        const tickSym = data.symbol || (document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD');
+                        const lastP = parseFloat(data.price || data.close);
+                        const isGold = tickSym.includes('XAU');
+                        const isBtc = tickSym.includes('BTC');
+                        const isJpy = tickSym.includes('JPY');
+                        const pipUnit = isGold ? 0.10 : (isBtc ? 1.0 : (isJpy ? 0.01 : 0.0001));
+                        const decimals = (isGold || isBtc) ? 2 : (isJpy ? 2 : 4);
 
-                    // Binance 24hrTicker payload:
-                    // c: Last Price, b: Best Bid, a: Best Ask, E: Event Time
-                    if (data && data.c) {
-                        const rawLast = parseFloat(data.c);
-                        const rawBid = data.b ? parseFloat(data.b) : rawLast;
-                        const rawAsk = data.a ? parseFloat(data.a) : rawLast;
-                        const curOffset = window.goldOffset || 0.0;
-                        const lastPrice = rawLast + curOffset;
-                        const bidPrice = rawBid + curOffset;
-                        const askPrice = rawAsk + curOffset;
-                        const eventTime = data.E || Date.now();
-                        const midPrice = lastPrice; // Directly parse last price from data.c
-                        const spreadPips = Math.max(0, (askPrice - bidPrice) / 0.10);
+                        const curOffset = (isGold && window.goldOffset) ? window.goldOffset : 0.0;
+                        const effLast = lastP + curOffset;
+                        const bidP = data.bid ? (parseFloat(data.bid) + curOffset) : (effLast - pipUnit * 1.5);
+                        const askP = data.ask ? (parseFloat(data.ask) + curOffset) : (effLast + pipUnit * 1.5);
+                        const spreadPips = Math.max(0, (askP - bidP) / pipUnit);
+                        const eventTime = data.timestamp ? (data.timestamp * 1000) : Date.now();
 
-                        // Live modal raw display updater
-                        const calibRawEl = document.getElementById('calibRawPrice');
-                        if (calibRawEl) calibRawEl.textContent = rawLast.toFixed(2);
-                        const calibEffEl = document.getElementById('calibEffectivePrice');
-                        if (calibEffEl) calibEffEl.textContent = lastPrice.toFixed(2);
-
-                        goldLiveTick = {
-                            raw_last: rawLast,
-                            raw_bid: rawBid,
-                            raw_ask: rawAsk,
+                        const tick = {
+                            symbol: tickSym,
+                            raw_last: lastP,
+                            raw_bid: data.bid ? parseFloat(data.bid) : lastP,
+                            raw_ask: data.ask ? parseFloat(data.ask) : lastP,
                             offset: curOffset,
-                            last: lastPrice,
-                            bid: bidPrice,
-                            ask: askPrice,
-                            mid: lastPrice,
+                            last: effLast,
+                            bid: bidP,
+                            ask: askP,
+                            mid: effLast,
                             spread_pips: spreadPips,
                             event_time: eventTime,
-                            received_at: Date.now()
+                            received_at: Date.now(),
+                            provider: 'Twelve Data'
                         };
+
+                        tdLiveTick = tick;
+                        goldLiveTick = tick;
+                        lastLiveTickTime = Date.now();
                         lastGoldTickTime = Date.now();
 
-                        const curSym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
-                        if (curSym.includes('XAU')) {
-                            // Immediately update DOM element for "Indicative Market Price"
-                            const priceMidEl = document.getElementById('priceMid');
-                            if (priceMidEl) {
-                                priceMidEl.textContent = lastPrice.toFixed(2);
-                                priceMidEl.style.transition = 'color 0.15s ease';
-                                priceMidEl.style.color = '#34d399';
-                                setTimeout(() => { if (priceMidEl) priceMidEl.style.color = 'var(--text-primary)'; }, 200);
-                            }
-                            const priceBidEl = document.getElementById('priceBid');
-                            if (priceBidEl) priceBidEl.textContent = bidPrice.toFixed(2);
-                            const priceAskEl = document.getElementById('priceAsk');
-                            if (priceAskEl) priceAskEl.textContent = askPrice.toFixed(2);
+                        // Update Calibration modal display if open
+                        const calibRawEl = document.getElementById('calibRawPrice');
+                        if (calibRawEl) calibRawEl.textContent = lastP.toFixed(decimals);
+                        const calibEffEl = document.getElementById('calibEffectivePrice');
+                        if (calibEffEl) calibEffEl.textContent = effLast.toFixed(decimals);
 
-                            renderLiveGoldTick(goldLiveTick);
-                            checkLivePaperPositions(goldLiveTick);
-                            updateChartWithLiveTick(goldLiveTick);
-                            if (currentObservation) updateStrategyMatrix(currentObservation, goldLiveTick);
+                        const curSym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
+                        if (normalizeSym(tickSym) === normalizeSym(curSym)) {
+                            renderLiveRealtimeTick(tick);
+                            checkLivePaperPositions(tick);
+                            updateChartWithLiveTick(tick);
+                            if (currentObservation) updateStrategyMatrix(currentObservation, tick);
                         }
                     }
                 } catch (e) {
-                    console.error('[WebSocket] Error parsing PAXG tick:', e);
+                    console.error('[Twelve Data WS] Parse error:', e);
                 }
             };
 
-            goldWs.onerror = function(err) {
-                console.warn('[WebSocket] Error in PAXG/USDT stream:', err);
-                scheduleGoldWsReconnect();
+            tdWs.onerror = function(err) {
+                console.warn('[Twelve Data WS] Stream error:', err);
+                scheduleTwelveDataWsReconnect();
             };
 
-            goldWs.onclose = function() {
-                console.log('[WebSocket] PAXG/USDT stream closed, scheduling reconnect...');
-                scheduleGoldWsReconnect();
+            tdWs.onclose = function() {
+                console.log('[Twelve Data WS] Connection closed, scheduling reconnect...');
+                scheduleTwelveDataWsReconnect();
             };
         }
 
-        function scheduleGoldWsReconnect() {
-            if (goldWsReconnectTimer) return;
-            const delay = Math.min(10000, 1000 * Math.pow(1.5, goldWsReconnectAttempts));
-            goldWsReconnectAttempts++;
-            goldWsReconnectTimer = setTimeout(() => {
-                goldWsReconnectTimer = null;
-                initGoldWebSocket();
+        function scheduleTwelveDataWsReconnect() {
+            if (tdWsReconnectTimer) return;
+            const delay = Math.min(10000, 1000 * Math.pow(1.5, tdWsReconnectAttempts));
+            tdWsReconnectAttempts++;
+            tdWsReconnectTimer = setTimeout(() => {
+                tdWsReconnectTimer = null;
+                initTwelveDataWebSocket();
             }, delay);
         }
 
-        function renderLiveGoldTick(tick) {
+        function subscribeActiveSymbols() {
+            if (!tdWs || tdWs.readyState !== WebSocket.OPEN) return;
+            const activeSym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
+            const symbolsList = [activeSym, 'XAU/USD', 'BTC/USD', 'EUR/USD', 'GBP/USD', 'USD/JPY'];
+            const uniqueSyms = Array.from(new Set(symbolsList)).join(',');
+            try {
+                tdWs.send(JSON.stringify({
+                    action: 'subscribe',
+                    params: {
+                        symbols: uniqueSyms
+                    }
+                }));
+            } catch (e) {}
+        }
+
+        function normalizeSym(s) {
+            return (s || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+        }
+
+        function renderLiveRealtimeTick(tick) {
             const sym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
-            if (!sym.includes('XAU')) return;
+            const isGold = sym.includes('XAU');
+            const isBtc = sym.includes('BTC');
+            const isJpy = sym.includes('JPY');
+            const decimals = (isGold || isBtc) ? 2 : (isJpy ? 2 : 4);
 
             const priceMid = document.getElementById('priceMid');
             const priceBid = document.getElementById('priceBid');
@@ -2473,21 +2648,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const signalBadge = document.getElementById('signalBadge');
 
             if (priceMid) {
-                priceMid.textContent = tick.last.toFixed(2);
+                priceMid.textContent = tick.last.toFixed(decimals);
+                priceMid.style.transition = 'color 0.15s ease';
+                priceMid.style.color = '#34d399';
+                setTimeout(() => { if (priceMid) priceMid.style.color = 'var(--text-primary)'; }, 200);
             }
-            if (priceBid) priceBid.textContent = tick.bid.toFixed(2);
-            if (priceAsk) priceAsk.textContent = tick.ask.toFixed(2);
+            if (priceBid) priceBid.textContent = tick.bid.toFixed(decimals);
+            if (priceAsk) priceAsk.textContent = tick.ask.toFixed(decimals);
 
-            if (spreadDisplay) spreadDisplay.textContent = tick.spread_pips.toFixed(1) + ' pips ($' + (tick.ask - tick.bid).toFixed(2) + ')';
+            if (spreadDisplay) {
+                const diffUsd = Math.abs(tick.ask - tick.bid);
+                spreadDisplay.textContent = tick.spread_pips.toFixed(1) + ' pips ($' + diffUsd.toFixed(decimals) + ')';
+            }
             if (sourceDisplay) {
                 if (tick.offset) {
-                    sourceDisplay.textContent = 'Binance WebSocket (PAXG) [Calibrated ' + (tick.offset >= 0 ? '+' : '') + tick.offset.toFixed(2) + ']';
+                    sourceDisplay.textContent = 'Twelve Data Real-Time [Calibrated ' + (tick.offset >= 0 ? '+' : '') + tick.offset.toFixed(2) + ']';
                 } else {
-                    sourceDisplay.textContent = 'Binance WebSocket (PAXG/USDT Stream)';
+                    sourceDisplay.textContent = 'Twelve Data Real-Time (Retail Spot Feed)';
                 }
             }
             if (freshnessDisplay) freshnessDisplay.innerHTML = '<span style="color:var(--accent-green); font-weight:700;">● LIVE (0s ago)</span>';
-            if (timeDisplay) timeDisplay.textContent = new Date(tick.event_time).toLocaleTimeString() + ' (Live WS)';
+            if (timeDisplay) timeDisplay.textContent = new Date(tick.event_time).toLocaleTimeString() + ' (Twelve Data WS)';
 
             const off = tick.offset || window.goldOffset || 0.0;
             const offStr = (off >= 0 ? '+' : '') + off.toFixed(2);
@@ -2500,11 +2681,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             if (marketBadge) {
                 marketBadge.className = 'badge badge-green';
-                marketBadge.textContent = 'LIVE / ACTIVE (24/7 Benchmark)';
+                marketBadge.textContent = 'LIVE / ACTIVE (Twelve Data Spot)';
             }
             if (statusBox) statusBox.className = 'status-box active';
-            if (statusHeading) statusHeading.innerHTML = '<span class="pulse-dot green"></span> LIVE / ACTIVE (24/7 Benchmark)';
-            if (statusDesc) statusDesc.textContent = 'Binance PAXG/USDT 24/7 real-time feed active. Tracks 1 oz spot gold 1:1 against USD with zero rate limits or weekend halts.';
+            if (statusHeading) statusHeading.innerHTML = '<span class="pulse-dot green"></span> LIVE / ACTIVE (Twelve Data Spot Feed)';
+            if (statusDesc) statusDesc.textContent = 'Twelve Data Real-Time spot broker feed active. Direct retail spot prices with zero crypto basis.';
             if (signalBadge && (signalBadge.textContent === 'MARKET CLOSED' || signalBadge.textContent === 'STALE')) {
                 signalBadge.className = 'badge badge-blue';
                 signalBadge.textContent = 'MONITORING';
@@ -2515,25 +2696,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const healthSession = document.getElementById('healthSession');
             const healthBenchmark = document.getElementById('healthBenchmark');
             if (healthDot) healthDot.className = 'pulse-dot green';
-            if (healthFeed) healthFeed.innerHTML = '<span style="color:var(--accent-green);">● WebSocket Connected (PAXG/USDT)</span>';
-            if (healthSession) healthSession.textContent = '24/7 Spot Benchmark';
-            if (healthBenchmark) healthBenchmark.textContent = 'Binance PAXG/USDT (1 oz Spot Gold Stream)';
+            if (healthFeed) healthFeed.innerHTML = '<span style="color:var(--accent-green);">● Twelve Data Connected (Real-Time)</span>';
+            if (healthSession) healthSession.textContent = (isGold || isBtc) ? '24/7 Spot Benchmark' : 'Open (London/NY Session)';
+            if (healthBenchmark) healthBenchmark.textContent = 'Twelve Data Real-Time (Institutional Spot)';
 
             const simEntry = document.getElementById('simEntry');
             if (simEntry && !simEntry.value) {
-                simEntry.value = tick.mid.toFixed(2);
+                simEntry.value = tick.mid.toFixed(decimals);
                 const simStop = document.getElementById('simStop');
                 const simTarget = document.getElementById('simTarget');
-                if (simStop && !simStop.value) simStop.value = (tick.mid - 5.0).toFixed(2);
-                if (simTarget && !simTarget.value) simTarget.value = (tick.mid + 10.0).toFixed(2);
+                const offsetP = isGold ? 5.0 : (isBtc ? 200.0 : 0.0020);
+                if (simStop && !simStop.value) simStop.value = (tick.mid - offsetP).toFixed(decimals);
+                if (simTarget && !simTarget.value) simTarget.value = (tick.mid + (offsetP * 2)).toFixed(decimals);
                 recalcSimulation();
+            }
+
+            // Live update of entry reference in Automatic Signal Engine if monitoring
+            const autoAction = document.getElementById('autoSignalAction');
+            if (autoAction && autoAction.textContent.includes('MONITORING')) {
+                const autoEntry = document.getElementById('autoSignalEntry');
+                if (autoEntry) autoEntry.textContent = tick.mid.toFixed(decimals);
             }
         }
 
+        // Backward compatibility alias
+        function renderLiveGoldTick(tick) {
+            renderLiveRealtimeTick(tick);
+        }
+
         function updateFreshnessLabel() {
-            const sym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
-            if (sym.includes('XAU') && goldLiveTick && lastGoldTickTime > 0) {
-                const elapsedSec = Math.floor((Date.now() - lastGoldTickTime) / 1000);
+            if (lastLiveTickTime > 0) {
+                const elapsedSec = Math.floor((Date.now() - lastLiveTickTime) / 1000);
                 const el = document.getElementById('freshnessDisplay');
                 if (el) {
                     if (elapsedSec <= 1) {
@@ -2547,6 +2740,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function updateChartWithLiveTick(tick) {
             if (!currentChartData || !currentChartData.candles || !currentChartData.candles.length) return;
+            const curSym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : '';
+            if (normalizeSym(tick.symbol) !== normalizeSym(currentChartData.symbol) || normalizeSym(tick.symbol) !== normalizeSym(curSym)) return;
+
             const candles = currentChartData.candles;
             const lastCandle = candles[candles.length - 1];
             if (!lastCandle) return;
@@ -2560,26 +2756,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function onPairChange() {
             const sym = document.getElementById('pairSelect').value;
-            const isGold = sym.includes('XAU');
-            const goldBanner = document.getElementById('goldBanner');
-            if (isGold) {
-                goldBanner.classList.add('active');
-                if (!goldLiveTick) {
-                    const priceMid = document.getElementById('priceMid');
-                    const priceBid = document.getElementById('priceBid');
-                    const priceAsk = document.getElementById('priceAsk');
-                    if (priceMid) priceMid.textContent = 'Connecting...';
-                    if (priceBid) priceBid.textContent = 'Connecting...';
-                    if (priceAsk) priceAsk.textContent = 'Connecting...';
-                }
-                initGoldWebSocket();
-            } else {
-                goldBanner.classList.remove('active');
-                if (goldWs) {
-                    try { goldWs.close(); } catch (e) {}
-                    goldWs = null;
-                }
-            }
+            subscribeActiveSymbols();
+            fetchHealth();
             fetchObservation();
             fetchChart();
         }
@@ -2627,26 +2805,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const sym = data.symbol || '';
             const isGold = sym.includes('XAU');
 
-            // Top Gold banner
+            // Top Gold banner (if present)
             const goldBanner = document.getElementById('goldBanner');
-            if (isGold) {
-                goldBanner.classList.add('active');
-            } else {
-                goldBanner.classList.remove('active');
+            if (goldBanner) {
+                if (isGold) {
+                    goldBanner.classList.add('active');
+                } else {
+                    goldBanner.classList.remove('active');
+                }
             }
 
             // Decouple stale polling: if live WebSocket is streaming, preserve live tick data
-            const isLiveStreaming = isGold && goldLiveTick && (Date.now() - lastGoldTickTime < 30000);
-            if (isLiveStreaming) {
-                data.indicative_mid = goldLiveTick.mid;
-                data.indicative_bid = goldLiveTick.bid;
-                data.indicative_ask = goldLiveTick.ask;
-                data.spread_pips = goldLiveTick.spread_pips;
-                data.source = goldLiveTick.offset ? ("Binance WebSocket (PAXG) [Calibrated " + (goldLiveTick.offset >= 0 ? '+' : '') + goldLiveTick.offset.toFixed(2) + "]") : "Binance WebSocket (PAXG/USDT Stream)";
+            const isLiveStreaming = tdLiveTick && (Date.now() - lastLiveTickTime < 30000);
+            if (isLiveStreaming && normalizeSym(tdLiveTick.symbol) === normalizeSym(sym)) {
+                data.indicative_mid = tdLiveTick.mid;
+                data.indicative_bid = tdLiveTick.bid;
+                data.indicative_ask = tdLiveTick.ask;
+                data.spread_pips = tdLiveTick.spread_pips;
+                data.source = tdLiveTick.offset ? ("Twelve Data Real-Time [Calibrated " + (tdLiveTick.offset >= 0 ? '+' : '') + tdLiveTick.offset.toFixed(2) + "]") : "Twelve Data Real-Time (Retail Spot Feed)";
                 data.data_freshness = "LIVE (0s ago)";
-                data.timestamp_et = new Date(goldLiveTick.event_time).toLocaleTimeString() + " (Live WS)";
+                data.timestamp_et = new Date(tdLiveTick.event_time).toLocaleTimeString() + " (Twelve Data WS)";
                 if (data.status === 'NO SIGNAL' && data.reason && (data.reason.includes('closed') || data.reason.includes('stale'))) {
-                    data.reason = "Binance PAXG/USDT 24/7 stream active. Uncapped 1 oz spot gold benchmark.";
+                    data.reason = "Twelve Data Real-Time spot feed active. Direct retail spot prices with zero crypto basis.";
                 }
             } else if (isGold && window.goldOffset && !data.calibrated_offset) {
                 const off = window.goldOffset;
@@ -2665,42 +2845,31 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const priceBid = document.getElementById('priceBid');
             const priceAsk = document.getElementById('priceAsk');
 
-            const decimals = isGold ? 2 : 4;
+            const isBtc = sym.includes('BTC');
+            const isJpy = sym.includes('JPY');
+            const decimals = (isGold || isBtc) ? 2 : (isJpy ? 2 : 4);
 
-            if (isGold) {
-                // Exclusively bound to Binance PAXG/USDT stream - zero lingering GC=F price
-                if (goldLiveTick) {
-                    if (priceMid) priceMid.textContent = goldLiveTick.last.toFixed(2);
-                    if (priceBid) priceBid.textContent = goldLiveTick.bid.toFixed(2);
-                    if (priceAsk) priceAsk.textContent = goldLiveTick.ask.toFixed(2);
-                } else {
-                    if (priceMid) priceMid.textContent = 'Connecting...';
-                    if (priceBid) priceBid.textContent = 'Connecting...';
-                    if (priceAsk) priceAsk.textContent = 'Connecting...';
-                }
+            const mid = data.indicative_mid || data.latest_price;
+            if (mid !== undefined && mid !== null) {
+                if (priceMid) priceMid.textContent = Number(mid).toFixed(decimals);
             } else {
-                const mid = data.indicative_mid || data.latest_price;
-                if (mid !== undefined && mid !== null) {
-                    priceMid.textContent = Number(mid).toFixed(decimals);
-                } else {
-                    priceMid.textContent = '--.----';
-                }
+                if (priceMid) priceMid.textContent = '--.----';
+            }
 
-                if (data.indicative_bid !== undefined && data.indicative_bid !== null) {
-                    priceBid.textContent = Number(data.indicative_bid).toFixed(decimals + 1);
-                    priceAsk.textContent = Number(data.indicative_ask).toFixed(decimals + 1);
-                } else if (mid !== undefined && mid !== null) {
-                    priceBid.textContent = Number(mid).toFixed(decimals);
-                    priceAsk.textContent = Number(mid).toFixed(decimals);
-                } else {
-                    priceBid.textContent = '--.----';
-                    priceAsk.textContent = '--.----';
-                }
+            if (data.indicative_bid !== undefined && data.indicative_bid !== null) {
+                if (priceBid) priceBid.textContent = Number(data.indicative_bid).toFixed(decimals);
+                if (priceAsk) priceAsk.textContent = Number(data.indicative_ask).toFixed(decimals);
+            } else if (mid !== undefined && mid !== null) {
+                if (priceBid) priceBid.textContent = Number(mid).toFixed(decimals);
+                if (priceAsk) priceAsk.textContent = Number(mid).toFixed(decimals);
+            } else {
+                if (priceBid) priceBid.textContent = '--.----';
+                if (priceAsk) priceAsk.textContent = '--.----';
             }
 
             // Meta List
             document.getElementById('spreadDisplay').textContent = (data.spread_pips !== undefined && data.spread_pips !== null) ? (Number(data.spread_pips).toFixed(1) + ' pips') : 'N/A';
-            document.getElementById('sourceDisplay').textContent = data.source || 'Yahoo Finance';
+            document.getElementById('sourceDisplay').textContent = data.source || 'Twelve Data Real-Time';
             if (isLiveStreaming) {
                 document.getElementById('freshnessDisplay').innerHTML = '<span style="color:var(--accent-green); font-weight:700;">● LIVE (0s ago)</span>';
             } else {
@@ -2720,10 +2889,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             if (isLiveStreaming) {
                 statusBox.className = 'status-box active';
-                statusHeading.innerHTML = '<span class="pulse-dot green"></span> LIVE / ACTIVE (24/7 Benchmark)';
-                statusDesc.textContent = 'Binance PAXG/USDT 24/7 real-time feed active. Tracks 1 oz spot gold 1:1 against USD with zero rate limits or weekend halts.';
+                statusHeading.innerHTML = '<span class="pulse-dot green"></span> LIVE / ACTIVE (Twelve Data Spot Feed)';
+                statusDesc.textContent = 'Twelve Data Real-Time spot broker feed active. Direct retail spot prices with zero crypto basis.';
                 marketBadge.className = 'badge badge-green';
-                marketBadge.textContent = 'LIVE / ACTIVE (24/7 Benchmark)';
+                marketBadge.textContent = 'LIVE / ACTIVE (Twelve Data)';
                 if (signalBadge.textContent === 'MARKET CLOSED' || signalBadge.textContent === 'STALE') {
                     signalBadge.className = 'badge badge-blue';
                     signalBadge.textContent = 'MONITORING';
@@ -2758,69 +2927,135 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 signalBadge.className = 'badge badge-blue';
             }
 
-            if (isLiveStreaming) {
-                document.getElementById('sessionsDisplay').textContent = '24/7 Spot Benchmark';
+            if (isLiveStreaming || isGold || isBtc) {
+                document.getElementById('sessionsDisplay').textContent = (isGold || isBtc) ? '24/7 Spot Benchmark' : 'Open (London/NY Session)';
             } else {
                 document.getElementById('sessionsDisplay').textContent = (data.active_sessions && data.active_sessions.length > 0) ? data.active_sessions.join(', ') : 'None (Closed)';
             }
             document.getElementById('biasDisplay').textContent = data.direction || 'NEUTRAL';
 
-            // Automatic Signal Generation Engine Mapping
+            // Automatic Signal Generation Engine Mapping (Synced with Institutional Strategy Matrix)
             const autoSig = data.auto_signal || {};
+            const confSig = data.confluence_signal || {};
+            const confPlan = (confSig && confSig.execution_plan) ? confSig.execution_plan : {};
             const autoBadge = document.getElementById('autoSignalBadge');
             const autoHero = document.getElementById('autoSignalHero');
             const autoAction = document.getElementById('autoSignalAction');
             const autoReason = document.getElementById('autoSignalReason');
             const btnLogSignal = document.getElementById('btnLogAutoSignal');
 
-            const action = autoSig.action || 'NO SIGNAL';
-            if (autoBadge) autoBadge.textContent = action;
-            if (autoAction) autoAction.textContent = action;
-            let displayReason = autoSig.reason || data.reason || 'Checking market schedule and candle status.';
-            if (isLiveStreaming && displayReason.includes('closed')) {
-                displayReason = "Binance PAXG/USDT 24/7 live benchmark active. Monitoring candle-close setups.";
+            let action = autoSig.action || 'NO SIGNAL';
+            if (action === 'NO SIGNAL' && confSig.action && confSig.action !== 'NEUTRAL') {
+                action = confSig.action;
+            }
+
+            const cScore = confSig.confluence_score !== undefined ? confSig.confluence_score : (autoSig.confluence_score || 0);
+            const cGrade = confSig.grade || autoSig.grade || 'Grade C';
+
+            if (autoBadge) {
+                if (action === 'BUY') {
+                    autoBadge.textContent = 'BUY (सक्रिय)';
+                    autoBadge.className = 'badge badge-green';
+                } else if (action === 'SELL') {
+                    autoBadge.textContent = 'SELL (सक्रिय)';
+                    autoBadge.className = 'badge badge-rose';
+                } else {
+                    autoBadge.textContent = 'NO SIGNAL';
+                    autoBadge.className = 'badge badge-amber';
+                }
+            }
+
+            if (autoAction) {
+                if (action === 'BUY') {
+                    autoAction.textContent = 'BUY CONFIRMED';
+                } else if (action === 'SELL') {
+                    autoAction.textContent = 'SELL CONFIRMED';
+                } else {
+                    autoAction.textContent = 'NO SIGNAL';
+                }
+            }
+
+            let displayReason = autoSig.reason || data.reason || '';
+            const factors = confSig.confluence_factors || autoSig.confluence_factors || [];
+            if (!displayReason || displayReason.includes('schedule') || displayReason.includes('freshness')) {
+                if (factors.length) {
+                    displayReason = factors.slice(0, 2).join(' | ');
+                } else {
+                    displayReason = "Price is not in a valid entry zone. Monitoring for Order Block, FVG, OTE, or Breakout level.";
+                }
             }
             if (autoReason) autoReason.textContent = displayReason;
 
             if (autoHero && btnLogSignal) {
                 if (action === 'BUY') {
                     autoHero.className = 'signal-hero buy';
-                    if (autoBadge) autoBadge.className = 'badge badge-green';
                     btnLogSignal.disabled = false;
                     btnLogSignal.textContent = 'Log BUY Signal to Paper Journal';
                     btnLogSignal.style.background = 'var(--accent-green)';
+                    btnLogSignal.style.border = 'none';
+                    btnLogSignal.style.color = '#ffffff';
                     btnLogSignal.style.cursor = 'pointer';
                 } else if (action === 'SELL') {
                     autoHero.className = 'signal-hero sell';
-                    if (autoBadge) autoBadge.className = 'badge badge-rose';
                     btnLogSignal.disabled = false;
                     btnLogSignal.textContent = 'Log SELL Signal to Paper Journal';
                     btnLogSignal.style.background = 'var(--accent-rose)';
+                    btnLogSignal.style.border = 'none';
+                    btnLogSignal.style.color = '#ffffff';
                     btnLogSignal.style.cursor = 'pointer';
                 } else {
                     autoHero.className = 'signal-hero no-signal';
-                    if (autoBadge) autoBadge.className = 'badge badge-amber';
                     btnLogSignal.disabled = true;
-                    btnLogSignal.textContent = 'No Confirmed Signal to Log';
-                    btnLogSignal.style.background = 'var(--text-muted)';
-                    btnLogSignal.style.cursor = 'not-allowed';
+                    btnLogSignal.textContent = 'No Signal (Price Outside Entry Zone)';
+                    btnLogSignal.style.background = 'rgba(245, 158, 11, 0.15)';
+                    btnLogSignal.style.border = '1px dashed #f59e0b';
+                    btnLogSignal.style.color = '#fbbf24';
+                    btnLogSignal.style.cursor = 'default';
                 }
             }
 
             const elStrategy = document.getElementById('autoSignalStrategy');
-            if (elStrategy) elStrategy.textContent = autoSig.strategy || 'trader-scanner + trader-entry';
+            if (elStrategy) elStrategy.textContent = autoSig.strategy || 'SMC / ICT Institutional Confluence Engine';
+            
             const elTf = document.getElementById('autoSignalTimeframe');
             if (elTf) elTf.textContent = autoSig.timeframe || currentInterval;
+
+            const entryVal = autoSig.entry_reference || confPlan.entry_price || mid || 0;
             const elEntry = document.getElementById('autoSignalEntry');
-            if (elEntry) elEntry.textContent = (autoSig.entry_reference !== null && autoSig.entry_reference !== undefined) ? Number(autoSig.entry_reference).toFixed(decimals) : '--';
+            if (elEntry) elEntry.textContent = entryVal ? Number(entryVal).toFixed(decimals) : '--';
+
+            const stopVal = autoSig.stop_loss || confPlan.stop_loss;
             const elStop = document.getElementById('autoSignalStop');
-            if (elStop) elStop.textContent = (autoSig.stop_loss !== null && autoSig.stop_loss !== undefined) ? Number(autoSig.stop_loss).toFixed(decimals) : '--';
+            if (elStop) {
+                if (stopVal) {
+                    const diffPips = confPlan.risk_pips ? ` (${confPlan.risk_pips} pips)` : '';
+                    elStop.textContent = Number(stopVal).toFixed(decimals) + diffPips;
+                } else {
+                    elStop.textContent = '--';
+                }
+            }
+
+            const tpVal = autoSig.take_profit || confPlan.take_profit_1;
             const elTarget = document.getElementById('autoSignalTarget');
-            if (elTarget) elTarget.textContent = (autoSig.take_profit !== null && autoSig.take_profit !== undefined) ? Number(autoSig.take_profit).toFixed(decimals) : '--';
+            if (elTarget) elTarget.textContent = tpVal ? Number(tpVal).toFixed(decimals) : '--';
+
+            const tp2Val = autoSig.take_profit_2 || confPlan.take_profit_2;
+            const elTarget2 = document.getElementById('autoSignalTarget2');
+            if (elTarget2) elTarget2.textContent = tp2Val ? Number(tp2Val).toFixed(decimals) : '--';
+
+            const elConf = document.getElementById('autoSignalConfluence');
+            if (elConf) {
+                const col = cScore >= 70 ? 'var(--accent-green)' : (cScore >= 50 ? 'var(--accent-blue)' : (cScore >= 35 ? 'var(--accent-amber)' : 'var(--accent-rose)'));
+                elConf.innerHTML = `<span style="font-weight:700; color:${col};">${cScore}% [${cGrade}]</span>`;
+            }
+
             const elRR = document.getElementById('autoSignalRR');
-            if (elRR) elRR.textContent = autoSig.reward_risk ? (autoSig.reward_risk + ':1 (2R)') : '--';
+            const rr1 = autoSig.reward_risk || confPlan.rr_ratio_tp1 || 2.0;
+            const rr2 = autoSig.reward_risk_tp2 || confPlan.rr_ratio_tp2 || 3.5;
+            if (elRR) elRR.textContent = `${rr1}:1 (TP1) / ${rr2}:1 (TP2)`;
+
             const elTime = document.getElementById('autoSignalTime');
-            if (elTime) elTime.textContent = autoSig.timestamp_et || autoSig.timestamp_utc || data.timestamp_et || '--';
+            if (elTime) elTime.textContent = autoSig.timestamp_et || autoSig.timestamp_utc || data.timestamp_et || new Date().toLocaleTimeString();
 
             // Auto-fill simulator defaults if empty
             if (mid && !document.getElementById('simEntry').value) {
@@ -2836,7 +3071,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         /* -------------------------------------------------------------
-           Strategy Intelligence & Trade Decision Matrix Engine
+           Institutional Strategy Intelligence & Trade Decision Matrix Engine
            ------------------------------------------------------------- */
         function updateStrategyMatrix(data, liveTick) {
             if (!data) return;
@@ -2845,37 +3080,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const decimals = isGold ? 2 : 4;
             const curPrice = (liveTick && liveTick.last) ? liveTick.last : (data.indicative_mid || data.latest_price || 0);
             const autoSig = data.auto_signal || {};
+            const confSig = data.confluence_signal || {};
             const action = autoSig.action || 'NO SIGNAL';
-            const entryEval = data.entry_eval || {};
-            const asianRange = data.asian_range || {};
-            const off = window.goldOffset || 0.0;
+            const smc = data.smc || (confSig.components && confSig.components.smc) || {};
+            const fib = data.fibonacci || (confSig.components && confSig.components.fibonacci) || {};
+            const liq = data.liquidity || (confSig.components && confSig.components.liquidity) || {};
+            const ict = data.ict || (confSig.components && confSig.components.ict) || {};
+            const score = confSig.confluence_score !== undefined ? confSig.confluence_score : (autoSig.confluence_score || 0);
+            const grade = confSig.grade || autoSig.grade || 'Grade C';
+            const factors = confSig.confluence_factors || autoSig.confluence_factors || [];
 
-            // Compute high/low boundaries
-            let high = asianRange.asian_high ? Number(asianRange.asian_high) : null;
-            let low = asianRange.asian_low ? Number(asianRange.asian_low) : null;
-            if (high && isGold && off) high = Number((high + off).toFixed(2));
-            if (low && isGold && off) low = Number((low + off).toFixed(2));
-
-            // Dynamic channel if Asian range is null
-            if (!high || !low) {
-                if (curPrice > 0) {
-                    high = Number((curPrice + (isGold ? 4.5 : 0.0025)).toFixed(decimals));
-                    low = Number((curPrice - (isGold ? 4.5 : 0.0025)).toFixed(decimals));
-                }
+            // Update Confluence Badges & Progress Bar
+            const badgeEl = document.getElementById('matrixConfluenceBadge');
+            const fillEl = document.getElementById('matrixConfluenceFill');
+            if (badgeEl) {
+                badgeEl.textContent = `Confluence: ${score}% [${grade}]`;
+                badgeEl.className = score >= 80 ? 'badge badge-green' : (score >= 65 ? 'badge badge-blue' : (score >= 50 ? 'badge badge-amber' : 'badge badge-rose'));
             }
-            const mid = (high && low) ? Number(((high + low) / 2).toFixed(decimals)) : curPrice;
-
-            // EMAs
-            let curEma9 = null;
-            let curEma21 = null;
-            if (currentChartData && currentChartData.indicators) {
-                const e9 = currentChartData.indicators.ema9;
-                const e21 = currentChartData.indicators.ema21;
-                if (e9 && e9.length) curEma9 = e9[e9.length - 1];
-                if (e21 && e21.length) curEma21 = e21[e21.length - 1];
+            if (fillEl) {
+                fillEl.style.width = Math.max(5, score) + '%';
+                fillEl.style.background = score >= 80 ? 'linear-gradient(90deg, #10b981, #059669)' : (score >= 65 ? 'linear-gradient(90deg, #38bdf8, #2563eb)' : (score >= 50 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 'linear-gradient(90deg, #f43f5e, #be123c)'));
             }
-            if (curEma9 === null && curPrice > 0) curEma9 = Number((curPrice + (action === 'BUY' ? 0.3 : (action === 'SELL' ? -0.3 : 0.1))).toFixed(decimals));
-            if (curEma21 === null && curPrice > 0) curEma21 = Number((curPrice + (action === 'BUY' ? -0.4 : (action === 'SELL' ? 0.4 : -0.2))).toFixed(decimals));
 
             // Update Decision Box
             const box = document.getElementById('matrixDecisionBox');
@@ -2883,108 +3108,182 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const summaryEl = document.getElementById('matrixDecisionSummary');
 
             if (box && actionEl && summaryEl) {
+                const plan = confSig.execution_plan || {};
+                const entryP = (plan.entry_price || autoSig.entry_reference || curPrice || 0).toFixed(decimals);
+                const slP = plan.stop_loss ? plan.stop_loss.toFixed(decimals) : (autoSig.stop_loss ? autoSig.stop_loss.toFixed(decimals) : '--');
+                const tp1P = plan.take_profit_1 ? plan.take_profit_1.toFixed(decimals) : (autoSig.take_profit ? autoSig.take_profit.toFixed(decimals) : '--');
+                const tp2P = plan.take_profit_2 ? plan.take_profit_2.toFixed(decimals) : '--';
+                const rr1 = plan.rr_ratio_tp1 || autoSig.reward_risk || 2.0;
+                const rr2 = plan.rr_ratio_tp2 || 3.5;
+                const riskPips = plan.risk_pips || autoSig.risk_pips || '--';
+                const factorListHtml = factors.length ? ('<ul style="margin:6px 0 6px 18px; font-size:11px;">' + factors.map(f => `<li>${f}</li>`).join('') + '</ul>') : '';
+
                 if (action === 'BUY') {
                     box.className = 'decision-box buy-active';
-                    actionEl.innerHTML = '<span class="pulse-dot green"></span> BUY SIGNAL CONFIRMED (बाय सिग्नल सक्रिय)';
+                    actionEl.innerHTML = `<span class="pulse-dot green"></span> BUY SIGNAL CONFIRMED (बाय सिग्नल सक्रिय) — ${score}% [${grade}]`;
                     actionEl.style.color = '#34d399';
-                    const entryPrice = autoSig.entry_reference ? Number(autoSig.entry_reference).toFixed(decimals) : curPrice.toFixed(decimals);
-                    const slPrice = autoSig.stop_loss ? Number(autoSig.stop_loss).toFixed(decimals) : mid.toFixed(decimals);
-                    const tpPrice = autoSig.take_profit ? Number(autoSig.take_profit).toFixed(decimals) : (Number(entryPrice) + Math.abs(Number(entryPrice) - Number(slPrice))*2).toFixed(decimals);
                     summaryEl.innerHTML = `
-                        <strong>का BUY करायचे (Why Buy):</strong> 5m कँडलने रेझिस्टन्स लेव्हलच्या वर <strong>${entryPrice}</strong> वर क्लोजिंग दिली आहे. 
-                        9 EMA (${curEma9.toFixed(decimals)}) हा 21 EMA (${curEma21.toFixed(decimals)}) च्या वर असल्याने बुलिश मोमेंटम स्पष्ट आहे. 
-                        फेक ब्रेकआउट टाळण्यासाठी विक्स (Wicks) नाकारण्यात आल्या आहेत.<br>
-                        <strong>नियोजित स्तर:</strong> Entry: <strong>${entryPrice}</strong> | Stop Loss: <strong>${slPrice}</strong> | Take Profit (2R): <strong>${tpPrice}</strong> | Max Risk: <strong>$50.00</strong>
+                        <strong>का BUY करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बुलिश असून किंमत Discount Zone मध्ये आहे. लिक्विडिटी हंट किंवा ऑर्डर ब्लॉक टेस्ट नंतर 5m कँडलने स्पष्ट कन्फर्मेशन दिले आहे.<br>
+                        ${factorListHtml}
+                        <strong>अचूक एक्झिक्युशन प्लॅन:</strong> Entry: <strong>${entryP}</strong> | Stop Loss: <strong>${slP}</strong> (Risk: ${riskPips} pips) | Target 1 (1:2 R:R): <strong>${tp1P}</strong> | Target 2 (1:${rr2} R:R): <strong>${tp2P}</strong> | Max Risk: <strong>$50.00</strong>
                     `;
                 } else if (action === 'SELL') {
                     box.className = 'decision-box sell-active';
-                    actionEl.innerHTML = '<span class="pulse-dot red"></span> SELL SIGNAL CONFIRMED (सेल सिग्नल सक्रिय)';
+                    actionEl.innerHTML = `<span class="pulse-dot red"></span> SELL SIGNAL CONFIRMED (सेल सिग्नल सक्रिय) — ${score}% [${grade}]`;
                     actionEl.style.color = '#fb7185';
-                    const entryPrice = autoSig.entry_reference ? Number(autoSig.entry_reference).toFixed(decimals) : curPrice.toFixed(decimals);
-                    const slPrice = autoSig.stop_loss ? Number(autoSig.stop_loss).toFixed(decimals) : mid.toFixed(decimals);
-                    const tpPrice = autoSig.take_profit ? Number(autoSig.take_profit).toFixed(decimals) : (Number(entryPrice) - Math.abs(Number(slPrice) - Number(entryPrice))*2).toFixed(decimals);
                     summaryEl.innerHTML = `
-                        <strong>का SELL करायचे (Why Sell):</strong> 5m कँडलने सपोर्ट लेव्हलच्या खाली <strong>${entryPrice}</strong> वर क्लोजिंग दिली आहे. 
-                        9 EMA (${curEma9.toFixed(decimals)}) हा 21 EMA (${curEma21.toFixed(decimals)}) च्या खाली असल्याने बेअरिश डाऊनवर्ड ट्रेंड कन्फर्म झाला आहे.<br>
-                        <strong>नियोजित स्तर:</strong> Entry: <strong>${entryPrice}</strong> | Stop Loss: <strong>${slPrice}</strong> | Take Profit (2R): <strong>${tpPrice}</strong> | Max Risk: <strong>$50.00</strong>
+                        <strong>का SELL करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बेअरिश असून किंमत Premium Zone मध्ये आहे. Buy-Side Liquidity (BSL) स्वीप किंवा Supply Order Block रिजेक्शन नंतर मजबूत सेल-ऑफ दिसत आहे.<br>
+                        ${factorListHtml}
+                        <strong>अचूक एक्झिक्युशन प्लॅन:</strong> Entry: <strong>${entryP}</strong> | Stop Loss: <strong>${slP}</strong> (Risk: ${riskPips} pips) | Target 1 (1:2 R:R): <strong>${tp1P}</strong> | Target 2 (1:${rr2} R:R): <strong>${tp2P}</strong> | Max Risk: <strong>$50.00</strong>
                     `;
                 } else {
                     box.className = 'decision-box wait-active';
-                    actionEl.innerHTML = '<span class="pulse-dot amber"></span> MONITORING / WAITING (प्रतीक्षा करा - सध्या कँडल रेंजच्या आत आहे)';
+                    actionEl.innerHTML = `<span class="pulse-dot amber"></span> NO SIGNAL (प्रतीक्षा करा - किंमत अद्याप एन्ट्री झोनमध्ये नाही) — Confluence: ${score}% [${grade}]`;
                     actionEl.style.color = '#fbbf24';
-                    const highStr = high ? high.toFixed(decimals) : '--';
-                    const lowStr = low ? low.toFixed(decimals) : '--';
-                    const curStr = curPrice ? curPrice.toFixed(decimals) : '--';
                     summaryEl.innerHTML = `
-                        <strong>सध्या काय सुरू आहे व का थांबायचे आहे? (Why Wait):</strong> चालू भाव <strong>${curStr}</strong> हा सपोर्ट आणि रेझिस्टन्स रेंजच्या <em>आत</em> ट्रेड करत आहे. घाईगडबडीत चुकीचा ट्रेड होऊन नुकसान टाळण्यासाठी सिस्टम पुढील नियमांची वाट पाहत आहे:<br>
-                        • 🟢 <strong>BUY कधी होईल?</strong> पूर्ण झालेली 5-मिनिटांची कँडल <strong>${highStr}</strong> च्या वर स्पष्ट क्लोज (Bar Close) झाल्यावर.<br>
-                        • 🔴 <strong>SELL कधी होईल?</strong> पूर्ण झालेली 5-मिनिटांची कँडल <strong>${lowStr}</strong> च्या खाली स्पष्ट क्लोज (Bar Close) झाल्यावर.<br>
-                        • ⚠️ <strong>नियम:</strong> कँडलच्या फक्त सुया/विक्स (Wicks) बाहेर गेल्यास ट्रेड केला जात नाही, कारण ते ऑपरेटरचे फेक ब्रेकआउट (Trap) असतात.
+                        <strong>सध्या काय स्थिती आहे? (Current Status & Strategy Rationale):</strong> चालू भाव <strong>${curPrice ? curPrice.toFixed(decimals) : '--'}</strong> आहे. किंमत अद्याप स्ट्रॅटेजीनुसार व्हॅलिड एन्ट्री झोनमध्ये (Demand/Supply Order Block, FVG, OTE किंवा Breakout Level) पोहोचलेली नाही.<br>
+                        • <strong>SMC स्ट्रक्चर:</strong> ${smc.trend || 'Ranging'} | <strong>झोन:</strong> ${(fib.zone) || 'Equilibrium'} (50% Eq: ${(fib.equilibrium || 0).toFixed(decimals)})<br>
+                        • <strong>ऑर्डर ब्लॉक / FVG:</strong> डिमांड व सप्लाय झोनची चाचणी सुरू आहे.<br>
+                        • <strong>नियम:</strong> जोपर्यंत लाइव्ह मार्केट प्राईस अचूक एन्ट्री झोनमध्ये पोहोचत नाही, तोपर्यंत सिस्टम strictly 'NO SIGNAL' स्थितीत राहील.
                     `;
                 }
             }
 
-            // Update Checklist Cards
-            const chkSessionStatus = document.getElementById('chkSessionStatus');
-            const chkSessionDetail = document.getElementById('chkSessionDetail');
-            if (chkSessionStatus) {
-                chkSessionStatus.className = 'badge badge-green';
-                chkSessionStatus.textContent = 'PASS';
+            // Pillar 1: SMC Market Structure
+            const chkSmcStatus = document.getElementById('chkSmcStatus');
+            const chkSmcDetail = document.getElementById('chkSmcDetail');
+            if (chkSmcStatus) {
+                const tr = smc.trend || 'NEUTRAL';
+                chkSmcStatus.className = tr === 'BULLISH' ? 'badge badge-green' : (tr === 'BEARISH' ? 'badge badge-rose' : 'badge badge-amber');
+                chkSmcStatus.textContent = tr;
             }
-            if (chkSessionDetail) {
-                chkSessionDetail.textContent = isGold ? '24/7 Spot Benchmark Active (High Volume)' : ((data.active_sessions || []).join(', ') || 'Active Session');
-            }
-
-            const chkTrendStatus = document.getElementById('chkTrendStatus');
-            const chkTrendDetail = document.getElementById('chkTrendDetail');
-            const isBull = curEma9 >= curEma21;
-            if (chkTrendStatus) {
-                chkTrendStatus.className = isBull ? 'badge badge-green' : 'badge badge-rose';
-                chkTrendStatus.textContent = isBull ? 'BULLISH' : 'BEARISH';
-            }
-            if (chkTrendDetail) {
-                const diff = Math.abs(curEma9 - curEma21);
-                chkTrendDetail.textContent = `EMA 9 (${curEma9.toFixed(decimals)}) ${isBull ? '>' : '<'} EMA 21 (${curEma21.toFixed(decimals)}) [Diff: ${diff.toFixed(decimals)}]`;
+            if (chkSmcDetail) {
+                const struct = smc.structure || {};
+                const bos = struct.latest_bos ? `BOS: ${struct.latest_bos.price}` : 'No BOS';
+                const choch = struct.latest_choch ? `CHoCH: ${struct.latest_choch.price}` : 'No CHoCH';
+                chkSmcDetail.textContent = `${smc.trend || 'Consolidation'} | ${bos} | ${choch}`;
             }
 
-            const chkBreakoutStatus = document.getElementById('chkBreakoutStatus');
-            const chkBreakoutDetail = document.getElementById('chkBreakoutDetail');
-            if (chkBreakoutStatus) {
-                if (action === 'BUY' || action === 'SELL') {
-                    chkBreakoutStatus.className = 'badge badge-green';
-                    chkBreakoutStatus.textContent = 'CONFIRMED';
+            // Pillar 2: Order Blocks & FVG
+            const chkObStatus = document.getElementById('chkObStatus');
+            const chkObDetail = document.getElementById('chkObDetail');
+            const obs = smc.order_blocks || {};
+            const fvgs = smc.fvgs || {};
+            if (chkObStatus) {
+                if (obs.inside_order_block) {
+                    chkObStatus.className = obs.inside_order_block.type === 'BULLISH_OB' ? 'badge badge-green' : 'badge badge-rose';
+                    chkObStatus.textContent = 'IN ' + obs.inside_order_block.type.replace('_', ' ');
+                } else if (fvgs.inside_fvg) {
+                    chkObStatus.className = 'badge badge-purple';
+                    chkObStatus.textContent = 'IN ' + fvgs.inside_fvg.type.replace('_', ' ');
                 } else {
-                    chkBreakoutStatus.className = 'badge badge-amber';
-                    chkBreakoutStatus.textContent = 'WAITING';
+                    chkObStatus.className = 'badge badge-blue';
+                    chkObStatus.textContent = 'ACTIVE';
                 }
             }
-            if (chkBreakoutDetail) {
-                if (action === 'BUY') chkBreakoutDetail.textContent = `Completed 5m candle closed above ${high ? high.toFixed(decimals) : ''} (Wicks Ignored)`;
-                else if (action === 'SELL') chkBreakoutDetail.textContent = `Completed 5m candle closed below ${low ? low.toFixed(decimals) : ''} (Wicks Ignored)`;
-                else chkBreakoutDetail.textContent = `Waiting for 5m candle-body close beyond [${low ? low.toFixed(decimals) : '--'} - ${high ? high.toFixed(decimals) : '--'}]`;
+            if (chkObDetail) {
+                const dOb = obs.nearest_demand ? `Demand: ${obs.nearest_demand.top.toFixed(decimals)}` : 'Demand: None';
+                const sOb = obs.nearest_supply ? `Supply: ${obs.nearest_supply.bottom.toFixed(decimals)}` : 'Supply: None';
+                chkObDetail.textContent = `${dOb} | ${sOb}`;
             }
 
+            // Pillar 3: ICT Session & Killzones
+            const chkSessionStatus = document.getElementById('chkSessionStatus');
+            const chkSessionDetail = document.getElementById('chkSessionDetail');
+            const kz = ict.killzones || {};
+            if (chkSessionStatus) {
+                if (kz.is_silver_bullet_active) {
+                    chkSessionStatus.className = 'badge badge-gold';
+                    chkSessionStatus.textContent = 'SILVER BULLET';
+                } else if (kz.is_killzone_active) {
+                    chkSessionStatus.className = 'badge badge-green';
+                    chkSessionStatus.textContent = 'KILLZONE';
+                } else {
+                    chkSessionStatus.className = 'badge badge-blue';
+                    chkSessionStatus.textContent = 'ACTIVE';
+                }
+            }
+            if (chkSessionDetail) {
+                const kzName = (kz.active_killzones && kz.active_killzones.length) ? kz.active_killzones.map(k => k.name).join(', ') : (data.active_sessions ? data.active_sessions.join(', ') : 'Off-Peak');
+                const judas = (ict.judas_swing && ict.judas_swing.detected) ? ` | Judas: ${ict.judas_swing.bias}` : '';
+                chkSessionDetail.textContent = `${kzName}${judas}`;
+            }
+
+            // Pillar 4: Fibonacci & OTE (0.618 - 0.707)
+            const chkFibStatus = document.getElementById('chkFibStatus');
+            const chkFibDetail = document.getElementById('chkFibDetail');
+            if (chkFibStatus) {
+                if (fib.in_ote_zone) {
+                    chkFibStatus.className = 'badge badge-gold';
+                    chkFibStatus.textContent = 'IN OTE ZONE';
+                } else {
+                    chkFibStatus.className = fib.zone === 'DISCOUNT' ? 'badge badge-green' : 'badge badge-rose';
+                    chkFibStatus.textContent = fib.zone || 'EQUILIBRIUM';
+                }
+            }
+            if (chkFibDetail) {
+                const eq = fib.equilibrium ? `Eq: ${fib.equilibrium.toFixed(decimals)}` : '--';
+                const oteSweet = fib.ote_sweet_spot ? `OTE 70.7%: ${fib.ote_sweet_spot.toFixed(decimals)}` : '--';
+                chkFibDetail.textContent = `${fib.zone || 'Zone'}: ${eq} | ${oteSweet}`;
+            }
+
+            // Pillar 5: Liquidity Pools & Stop-Loss Hunt
+            const chkLiqStatus = document.getElementById('chkLiqStatus');
+            const chkLiqDetail = document.getElementById('chkLiqDetail');
+            const sweeps = liq.sweeps || {};
+            if (chkLiqStatus) {
+                if (sweeps.has_bullish_sweep) {
+                    chkLiqStatus.className = 'badge badge-green';
+                    chkLiqStatus.textContent = 'SSL SWEPT (TURTLE SOUP)';
+                } else if (sweeps.has_bearish_sweep) {
+                    chkLiqStatus.className = 'badge badge-rose';
+                    chkLiqStatus.textContent = 'BSL SWEPT (TURTLE SOUP)';
+                } else {
+                    chkLiqStatus.className = 'badge badge-cyan';
+                    chkLiqStatus.textContent = 'POOLS MAPPED';
+                }
+            }
+            if (chkLiqDetail) {
+                const bsl = liq.bsl_target ? `BSL: ${liq.bsl_target.toFixed(decimals)}` : 'BSL: --';
+                const ssl = liq.ssl_target ? `SSL: ${liq.ssl_target.toFixed(decimals)}` : 'SSL: --';
+                chkLiqDetail.textContent = `${bsl} | ${ssl}`;
+            }
+
+            // Pillar 6: Multi-Target R:R Capital Protection
             const chkRiskStatus = document.getElementById('chkRiskStatus');
             const chkRiskDetail = document.getElementById('chkRiskDetail');
             if (chkRiskStatus) {
                 chkRiskStatus.className = 'badge badge-green';
-                chkRiskStatus.textContent = '2.0R PLAN';
+                chkRiskStatus.textContent = 'TP1 2R & TP2 3.5R';
             }
             if (chkRiskDetail) {
-                chkRiskDetail.textContent = 'Fixed 1:2 R:R Ratio | Strictly $50.00 Max Risk Cap';
+                chkRiskDetail.textContent = 'Guaranteed 1:2+ R:R | Strictly $50.00 Max Risk Cap';
             }
 
-            // Update Level Metrics
-            const lvlHigh = document.getElementById('matrixLevelHigh');
-            const lvlLow = document.getElementById('matrixLevelLow');
-            const lvlEma = document.getElementById('matrixLevelEma');
+            // Update Decision Level Metrics
+            const lvlDemand = document.getElementById('matrixLevelDemand');
+            const lvlSupply = document.getElementById('matrixLevelSupply');
+            const lvlOte = document.getElementById('matrixLevelOte');
+            const lvlLiq = document.getElementById('matrixLevelLiq');
             const lvlRR = document.getElementById('matrixLevelRR');
-            if (lvlHigh) lvlHigh.textContent = high ? high.toFixed(decimals) : '--';
-            if (lvlLow) lvlLow.textContent = low ? low.toFixed(decimals) : '--';
-            if (lvlEma) lvlEma.textContent = `EMA 9: ${curEma9.toFixed(decimals)} | EMA 21: ${curEma21.toFixed(decimals)}`;
+
+            if (lvlDemand) {
+                lvlDemand.textContent = obs.nearest_demand ? `${obs.nearest_demand.top.toFixed(decimals)} (${obs.nearest_demand.bottom.toFixed(decimals)})` : (data.asian_range && data.asian_range.asian_low ? data.asian_range.asian_low.toFixed(decimals) : '--');
+            }
+            if (lvlSupply) {
+                lvlSupply.textContent = obs.nearest_supply ? `${obs.nearest_supply.bottom.toFixed(decimals)} (${obs.nearest_supply.top.toFixed(decimals)})` : (data.asian_range && data.asian_range.asian_high ? data.asian_range.asian_high.toFixed(decimals) : '--');
+            }
+            if (lvlOte) {
+                lvlOte.textContent = fib.ote_sweet_spot ? `Sweet Spot: ${fib.ote_sweet_spot.toFixed(decimals)}` : '--';
+            }
+            if (lvlLiq) {
+                const bslStr = liq.bsl_target ? liq.bsl_target.toFixed(decimals) : '--';
+                const sslStr = liq.ssl_target ? liq.ssl_target.toFixed(decimals) : '--';
+                lvlLiq.textContent = `BSL: ${bslStr} | SSL: ${sslStr}`;
+            }
             if (lvlRR) {
-                const risk = autoSig.risk_usd || 50.0;
-                lvlRR.textContent = `Risk: $${risk.toFixed(2)} | Target: +$${(risk * 2).toFixed(2)} (2.0R)`;
+                const riskUsd = autoSig.risk_usd || 50.0;
+                lvlRR.textContent = `Risk: $${riskUsd.toFixed(2)} | TP1: +$${(riskUsd * 2).toFixed(2)} (2R) | TP2: +$${(riskUsd * 3.5).toFixed(2)} (3.5R)`;
             }
         }
 
@@ -2996,7 +3295,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         async function fetchChart() {
             const sym = document.getElementById('pairSelect').value;
-            document.getElementById('chartTitle').textContent = sym + " Candlestick & Volume (" + currentInterval + ")";
+            const titleEl = document.getElementById('chartTitle');
+            if (titleEl) titleEl.textContent = sym + " Candlestick & Volume (" + currentInterval + ") [Loading...]";
             try {
                 const res = await fetch('/api/chart?symbol=' + encodeURIComponent(sym) + '&interval=' + currentInterval);
                 const data = await res.json();
@@ -3021,10 +3321,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         });
                     }
                 }
-                currentChartData = data;
-                renderCanvasChart();
+                if (data && data.candles && data.candles.length) {
+                    currentChartData = data;
+                    if (titleEl) titleEl.textContent = sym + " Candlestick & Volume (" + currentInterval + ")";
+                    renderCanvasChart();
+                } else if (titleEl) {
+                    titleEl.textContent = sym + " Candlestick & Volume (" + currentInterval + ")";
+                }
             } catch (err) {
                 console.error("Fetch chart error:", err);
+                if (titleEl) titleEl.textContent = sym + " Candlestick & Volume (" + currentInterval + ")";
             }
         }
 
@@ -3048,6 +3354,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const ema21 = (currentChartData.indicators && currentChartData.indicators.ema21) || [];
             const levels = currentChartData.levels || {};
             const markers = currentChartData.signal_markers || [];
+            const sym = currentChartData.symbol || '';
+            const dec = (currentChartData.is_gold || sym.includes('XAU') || sym.includes('BTC') || sym.includes('JPY')) ? 2 : 4;
 
             ctx.clearRect(0, 0, width, height);
 
@@ -3105,7 +3413,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 ctx.lineTo(priceWidth, y);
                 ctx.stroke();
 
-                const pStr = p.toFixed(currentChartData.is_gold ? 2 : 4);
+                const pStr = p.toFixed(dec);
                 ctx.fillText(pStr, priceWidth + 6, y + 3);
             }
 
@@ -3117,6 +3425,161 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 ctx.fillStyle = isBull ? "rgba(16, 185, 129, 0.35)" : "rgba(244, 63, 94, 0.35)";
                 const yV = yVol(c.volume);
                 ctx.fillRect(x - barW / 2, yV, barW, (height - 20) - yV);
+            }
+
+            // Toggles
+            const showSMC = document.getElementById('toggleSMC') ? document.getElementById('toggleSMC').checked : true;
+            const showFVG = document.getElementById('toggleFVG') ? document.getElementById('toggleFVG').checked : true;
+            const showFib = document.getElementById('toggleFib') ? document.getElementById('toggleFib').checked : true;
+            const showLiq = document.getElementById('toggleLiq') ? document.getElementById('toggleLiq').checked : true;
+            const showEMA = document.getElementById('toggleEMA') ? document.getElementById('toggleEMA').checked : true;
+
+            // Draw SMC Order Blocks (Demand & Supply Zones)
+            if (showSMC && currentChartData.smc && currentChartData.smc.order_blocks) {
+                const obs = currentChartData.smc.order_blocks.all_order_blocks || [];
+                obs.forEach(ob => {
+                    if (!ob.active) return;
+                    const yTop = yPrice(ob.top);
+                    const yBot = yPrice(ob.bottom);
+                    const obH = Math.max(3, yBot - yTop);
+                    const isBull = ob.type === "BULLISH_OB";
+                    if (yBot < 0 || yTop > mainHeight) return;
+
+                    ctx.save();
+                    ctx.fillStyle = isBull ? "rgba(16, 185, 129, 0.14)" : "rgba(244, 63, 94, 0.14)";
+                    ctx.strokeStyle = isBull ? "rgba(16, 185, 129, 0.6)" : "rgba(244, 63, 94, 0.6)";
+                    ctx.lineWidth = 1;
+                    ctx.fillRect(0, yTop, priceWidth, obH);
+                    ctx.strokeRect(0, yTop, priceWidth, obH);
+
+                    // Tag
+                    ctx.fillStyle = isBull ? "#10b981" : "#f43f5e";
+                    ctx.font = "bold 9px JetBrains Mono, monospace";
+                    ctx.fillText((isBull ? "DEMAND OB" : "SUPPLY OB") + " [" + ob.top.toFixed(dec) + " - " + ob.bottom.toFixed(dec) + "]", 8, yTop + 11);
+                    ctx.restore();
+                });
+            }
+
+            // Draw Fair Value Gaps (FVG) & Consequent Encroachment (50%)
+            if (showFVG && currentChartData.smc && currentChartData.smc.fvgs) {
+                const fvgs = currentChartData.smc.fvgs.active_fvgs || [];
+                fvgs.forEach(f => {
+                    const yTop = yPrice(f.top);
+                    const yBot = yPrice(f.bottom);
+                    const fH = Math.max(2, yBot - yTop);
+                    const isBull = f.type === "BULLISH_FVG";
+                    if (yBot < 0 || yTop > mainHeight) return;
+
+                    ctx.save();
+                    ctx.fillStyle = isBull ? "rgba(168, 85, 247, 0.18)" : "rgba(236, 72, 153, 0.18)";
+                    ctx.strokeStyle = isBull ? "rgba(168, 85, 247, 0.6)" : "rgba(236, 72, 153, 0.6)";
+                    ctx.lineWidth = 1;
+                    ctx.fillRect(priceWidth * 0.15, yTop, priceWidth * 0.85, fH);
+                    ctx.strokeRect(priceWidth * 0.15, yTop, priceWidth * 0.85, fH);
+
+                    // 50% Consequent Encroachment
+                    const yMid = yPrice(f.consequent_encroachment);
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(priceWidth * 0.15, yMid);
+                    ctx.lineTo(priceWidth, yMid);
+                    ctx.stroke();
+
+                    ctx.fillStyle = isBull ? "#c084fc" : "#f472b6";
+                    ctx.font = "8px JetBrains Mono, monospace";
+                    ctx.fillText("FVG 50% CE", priceWidth * 0.15 + 4, yMid - 2);
+                    ctx.restore();
+                });
+            }
+
+            // Draw Fibonacci Retracements & ICT OTE (0.618 - 0.786)
+            if (showFib && currentChartData.fibonacci && currentChartData.fibonacci.levels) {
+                const fLevels = currentChartData.fibonacci.levels;
+                const fibKeys = [
+                    { k: "0.500", label: "50% EQ", col: "#94a3b8" },
+                    { k: "0.618", label: "61.8% GOLDEN", col: "#eab308" },
+                    { k: "0.707", label: "70.7% ICT OTE", col: "#f59e0b" },
+                    { k: "0.786", label: "78.6% OTE", col: "#d97706" }
+                ];
+
+                // Shaded OTE band between 0.618 and 0.786
+                if (fLevels["0.618"] && fLevels["0.786"]) {
+                    const y618 = yPrice(fLevels["0.618"]);
+                    const y786 = yPrice(fLevels["0.786"]);
+                    const oteTop = Math.min(y618, y786);
+                    const oteH = Math.abs(y786 - y618);
+                    ctx.save();
+                    ctx.fillStyle = "rgba(234, 179, 8, 0.08)";
+                    ctx.fillRect(0, oteTop, priceWidth, oteH);
+                    ctx.restore();
+                }
+
+                fibKeys.forEach(fk => {
+                    const p = fLevels[fk.k];
+                    if (p === undefined || p === null) return;
+                    const y = yPrice(p);
+                    if (y < 0 || y > mainHeight) return;
+
+                    ctx.save();
+                    ctx.strokeStyle = fk.col;
+                    ctx.lineWidth = fk.k === "0.707" ? 1.4 : 1;
+                    ctx.setLineDash(fk.k === "0.707" ? [] : [4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(priceWidth, y);
+                    ctx.stroke();
+
+                    // Tag on right
+                    ctx.fillStyle = fk.col;
+                    ctx.font = "bold 9px JetBrains Mono, monospace";
+                    ctx.fillText(fk.label + " " + p.toFixed(dec), priceWidth - 145, y - 3);
+                    ctx.restore();
+                });
+            }
+
+            // Draw Liquidity Pools (BSL / SSL) and Sweeps
+            if (showLiq && currentChartData.liquidity) {
+                const liq = currentChartData.liquidity;
+
+                function drawLiqLine(p, label, col) {
+                    if (!p) return;
+                    const y = yPrice(p);
+                    if (y < 0 || y > mainHeight) return;
+                    ctx.save();
+                    ctx.strokeStyle = col;
+                    ctx.lineWidth = 1.3;
+                    ctx.setLineDash([5, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(priceWidth, y);
+                    ctx.stroke();
+
+                    ctx.fillStyle = col;
+                    ctx.font = "bold 9px JetBrains Mono, monospace";
+                    ctx.fillText(label + " " + p.toFixed(dec), 8, y - 4);
+                    ctx.restore();
+                }
+
+                drawLiqLine(liq.bsl_target, "BSL (BUY-SIDE LIQUIDITY)", "#ec4899");
+                drawLiqLine(liq.ssl_target, "SSL (SELL-SIDE LIQUIDITY)", "#06b6d4");
+
+                // Draw Liquidity Sweeps
+                const sweeps = (liq.sweeps && liq.sweeps.recent_sweeps) || [];
+                sweeps.forEach(sw => {
+                    const isBull = sw.sentiment === "BULLISH";
+                    const swPrice = isBull ? sw.low_wick : sw.high_wick;
+                    const y = yPrice(swPrice);
+                    if (y < 0 || y > mainHeight) return;
+
+                    ctx.save();
+                    ctx.fillStyle = isBull ? "#06b6d4" : "#ec4899";
+                    ctx.fillRect(priceWidth - 210, y - 8, 200, 16);
+                    ctx.fillStyle = "#090d16";
+                    ctx.font = "bold 8px JetBrains Mono, monospace";
+                    ctx.textAlign = "center";
+                    ctx.fillText(isBull ? "[SSL SWEPT - BULLISH TURTLE SOUP]" : "[BSL SWEPT - BEARISH TURTLE SOUP]", priceWidth - 110, y + 3);
+                    ctx.restore();
+                });
             }
 
             // Draw Candlesticks
@@ -3141,35 +3604,38 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 ctx.fillRect(x - barW / 2, Math.min(yO, yC), barW, Math.max(1.5, Math.abs(yC - yO)));
             }
 
-            // Draw EMA 9 (Cyan)
-            ctx.strokeStyle = "#38bdf8";
-            ctx.lineWidth = 1.6;
-            ctx.beginPath();
-            let started = false;
-            for (let i = 0; i < n; i++) {
-                if (ema9[i] !== null && ema9[i] !== undefined) {
-                    const x = i * slotW + slotW / 2;
-                    const y = yPrice(ema9[i]);
-                    if (!started) { ctx.moveTo(x, y); started = true; }
-                    else { ctx.lineTo(x, y); }
+            // Draw EMAs if enabled
+            if (showEMA) {
+                // Draw EMA 9 (Cyan)
+                ctx.strokeStyle = "#38bdf8";
+                ctx.lineWidth = 1.6;
+                ctx.beginPath();
+                let started = false;
+                for (let i = 0; i < n; i++) {
+                    if (ema9[i] !== null && ema9[i] !== undefined) {
+                        const x = i * slotW + slotW / 2;
+                        const y = yPrice(ema9[i]);
+                        if (!started) { ctx.moveTo(x, y); started = true; }
+                        else { ctx.lineTo(x, y); }
+                    }
                 }
-            }
-            ctx.stroke();
+                ctx.stroke();
 
-            // Draw EMA 21 (Amber)
-            ctx.strokeStyle = "#f59e0b";
-            ctx.lineWidth = 1.6;
-            ctx.beginPath();
-            started = false;
-            for (let i = 0; i < n; i++) {
-                if (ema21[i] !== null && ema21[i] !== undefined) {
-                    const x = i * slotW + slotW / 2;
-                    const y = yPrice(ema21[i]);
-                    if (!started) { ctx.moveTo(x, y); started = true; }
-                    else { ctx.lineTo(x, y); }
+                // Draw EMA 21 (Amber)
+                ctx.strokeStyle = "#f59e0b";
+                ctx.lineWidth = 1.6;
+                ctx.beginPath();
+                started = false;
+                for (let i = 0; i < n; i++) {
+                    if (ema21[i] !== null && ema21[i] !== undefined) {
+                        const x = i * slotW + slotW / 2;
+                        const y = yPrice(ema21[i]);
+                        if (!started) { ctx.moveTo(x, y); started = true; }
+                        else { ctx.lineTo(x, y); }
+                    }
                 }
+                ctx.stroke();
             }
-            ctx.stroke();
 
             // Draw Simulated Active Trade Levels
             function drawDashedLevel(price, color, label) {
@@ -3186,17 +3652,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 // Label Tag
                 ctx.fillStyle = color;
-                ctx.fillRect(priceWidth - 90, y - 9, 86, 18);
+                ctx.fillRect(priceWidth - 95, y - 9, 90, 18);
                 ctx.fillStyle = "#090d16";
                 ctx.font = "bold 9px JetBrains Mono, monospace";
                 ctx.textAlign = "center";
-                ctx.fillText(label + " " + price.toFixed(currentChartData.is_gold ? 2 : 4), priceWidth - 47, y + 3);
+                ctx.fillText(label + " " + price.toFixed(dec), priceWidth - 50, y + 3);
                 ctx.restore();
             }
 
             drawDashedLevel(levels.entry, "#60a5fa", "ENTRY");
             drawDashedLevel(levels.stop, "#f43f5e", "STOP");
-            drawDashedLevel(levels.target, "#10b981", "TP 2R");
+            drawDashedLevel(levels.target, "#10b981", "TP1 2R");
+
+            // TP2 Extended Target if present
+            const confPlan = (currentChartData.confluence_signal && currentChartData.confluence_signal.execution_plan) || {};
+            if (confPlan.take_profit_2) {
+                drawDashedLevel(confPlan.take_profit_2, "#059669", "TP2 3.5R+");
+            }
 
             // Draw Signal Markers (Arrows)
             markers.forEach(m => {
@@ -3247,7 +3719,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 // Update Stats Bar
                 const dt = new Date(c.time * 1000).toISOString().replace('T', ' ').substring(0, 16);
-                const dec = currentChartData.is_gold ? 2 : 4;
                 const e9 = ema9[idx] !== null && ema9[idx] !== undefined ? ema9[idx].toFixed(dec) : '--';
                 const e21 = ema21[idx] !== null && ema21[idx] !== undefined ? ema21[idx].toFixed(dec) : '--';
 
@@ -3503,10 +3974,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const stop = parseFloat(document.getElementById('simStop').value);
             const target = parseFloat(document.getElementById('simTarget').value);
 
-            // If observing Gold with live WebSocket stream, use live bid/ask if user hasn't overridden
-            if (sym.includes('XAU') && goldLiveTick) {
-                if (isNaN(entry) || Math.abs(entry - goldLiveTick.mid) > 50) {
-                    entry = side === 'BUY' ? goldLiveTick.ask : goldLiveTick.bid;
+            // If live WebSocket stream is active, use live bid/ask if user hasn't overridden
+            if (tdLiveTick && normalizeSym(tdLiveTick.symbol) === normalizeSym(sym)) {
+                if (isNaN(entry) || Math.abs(entry - tdLiveTick.mid) > (sym.includes('BTC') ? 1000 : 50)) {
+                    entry = side === 'BUY' ? tdLiveTick.ask : tdLiveTick.bid;
                 }
             }
 
@@ -3524,7 +3995,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     simulated_fill: entry,
                     stop_price: stop,
                     target_price: target,
-                    note: sym.includes('XAU') ? "Binance PAXG 24/7 live tick paper fill" : "Manual paper observation trigger"
+                    note: tdLiveTick ? "Twelve Data Real-Time live tick paper fill" : "Manual paper observation trigger"
                 })
             });
             const ans = await res.json();
@@ -3799,11 +4270,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         /* -------------------------------------------------------------
            Twelve Data Direct Spot Gold & Forex Real-Time Engine
            ------------------------------------------------------------- */
-        let tdApiKey = localStorage.getItem('twelve_data_api_key') || '73345dbfbdc94360af524b86732676d2';
-        let tdEnabled = localStorage.getItem('twelve_data_enabled') !== 'false';
-        let tdWs = null;
-        let tdLiveTick = null;
-
         function openTwelveDataModal() {
             document.getElementById('tdApiKeyInput').value = tdApiKey;
             document.getElementById('tdEnabledCheckbox').checked = tdEnabled;
@@ -3870,91 +4336,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 updateTwelveDataUI();
             } catch (e) {
                 updateTwelveDataUI();
-            }
-        }
-
-        function initTwelveDataWebSocket() {
-            if (!tdEnabled || !tdApiKey) return;
-            const sym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
-            if (tdWs) {
-                try { tdWs.close(); } catch (e) {}
-                tdWs = null;
-            }
-
-            try {
-                const wsUrl = `wss://ws.twelvedata.com/v1/quotes/price?apikey=${encodeURIComponent(tdApiKey)}`;
-                tdWs = new WebSocket(wsUrl);
-
-                tdWs.onopen = function() {
-                    console.log('[Twelve Data WS] Connected. Subscribing to', sym);
-                    const canon = sym.includes('XAU') ? 'XAU/USD' : sym;
-                    tdWs.send(JSON.stringify({
-                        action: 'subscribe',
-                        params: {
-                            symbols: canon
-                        }
-                    }));
-                    const feedStatusEl = document.getElementById('tdFeedStatus');
-                    if (feedStatusEl) feedStatusEl.textContent = 'Live WebSocket Streaming (XAU/USD)';
-                };
-
-                tdWs.onmessage = function(event) {
-                    try {
-                        const data = JSON.parse(event.data);
-                        if (data && (data.price || data.close)) {
-                            const lastP = parseFloat(data.price || data.close);
-                            const bidP = data.bid ? parseFloat(data.bid) : (lastP - 0.15);
-                            const askP = data.ask ? parseFloat(data.ask) : (lastP + 0.15);
-                            const spreadPips = Math.max(0, (askP - bidP) / (sym.includes('XAU') ? 0.10 : 0.0001));
-
-                            tdLiveTick = {
-                                raw_last: lastP,
-                                raw_bid: bidP,
-                                raw_ask: askP,
-                                offset: 0.0,
-                                last: lastP,
-                                bid: bidP,
-                                ask: askP,
-                                mid: lastP,
-                                spread_pips: spreadPips,
-                                event_time: data.timestamp ? (data.timestamp * 1000) : Date.now(),
-                                received_at: Date.now(),
-                                provider: 'Twelve Data'
-                            };
-
-                            const priceMidEl = document.getElementById('priceMid');
-                            if (priceMidEl) {
-                                priceMidEl.textContent = lastP.toFixed(sym.includes('XAU') ? 2 : 4);
-                                priceMidEl.style.transition = 'color 0.15s ease';
-                                priceMidEl.style.color = '#34d399';
-                                setTimeout(() => { if (priceMidEl) priceMidEl.style.color = 'var(--text-primary)'; }, 200);
-                            }
-                            const priceBidEl = document.getElementById('priceBid');
-                            if (priceBidEl) priceBidEl.textContent = bidP.toFixed(sym.includes('XAU') ? 2 : 4);
-                            const priceAskEl = document.getElementById('priceAsk');
-                            if (priceAskEl) priceAskEl.textContent = askP.toFixed(sym.includes('XAU') ? 2 : 4);
-
-                            const sourceDisplay = document.getElementById('sourceDisplay');
-                            if (sourceDisplay) sourceDisplay.textContent = 'Twelve Data (Retail Spot Live Feed)';
-
-                            checkLivePaperPositions(tdLiveTick);
-                            updateChartWithLiveTick(tdLiveTick);
-                            if (currentObservation) updateStrategyMatrix(currentObservation, tdLiveTick);
-                        }
-                    } catch (err) {
-                        console.error('[Twelve Data WS] Parse error:', err);
-                    }
-                };
-
-                tdWs.onerror = function(err) {
-                    console.warn('[Twelve Data WS] Stream error:', err);
-                };
-
-                tdWs.onclose = function() {
-                    console.log('[Twelve Data WS] Connection closed.');
-                };
-            } catch (e) {
-                console.error('[Twelve Data WS] Init error:', e);
             }
         }
 
@@ -4056,9 +4437,125 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
+        /* -------------------------------------------------------------
+           Multi-Pair Institutional Market Scanner (SMC + ICT + Fib + Stop Hunt)
+           ------------------------------------------------------------- */
+        let isScannerFetching = false;
+
+        async function fetchScannerSignals() {
+            if (isScannerFetching) return;
+            isScannerFetching = true;
+            const statusEl = document.getElementById('scannerStatusText');
+            if (statusEl) statusEl.textContent = 'Scanning pairs for SMC/ICT setups...';
+
+            try {
+                const res = await fetch('/api/signals/scan');
+                const data = await res.json();
+                const results = Array.isArray(data) ? data : (data.results || []);
+
+                const countBadge = document.getElementById('scannerCountBadge');
+                if (countBadge) {
+                    const buyCount = results.filter(r => r.action === 'BUY').length;
+                    const sellCount = results.filter(r => r.action === 'SELL').length;
+                    countBadge.textContent = `${results.length} Pairs (${buyCount} BUY / ${sellCount} SELL)`;
+                    countBadge.className = (buyCount + sellCount > 0) ? 'badge badge-green' : 'badge badge-blue';
+                }
+
+                if (statusEl) {
+                    const dt = new Date().toLocaleTimeString();
+                    statusEl.textContent = `Last scanned: ${dt}`;
+                }
+
+                renderScannerTable(results);
+            } catch (err) {
+                console.error("Scanner fetch error:", err);
+                if (statusEl) statusEl.textContent = 'Scanner error. Will retry.';
+            } finally {
+                isScannerFetching = false;
+            }
+        }
+
+        function renderScannerTable(results) {
+            const tbody = document.getElementById('scannerTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (!results || !results.length) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted);">No scan data available.</td></tr>';
+                return;
+            }
+
+            results.forEach(r => {
+                const tr = document.createElement('tr');
+                const isTwoDec = r.symbol && (r.symbol.includes('XAU') || r.symbol.includes('BTC') || r.symbol.includes('JPY'));
+                const dec = isTwoDec ? 2 : 4;
+                const priceStr = (r.price !== null && r.price !== undefined) ? Number(r.price).toFixed(dec) : '--';
+
+                // Structure badge
+                const trend = r.trend || 'NEUTRAL';
+                const trendClass = trend === 'BULLISH' ? 'badge-green' : (trend === 'BEARISH' ? 'badge-rose' : 'badge-amber');
+                const bosChoch = r.bos_choch || 'Normal';
+
+                // Liquidity / Sweep badge
+                const liq = r.liquidity_state || 'Mapped';
+                const isSwept = liq.includes('SWEPT') || liq.includes('SOUP');
+                const liqClass = isSwept ? (liq.includes('BULLISH') || liq.includes('SSL') ? 'badge-green' : 'badge-rose') : 'badge-cyan';
+
+                // Fib / Zone badge
+                const zone = r.zone || 'EQUILIBRIUM';
+                const inOte = r.in_ote;
+                const zoneBadge = inOte ? '<span class="badge badge-gold">IN OTE (0.707)</span>' : `<span class="badge ${zone === 'DISCOUNT' ? 'badge-green' : (zone === 'PREMIUM' ? 'badge-rose' : 'badge-blue')}">${zone}</span>`;
+
+                // Killzone badge
+                const kz = r.killzone || 'Off-Peak';
+                const isKz = r.is_killzone;
+                const isSb = r.is_silver_bullet;
+                const kzBadge = isSb ? '<span class="badge badge-gold">SILVER BULLET</span>' : (isKz ? `<span class="badge badge-green">${kz}</span>` : `<span class="badge badge-blue">${kz}</span>`);
+
+                // Confluence score badge
+                const score = r.confluence_score || 0;
+                const grade = r.grade || 'Grade C';
+                const scoreClass = score >= 80 ? 'badge-green' : (score >= 65 ? 'badge-blue' : (score >= 50 ? 'badge-amber' : 'badge-rose'));
+
+                // Action badge
+                const act = r.action || 'NO SIGNAL';
+                const actClass = act === 'BUY' ? 'badge-green' : (act === 'SELL' ? 'badge-rose' : 'badge-amber');
+
+                tr.innerHTML = `
+                    <td style="font-weight:700; font-family:var(--font-mono); color:var(--text-primary);">
+                        <a href="javascript:void(0)" onclick="selectScannerPair('${r.symbol}')" style="color:var(--accent-blue); text-decoration:none;">${r.symbol}</a>
+                    </td>
+                    <td style="font-family:var(--font-mono); font-weight:600;">${priceStr}</td>
+                    <td><span class="badge ${trendClass}">${trend}</span> <span style="font-size:10px; color:var(--text-muted); display:block;">${bosChoch}</span></td>
+                    <td><span class="badge ${liqClass}">${liq}</span></td>
+                    <td>${zoneBadge}</td>
+                    <td>${kzBadge}</td>
+                    <td><span class="badge ${scoreClass}">${score}% [${grade}]</span></td>
+                    <td><strong class="badge ${actClass}">${act}</strong></td>
+                    <td>
+                        <button class="btn btn-primary" style="padding:3px 8px; font-size:11px;" onclick="selectScannerPair('${r.symbol}')">
+                            Analyze & Chart
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function selectScannerPair(sym) {
+            const selectEl = document.getElementById('pairSelect');
+            if (selectEl) {
+                selectEl.value = sym;
+                onPairChange();
+                const chartCanvas = document.getElementById('chartCanvas');
+                if (chartCanvas) {
+                    chartCanvas.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
         // Initialize on load
         window.addEventListener('DOMContentLoaded', () => {
-            initGoldWebSocket();
             fetchHealth();
             fetchObservation();
             fetchChart();
@@ -4068,6 +4565,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             fetchCalibration();
             fetchTwelveDataConfig();
             initTwelveDataWebSocket();
+            fetchScannerSignals();
+
+            // Periodic multi-pair institutional scanner (25s)
+            setInterval(fetchScannerSignals, 25000);
 
             // 1-second real-time freshness updater
             setInterval(updateFreshnessLabel, 1000);
@@ -4176,40 +4677,41 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     interval=interval,
                     offline_data=self.OFFLINE_DATA,
                 )
-                if self.OFFLINE_DATA is None and "XAU" in canon:
-                    live = LIVE_TICKS.get("XAU/USD")
+                if self.OFFLINE_DATA is None:
+                    live = LIVE_TICKS.get(canon)
                     if not live or (time.time() - live.get("received_at", 0) >= 30):
-                        paxg_tick = fetch_binance_paxg_ticker(timeout=2)
-                        if paxg_tick:
+                        td_quote = fetch_twelve_data_quote(canon)
+                        if td_quote:
                             live = {
-                                "symbol": "XAU/USD",
-                                "mid": paxg_tick["mid"],
-                                "bid": paxg_tick["bid"],
-                                "ask": paxg_tick["ask"],
-                                "last": paxg_tick["mid"],
+                                "symbol": canon,
+                                "mid": td_quote["mid"],
+                                "bid": td_quote["bid"],
+                                "ask": td_quote["ask"],
+                                "last": td_quote["last"],
                                 "event_time": int(time.time() * 1000),
                                 "received_at": time.time(),
                             }
-                            LIVE_TICKS["XAU/USD"] = live
+                            LIVE_TICKS[canon] = live
                     if live:
                         obs["indicative_mid"] = live["mid"]
                         obs["latest_price"] = live["mid"]
                         obs["indicative_bid"] = live["bid"]
                         obs["indicative_ask"] = live["ask"]
-                        obs["spread_pips"] = round((live["ask"] - live["bid"]) / 0.10, 1)
+                        pip_div = 0.10 if "XAU" in canon else (1.0 if "BTC" in canon else (0.01 if "JPY" in canon else 0.0001))
+                        obs["spread_pips"] = round(max(0.0, live["ask"] - live["bid"]) / pip_div, 1)
                         obs["data_freshness"] = "LIVE (0s ago)"
-                        obs["source"] = "Binance WebSocket (PAXG/USDT Stream)"
-                        obs["status"] = "LIVE / ACTIVE (24/7 Benchmark)"
-                        obs["market_state"] = "ACTIVE (24/7)"
+                        obs["source"] = "Twelve Data Real-Time (Retail Spot Feed)"
+                        obs["status"] = "LIVE / ACTIVE (Twelve Data Spot Feed)"
+                        obs["market_state"] = "ACTIVE (24/7 Spot)" if ("XAU" in canon or "BTC" in canon) else "ACTIVE (Twelve Data Real-Time)"
                         obs["is_market_open"] = True
-                        obs["is_live_24_7"] = True
-                        obs["active_sessions"] = ["24/7 Spot Benchmark"]
-                        obs["reason"] = "Binance PAXG/USDT 24/7 real-time feed active. Tracks 1 oz spot gold 1:1 against USD."
+                        obs["is_live_24_7"] = ("XAU" in canon or "BTC" in canon)
+                        obs["active_sessions"] = ["24/7 Spot Benchmark"] if ("XAU" in canon or "BTC" in canon) else obs.get("active_sessions", ["Open Session"])
+                        obs["reason"] = f"Twelve Data Real-Time spot feed active for {canon}. Direct institutional spot rates."
                         if obs.get("auto_signal"):
                             auto = obs["auto_signal"]
                             if auto.get("action") == "NO SIGNAL" and "closed" in (auto.get("reason") or "").lower():
                                 auto["is_market_open"] = True
-                                auto["reason"] = "Binance PAXG/USDT 24/7 live benchmark active. Monitoring candle-close setups."
+                                auto["reason"] = f"Twelve Data Real-Time live feed active for {canon}."
                 if "XAU" in canon and GOLD_CALIBRATION["offset"] != 0.0:
                     c_off = GOLD_CALIBRATION["offset"]
                     if obs.get("indicative_mid") is not None:
@@ -4222,7 +4724,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         obs["indicative_ask"] = round(obs["indicative_ask"] + c_off, 2)
                     obs["calibrated_offset"] = c_off
                     obs["target_broker"] = GOLD_CALIBRATION.get("target_broker", "Spot XAU/USD")
-                    obs["source"] = f"Binance WebSocket (PAXG/USDT Stream) [Calibrated {c_off:+.2f}]"
+                    obs["source"] = f"Twelve Data Real-Time (Retail Spot Feed) [Calibrated {c_off:+.2f}]"
                     if obs.get("auto_signal"):
                         auto = obs["auto_signal"]
                         if auto.get("entry_reference"):
@@ -4233,6 +4735,14 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             auto["take_profit"] = round(auto["take_profit"] + c_off, 2)
                 current_mid = obs.get("indicative_mid") or obs.get("latest_price")
                 if current_mid is not None:
+                    if obs.get("indicative_mid") is None:
+                        obs["indicative_mid"] = current_mid
+                    if obs.get("indicative_bid") is None:
+                        p = float(current_mid)
+                        pip_div = 0.10 if "XAU" in canon else (1.0 if "BTC" in canon else (0.01 if "JPY" in canon else 0.0001))
+                        sp = float(obs.get("spread_pips", 1.0))
+                        obs["indicative_bid"] = round(p - (sp * pip_div / 2), 2 if ("XAU" in canon or "BTC" in canon) else 4)
+                        obs["indicative_ask"] = round(p + (sp * pip_div / 2), 2 if ("XAU" in canon or "BTC" in canon) else 4)
                     update_journal_positions(float(current_mid), sym)
 
                 self.send_response(200)
@@ -4276,19 +4786,31 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         offline_data=self.OFFLINE_DATA,
                     )
                 candles = chart.get("candles", [])
+                for c in candles:
+                    if "time" not in c:
+                        c["time"] = c.get("timestamp")
+                    if "timestamp" not in c:
+                        c["timestamp"] = c.get("time")
+
                 closes = [c["close"] for c in candles]
                 ema9 = calculate_ema(closes, 9)
                 ema21 = calculate_ema(closes, 21)
 
-                obs = observe_pair(canon, interval=interval, offline_data=self.OFFLINE_DATA)
-                auto_sig = obs.get("auto_signal") or {}
+                try:
+                    obs = observe_pair(canon, interval=interval, offline_data=self.OFFLINE_DATA)
+                    auto_sig = obs.get("auto_signal") or {}
+                except Exception:
+                    obs = {}
+                    auto_sig = {}
 
                 signal_markers = []
                 if auto_sig.get("action") in ("BUY", "SELL") and candles:
+                    last_c = candles[-1]
+                    m_time = last_c.get("time") or last_c.get("timestamp")
                     signal_markers.append({
-                        "time": candles[-1]["time"],
+                        "time": m_time,
                         "type": auto_sig["action"],
-                        "price": auto_sig.get("entry_reference") or candles[-1]["close"],
+                        "price": auto_sig.get("entry_reference") or last_c.get("close"),
                         "label": f"{auto_sig['action']} ({auto_sig.get('timeframe', interval)})",
                     })
 
@@ -4340,6 +4862,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     "signal_markers": signal_markers,
                     "levels": levels,
                     "auto_signal": auto_sig,
+                    "smc": obs.get("smc"),
+                    "fibonacci": obs.get("fibonacci"),
+                    "liquidity": obs.get("liquidity"),
+                    "ict": obs.get("ict"),
+                    "confluence_signal": obs.get("confluence_signal"),
                     "timestamp": obs.get("timestamp_et", ""),
                     "freshness": obs.get("data_freshness", "N/A"),
                 }
@@ -4353,6 +4880,60 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e), "paper_mode": True}).encode("utf-8"))
+            return
+
+        # 4b. API: Multi-Pair Institutional Confluence Scanner (SMC, ICT, Fib, Liquidity)
+        if path == "/api/signals/scan":
+            interval = params.get("interval", ["5m"])[0]
+            try:
+                results = scan_all_pairs_confluence(interval=interval, offline_data=self.OFFLINE_DATA)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("X-Paper-Trading-Only", "true")
+                self.end_headers()
+                payload = {
+                    "results": results,
+                    "count": len(results),
+                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+                    "paper_mode": True,
+                }
+                self.wfile.write(json.dumps(payload).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+            return
+
+        # 4c. API: Detailed Institutional SMC/ICT Analysis
+        if path == "/api/institutional":
+            sym = params.get("symbol", ["XAU/USD"])[0]
+            interval = params.get("interval", ["5m"])[0]
+            canon = normalize_symbol(sym)
+            try:
+                obs = observe_pair(canon, interval=interval, offline_data=self.OFFLINE_DATA)
+                res = {
+                    "symbol": canon,
+                    "interval": interval,
+                    "confluence_signal": obs.get("confluence_signal"),
+                    "smc": obs.get("smc"),
+                    "fibonacci": obs.get("fibonacci"),
+                    "liquidity": obs.get("liquidity"),
+                    "ict": obs.get("ict"),
+                    "auto_signal": obs.get("auto_signal"),
+                    "paper_simulation": obs.get("paper_simulation"),
+                    "timestamp": obs.get("timestamp_et", ""),
+                }
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("X-Paper-Trading-Only", "true")
+                self.end_headers()
+                self.wfile.write(json.dumps(res).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
             return
 
         # 5. API: Historical Strategy Backtest (Range Breakout + 2R Plan)
@@ -4430,15 +5011,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             active_sessions = get_active_sessions(now_et) if is_open else []
 
             is_live_ws = False
-            if self.OFFLINE_DATA is None and "XAU" in canon and "XAU/USD" in LIVE_TICKS:
-                live = LIVE_TICKS["XAU/USD"]
-                if time.time() - live.get("received_at", 0) < 30:
+            if self.OFFLINE_DATA is None and (canon in LIVE_TICKS or ("XAU" in canon and "XAU/USD" in LIVE_TICKS)):
+                live = LIVE_TICKS.get(canon, LIVE_TICKS.get("XAU/USD"))
+                if live and time.time() - live.get("received_at", 0) < 30:
                     is_live_ws = True
                     is_open = True
-                    open_reason = "Binance PAXG/USDT 24/7 real-time benchmark active (no weekend halts)"
+                    open_reason = "Twelve Data Real-Time direct feed active (Institutional stream)"
 
             health_info = {
-                "status": "HEALTHY (24/7 Live Stream)" if is_live_ws else "HEALTHY",
+                "status": "HEALTHY (Twelve Data Live Stream)" if is_live_ws else "HEALTHY",
                 "symbol": canon,
                 "is_gold": "XAU" in canon,
                 "market_open": is_open,
@@ -4451,11 +5032,19 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 "broker_notice": "DISABLED — No broker connections permitted",
                 "benchmark_verified": True,
                 "benchmark_notice": (
-                    "COMEX Gold Futures benchmark (GC=F) — not OTC spot XAU/USD"
+                    "Twelve Data Real-Time Spot Gold (XAU/USD) & COMEX Gold Futures benchmark (GC=F) — not OTC spot/interbank aggregate feeds"
                     if "XAU" in canon
-                    else "Yahoo Finance FX (query2 indicative aggregate)"
+                    else (
+                        "Twelve Data Real-Time Crypto (BTC/USD)"
+                        if "BTC" in canon
+                        else "Twelve Data Real-Time Forex Feed"
+                    )
                 ),
-                "futures_benchmark": "COMEX Gold Futures (GC=F)" if "XAU" in canon else None,
+                "futures_benchmark": (
+                    "Twelve Data Real-Time Spot (XAU/USD)"
+                    if "XAU" in canon
+                    else ("Twelve Data BTC/USD" if "BTC" in canon else "Twelve Data Real-Time FX")
+                ),
                 "paper_mode": True,
                 "is_live_24_7": is_live_ws,
             }
@@ -4515,7 +5104,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         except Exception:
             payload = {}
 
-        # 0. API: Ingest Live WebSocket Tick (e.g. Binance PAXG/USDT)
+        # 0. API: Ingest Live WebSocket Tick (Twelve Data Real-Time)
         if path == "/api/tick":
             sym = normalize_symbol(payload.get("symbol", "XAU/USD"))
             mid = float(payload.get("mid", payload.get("last", 0.0)))
@@ -4811,3 +5400,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+.

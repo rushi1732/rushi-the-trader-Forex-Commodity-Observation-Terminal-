@@ -37,6 +37,11 @@ from .entry import evaluate_entry_from_candles
 from .exit import plan_exit
 from .sizer import size_position
 from .risk import validate_forex_trade
+from .signals import evaluate_confluence_signal
+from .smc import analyze_smc
+from .fibonacci import analyze_fibonacci
+from .liquidity import analyze_liquidity
+from .ict import analyze_ict
 
 BANNER_FOREX = """
 ========================================================================================
@@ -107,13 +112,14 @@ def build_auto_signal(
     entry_signal: Optional[Dict[str, Any]] = None,
     paper_simulation: Optional[Dict[str, Any]] = None,
     latest_price: Optional[float] = None,
+    confluence_signal: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build an authentic automatic paper trading signal from multi-skill analysis.
     
     Guarantees:
     - Never generates fake or random signals.
     - If market is closed, data stale, or candles insufficient, action is strictly 'NO SIGNAL'.
-    - If candle close confirms breakout, action is 'BUY' or 'SELL'.
+    - If candle close confirms breakout or institutional confluence, action is 'BUY' or 'SELL'.
     - Contains strategy/skill, timeframe, entry reference, stop-loss, take-profit (2R), and timestamps.
     - Zero broker connectivity, purely simulated paper observation.
     """
@@ -140,17 +146,24 @@ def build_auto_signal(
         }
 
     if not is_fresh:
+        plan = (confluence_signal or {}).get("execution_plan", {})
+        conf_score = (confluence_signal or {}).get("confluence_score", 0)
+        conf_grade = (confluence_signal or {}).get("grade", "C")
         return {
             "action": "NO SIGNAL",
-            "strategy": "trader-scanner + trader-entry + trader-exit",
+            "strategy": f"SMC / ICT Confluence Engine ({conf_grade})",
             "timeframe": timeframe,
             "symbol": symbol,
-            "entry_reference": None,
-            "stop_loss": None,
-            "take_profit": None,
-            "reward_risk": None,
-            "risk_pips": None,
-            "reward_pips": None,
+            "entry_reference": plan.get("entry_price") or latest_price,
+            "stop_loss": plan.get("stop_loss"),
+            "take_profit": plan.get("take_profit_1"),
+            "take_profit_2": plan.get("take_profit_2"),
+            "reward_risk": plan.get("rr_ratio_tp1", 2.0),
+            "reward_risk_tp2": plan.get("rr_ratio_tp2", 3.5),
+            "risk_pips": plan.get("risk_pips"),
+            "reward_pips": plan.get("reward_pips_tp1"),
+            "confluence_score": conf_score,
+            "grade": conf_grade,
             "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
             "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
             "is_market_open": True,
@@ -161,6 +174,51 @@ def build_auto_signal(
             "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
         }
 
+    # Priority 1: Institutional SMC + ICT + Fibonacci + Liquidity Confluence Signal
+    if confluence_signal and confluence_signal.get("action") in ("BUY", "SELL"):
+        side = confluence_signal["action"]
+        plan = confluence_signal.get("execution_plan", {})
+        score = confluence_signal.get("confluence_score", 0)
+        grade = confluence_signal.get("grade", "A")
+        factors = confluence_signal.get("confluence_factors", [])
+        factors_summary = " | ".join(factors[:2]) if factors else "Institutional multi-factor alignment"
+        strategy_label = f"SMC / ICT Confluence ({grade} - {score}%)"
+
+        sim_lot = (paper_simulation or {}).get("paper_lot_size", 0.05)
+        sim_units = (paper_simulation or {}).get("paper_units", 5000)
+        sim_risk_usd = (paper_simulation or {}).get("simulated_max_loss_usd", 50.0)
+
+        return {
+            "action": side,
+            "strategy": strategy_label,
+            "timeframe": timeframe,
+            "symbol": symbol,
+            "entry_reference": plan.get("entry_price") or latest_price,
+            "stop_loss": plan.get("stop_loss"),
+            "take_profit": plan.get("take_profit_1"),
+            "take_profit_2": plan.get("take_profit_2"),
+            "reward_risk": plan.get("rr_ratio_tp1", 2.0),
+            "reward_risk_tp2": plan.get("rr_ratio_tp2", 3.5),
+            "risk_pips": plan.get("risk_pips"),
+            "reward_pips": plan.get("reward_pips_tp1"),
+            "reward_pips_tp2": plan.get("reward_pips_tp2"),
+            "confluence_score": score,
+            "grade": grade,
+            "confluence_factors": factors,
+            "lot_size": sim_lot,
+            "units": sim_units,
+            "risk_usd": sim_risk_usd,
+            "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
+            "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "is_market_open": True,
+            "is_fresh": True,
+            "reason": f"Confirmed {side} Institutional Setup ({grade}, Score: {score}%): {factors_summary}",
+            "candle_close_confirmed": True,
+            "paper_mode": True,
+            "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+        }
+
+    # Priority 2: Session Range Breakout + Candle Close Simulation
     if paper_simulation and isinstance(paper_simulation, dict) and "error" not in paper_simulation:
         side = paper_simulation.get("side", "BUY")
         setup_name = (scan_info or {}).get("primary_setup") or "Session Range Breakout"
@@ -189,26 +247,32 @@ def build_auto_signal(
             "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
         }
 
-    # Market open & fresh, but no confirmed breakout / candle close yet
+    # Market open & fresh, but no confirmed setup yet
     setup_name = (scan_info or {}).get("primary_setup") or "Consolidation"
-    strategy = f"trader-scanner ({setup_name}) + trader-entry"
+    strategy = f"trader-scanner ({setup_name}) + SMC / ICT Confluence Engine"
+    conf_score = (confluence_signal or {}).get("confluence_score", 0)
+    conf_grade = (confluence_signal or {}).get("grade", "C")
     if status_reason:
         final_reason = status_reason
     else:
-        reason_text = (entry_signal or {}).get("reason") or "Price consolidating inside setup range. Waiting for candle-close breakout (wicks ignored)."
-        final_reason = f"Active market session. {reason_text}"
+        final_reason = "Price is not in a valid entry zone. Monitoring for Order Block, FVG, OTE, or Breakout level."
 
+    plan = (confluence_signal or {}).get("execution_plan", {})
     return {
         "action": "NO SIGNAL",
         "strategy": strategy,
         "timeframe": timeframe,
         "symbol": symbol,
-        "entry_reference": latest_price,
-        "stop_loss": None,
-        "take_profit": None,
-        "reward_risk": None,
-        "risk_pips": None,
-        "reward_pips": None,
+        "entry_reference": plan.get("entry_price") or latest_price,
+        "stop_loss": plan.get("stop_loss"),
+        "take_profit": plan.get("take_profit_1"),
+        "take_profit_2": plan.get("take_profit_2"),
+        "reward_risk": plan.get("rr_ratio_tp1", 2.0),
+        "risk_pips": plan.get("risk_pips"),
+        "reward_pips": plan.get("reward_pips_tp1"),
+        "confluence_score": conf_score,
+        "grade": conf_grade,
+        "confluence_factors": (confluence_signal or {}).get("confluence_factors", []),
         "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
         "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
         "is_market_open": True,
@@ -330,6 +394,27 @@ def observe_pair(
         latest_candle["timestamp"], interval_str=interval, now_utc=now_utc
     )
 
+    # Compute technical and institutional confluence analysis from available candles
+    scan_info = analyze_pair(
+        symbol=canon,
+        interval=interval,
+        offline_file=offline_file,
+        offline_data=offline_data,
+    )
+    direction = scan_info.get("direction", "NEUTRAL")
+    asian_setup = scan_info.get("asian_setup", {})
+    latest_close = latest_candle["close"]
+    spread_pips = info.get("default_spread", 1.0)
+    bid, ask = calc_spread_prices(canon, latest_close, spread_pips)
+
+    confluence_sig = evaluate_confluence_signal(
+        symbol=canon,
+        candles=candles,
+        interval=interval,
+        now_dt=now_et,
+        asian_range=asian_setup,
+    )
+
     # 3. Market Closed or Stale Data Guard
     if not is_open:
         market_label = "COMEX Gold Futures (GC=F)" if is_gold else "Spot Forex"
@@ -343,6 +428,7 @@ def observe_pair(
             now_utc=now_utc,
             status_reason=reason_msg,
             latest_price=latest_candle["close"],
+            confluence_signal=confluence_sig,
         )
         return {
             "symbol": canon,
@@ -355,6 +441,11 @@ def observe_pair(
             "paper_mode": True,
             "disclaimer": disclaimer_text,
             "auto_signal": auto_sig,
+            "confluence_signal": confluence_sig,
+            "smc": confluence_sig.get("components", {}).get("smc"),
+            "fibonacci": confluence_sig.get("components", {}).get("fibonacci"),
+            "liquidity": confluence_sig.get("components", {}).get("liquidity"),
+            "ict": confluence_sig.get("components", {}).get("ict"),
         }
 
     if not is_fresh:
@@ -368,6 +459,7 @@ def observe_pair(
             now_utc=now_utc,
             status_reason=reason_msg,
             latest_price=latest_candle["close"],
+            confluence_signal=confluence_sig,
         )
         return {
             "symbol": canon,
@@ -380,6 +472,11 @@ def observe_pair(
             "paper_mode": True,
             "disclaimer": disclaimer_text,
             "auto_signal": auto_sig,
+            "confluence_signal": confluence_sig,
+            "smc": confluence_sig.get("components", {}).get("smc"),
+            "fibonacci": confluence_sig.get("components", {}).get("fibonacci"),
+            "liquidity": confluence_sig.get("components", {}).get("liquidity"),
+            "ict": confluence_sig.get("components", {}).get("ict"),
         }
 
     if len(candles) < 15:
@@ -430,9 +527,40 @@ def observe_pair(
         spread_pips=spread_pips,
     )
 
-    # 6. Paper Simulation (If setup is confirmed)
+    # 5b. Evaluate Institutional Confluence (SMC + ICT + Fibonacci + Liquidity)
+    confluence_sig = evaluate_confluence_signal(
+        symbol=canon,
+        candles=candles,
+        interval=interval,
+        now_dt=now_et,
+        asian_range=asian_setup,
+    )
+
+    # 6. Paper Simulation (If setup is confirmed and price is in a valid entry zone)
     paper_simulation = None
+    is_breakout_in_entry_zone = False
+    pip_size = info.get("pip_size", 0.0001)
     if entry_signal.get("status") == "TRIGGERED":
+        level_ref = entry_signal.get("level", latest_close)
+        trade_side = entry_signal.get("side", "BUY")
+        pip_dist = to_pips(canon, abs(latest_close - level_ref))
+        bars_since = entry_signal.get("bars_since_trigger", 0)
+
+        # Breakout Entry Zone verification:
+        # 1. Breakout trigger must be fresh (on current/recent candle, bars_since <= 2)
+        # 2. Live market price must be actively in the valid breakout entry zone:
+        #    - BUY: Price >= Breakout level (-1 pip buffer) and within entry threshold
+        #    - SELL: Price <= Breakdown level (+1 pip buffer) and within entry threshold
+        max_entry_pips = 60.0 if "XAU" in canon else (400.0 if "BTC" in canon else 25.0)
+        is_fresh = (bars_since <= 2)
+        if trade_side == "BUY":
+            in_zone = (latest_close >= (level_ref - pip_size * 1.0)) and (pip_dist <= max_entry_pips)
+        else:
+            in_zone = (latest_close <= (level_ref + pip_size * 1.0)) and (pip_dist <= max_entry_pips)
+
+        is_breakout_in_entry_zone = is_fresh and in_zone
+
+    if is_breakout_in_entry_zone:
         trade_side = entry_signal["side"]
         sim_fill = execution_price(
             symbol=canon,
@@ -493,6 +621,58 @@ def observe_pair(
         except Exception as ex:
             paper_simulation = {"error": str(ex)}
 
+    # If no breakout triggered, check if institutional confluence triggered an entry
+    if not paper_simulation and confluence_sig.get("action") in ("BUY", "SELL"):
+        plan_c = confluence_sig.get("execution_plan", {})
+        if plan_c.get("stop_loss") and plan_c.get("take_profit_1"):
+            c_side = confluence_sig["action"]
+            c_fill = execution_price(
+                symbol=canon,
+                side=c_side,
+                mid_price=latest_close,
+                spread_pips=spread_pips,
+                slippage_pips=slippage_pips,
+            )
+            try:
+                sizing_c = size_position(
+                    symbol=canon,
+                    side=c_side,
+                    entry_price=c_fill,
+                    stop_price=plan_c["stop_loss"],
+                    budget_usd=config.get("budget", 5000.0),
+                    max_loss_usd=config.get("max_loss_per_trade_usd", 50.0),
+                    leverage=config.get("leverage", 30.0),
+                )
+                risk_c = validate_forex_trade(
+                    symbol=canon,
+                    side=c_side,
+                    entry_price=c_fill,
+                    stop_price=plan_c["stop_loss"],
+                    target_price=plan_c["take_profit_1"],
+                    lot_size=sizing_c.get("lot_size", 0.01),
+                    config=config,
+                    now_et=now_et,
+                )
+                paper_simulation = {
+                    "side": c_side,
+                    "simulated_fill": c_fill,
+                    "indicative_spread_pips": spread_pips,
+                    "simulated_slippage_pips": slippage_pips,
+                    "stop_price": plan_c["stop_loss"],
+                    "target_price": plan_c["take_profit_1"],
+                    "target_price_2": plan_c.get("take_profit_2"),
+                    "risk_pips": plan_c.get("risk_pips"),
+                    "target_pips": plan_c.get("reward_pips_tp1"),
+                    "reward_risk": plan_c.get("rr_ratio_tp1", 2.0),
+                    "paper_lot_size": sizing_c.get("lot_size", 0.01),
+                    "paper_units": sizing_c.get("units", 1000),
+                    "simulated_max_loss_usd": sizing_c.get("max_loss_usd", 50.0),
+                    "margin_required_usd": sizing_c.get("margin_required_usd", 0.0),
+                    "risk_status": risk_c.get("status", "PASS"),
+                }
+            except Exception:
+                pass
+
     auto_sig = build_auto_signal(
         symbol=canon,
         timeframe=interval,
@@ -500,19 +680,22 @@ def observe_pair(
         is_fresh=True,
         now_et=now_et,
         now_utc=now_utc,
-        status_reason="Signal active" if paper_simulation and "error" not in paper_simulation else "Waiting for candle close",
+        status_reason="Institutional setup active" if (confluence_sig.get("action") in ("BUY", "SELL")) else ("Breakout active" if paper_simulation and "error" not in paper_simulation else "Price is not in a valid entry zone. Monitoring for Order Block, FVG, OTE, or Breakout level."),
         scan_info=scan_info,
         entry_signal=entry_signal,
         paper_simulation=paper_simulation,
         latest_price=latest_close,
+        confluence_signal=confluence_sig,
     )
+
+    is_confirmed = (auto_sig.get("action") in ("BUY", "SELL"))
 
     return {
         "symbol": canon,
-        "status": "SIGNAL CONFIRMED" if paper_simulation and "error" not in paper_simulation else "MONITORING (WAITING)",
+        "status": "SIGNAL CONFIRMED" if is_confirmed else "MONITORING (WAITING)",
         "source": source_label,
         "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
-        "latest_bar_utc": latest_candle["datetime_utc"],
+        "latest_bar_utc": latest_candle.get("datetime_utc") or datetime.fromtimestamp(latest_candle.get("timestamp", time.time()), tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "data_freshness": freshness_reason,
         "active_sessions": active_sessions,
         "indicative_mid": latest_close,
@@ -523,6 +706,11 @@ def observe_pair(
         "primary_setup": scan_info.get("primary_setup", "Consolidation"),
         "asian_range": asian_setup,
         "entry_eval": entry_signal,
+        "confluence_signal": confluence_sig,
+        "smc": confluence_sig.get("components", {}).get("smc"),
+        "fibonacci": confluence_sig.get("components", {}).get("fibonacci"),
+        "liquidity": confluence_sig.get("components", {}).get("liquidity"),
+        "ict": confluence_sig.get("components", {}).get("ict"),
         "paper_simulation": paper_simulation,
         "auto_signal": auto_sig,
         "paper_mode": True,

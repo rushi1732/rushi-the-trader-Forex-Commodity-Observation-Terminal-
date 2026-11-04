@@ -29,6 +29,8 @@ INDICATIVE_DISCLAIMER_GOLD = (
 INDICATIVE_DISCLAIMER = INDICATIVE_DISCLAIMER_FOREX
 
 MAJOR_PAIRS = [
+    "XAU/USD",
+    "BTC/USD",
     "EUR/USD",
     "GBP/USD",
     "USD/JPY",
@@ -39,23 +41,26 @@ MAJOR_PAIRS = [
     "EUR/GBP",
     "EUR/JPY",
     "GBP/JPY",
-    "XAU/USD",
 ]
 
 
 def pair_to_yahoo_ticker(symbol: str) -> str:
-    """Convert 'EUR/USD' -> 'EURUSD=X', 'XAU/USD' -> 'GC=F' for Yahoo Finance."""
+    """Convert 'EUR/USD' -> 'EURUSD=X', 'XAU/USD' -> 'GC=F', 'BTC/USD' -> 'BTC-USD' for Yahoo Finance."""
     canon = normalize_symbol(symbol)
     if canon == "XAU/USD":
         return "GC=F"
+    if canon == "BTC/USD":
+        return "BTC-USD"
     return canon.replace("/", "") + "=X"
 
 
 def yahoo_ticker_to_pair(ticker: str) -> str:
-    """Convert 'EURUSD=X' -> 'EUR/USD', 'GC=F' -> 'XAU/USD'."""
+    """Convert 'EURUSD=X' -> 'EUR/USD', 'GC=F' -> 'XAU/USD', 'BTC-USD' -> 'BTC/USD'."""
     clean = ticker.upper().strip()
     if clean in ("GC=F", "GC", "MGC=F"):
         return "XAU/USD"
+    if clean in ("BTC-USD", "BTCUSD=X", "BTC=F"):
+        return "BTC/USD"
     clean = clean.replace("=X", "")
     if len(clean) == 6:
         return f"{clean[:3]}/{clean[3:]}"
@@ -79,33 +84,62 @@ def http_get(url: str, timeout: int = 5) -> str:
         return content.decode("utf-8")
 
 
-BINANCE_PAXG_WS = "wss://stream.binance.com:9443/ws/paxgusdt@ticker"
-BINANCE_PAXG_REST_URL = "https://api.binance.com/api/v3/ticker/bookTicker?symbol=PAXGUSDT"
+TWELVE_DATA_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "twelvedata_config.json")
 
 
-def fetch_binance_paxg_ticker(timeout: int = 4) -> Optional[Dict[str, Any]]:
-    """Fetch live 24/7 Spot Gold (PAXG/USDT) quote directly from Binance public API."""
+def load_twelve_data_config() -> Dict[str, Any]:
+    """Load Twelve Data API configuration from disk."""
+    if os.path.exists(TWELVE_DATA_CONFIG_PATH):
+        try:
+            with open(TWELVE_DATA_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"api_key": "73345dbfbdc94360af524b86732676d2", "enabled": True, "provider": "twelvedata"}
+
+
+def fetch_twelve_data_quote(symbol: str, api_key: str = "", timeout: int = 4) -> Optional[Dict[str, Any]]:
+    """Fetch live real-time spot quote for any symbol from Twelve Data API."""
+    canon = normalize_symbol(symbol)
+    if not api_key:
+        cfg = load_twelve_data_config()
+        api_key = cfg.get("api_key", "73345dbfbdc94360af524b86732676d2")
+    if not api_key:
+        return None
+
     try:
-        raw = http_get(BINANCE_PAXG_REST_URL, timeout=timeout)
+        url = f"https://api.twelvedata.com/quote?symbol={canon}&apikey={api_key}"
+        raw = http_get(url, timeout=timeout)
         data = json.loads(raw)
-        bid = float(data.get("bidPrice", 0.0))
-        ask = float(data.get("askPrice", 0.0))
-        if bid > 0 and ask > 0:
-            mid = (bid + ask) / 2.0
-            return {
-                "symbol": "XAU/USD",
-                "feed": "Binance WebSocket / REST (PAXG/USDT Stream)",
-                "bid": bid,
-                "ask": ask,
-                "mid": mid,
-                "spread_pips": round((ask - bid) / 0.10, 2),
-                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-                "timestamp": int(time.time()),
-                "is_live_24_7": True,
-            }
+        if not isinstance(data, dict) or data.get("status") == "error":
+            return None
+        last_price = float(data.get("close") or data.get("price") or 0.0)
+        bid = float(data.get("bid") or last_price)
+        ask = float(data.get("ask") or last_price)
+        if bid <= 0 or ask <= 0:
+            bid = last_price
+            ask = last_price
+        mid = (bid + ask) / 2.0 if (bid > 0 and ask > 0) else last_price
+
+        is_gold = "XAU" in canon
+        is_btc = "BTC" in canon
+        pip_unit = 0.10 if is_gold else (1.0 if is_btc else (0.01 if "JPY" in canon else 0.0001))
+        spread_pips = round(max(0.0, ask - bid) / pip_unit, 2)
+
+        return {
+            "symbol": canon,
+            "feed": "Twelve Data Real-Time (Retail Spot Feed)",
+            "bid": bid,
+            "ask": ask,
+            "mid": mid,
+            "last": last_price,
+            "spread_pips": spread_pips,
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "timestamp": int(time.time()),
+            "is_live_24_7": is_gold or is_btc,
+        }
     except Exception:
-        pass
-    return None
+        return None
 
 
 def fetch_chart(
@@ -128,6 +162,8 @@ def fetch_chart(
     # 1. Offline dict injection (used in fast offline unit tests)
     if offline_data is not None:
         raw_json = offline_data.get(ticker) or offline_data.get(canon) or offline_data
+        if isinstance(raw_json, dict) and "candles" in raw_json:
+            return raw_json
         return parse_yahoo_chart(raw_json, canon)
 
     # 2. Offline file support
@@ -148,6 +184,21 @@ def fetch_chart(
             if time.time() - mtime < 300:
                 with open(cache_path, "r", encoding="utf-8") as fh:
                     return parse_yahoo_chart(json.load(fh), canon)
+
+    # 3b. Real-Time Twelve Data Feed (if enabled in twelvedata_config.json)
+    if offline_data is None and offline_file is None:
+        cfg = load_twelve_data_config()
+        if cfg.get("enabled") and cfg.get("api_key"):
+            try:
+                td_chart = fetch_twelve_data_chart(
+                    symbol=canon,
+                    interval=interval,
+                    api_key=cfg["api_key"],
+                )
+                if td_chart and td_chart.get("candles_count", 0) >= 10:
+                    return td_chart
+            except Exception:
+                pass
 
     # 4. Live network fetch with query2 -> query1 fallback & retry
     endpoints = [

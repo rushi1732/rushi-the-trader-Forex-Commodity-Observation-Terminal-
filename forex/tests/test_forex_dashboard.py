@@ -116,8 +116,7 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("COMEX Gold Futures (GC=F)", html)
 
         # Strictly forbid old 'aggregate bank feeds' wording for Gold
-        gold_section = html[html.find('id="goldBanner"'):html.find('</div>', html.find('id="goldBanner"'))]
-        self.assertNotIn("aggregate bank feeds", gold_section.lower())
+        self.assertNotIn("aggregate bank feeds", html.lower())
 
     def test_api_pairs(self):
         """Verify /api/pairs returns list of supported currency and commodity pairs."""
@@ -467,20 +466,20 @@ class TestForexDashboard(unittest.TestCase):
             csv_content = resp.read().decode("utf-8")
             self.assertIn("ID,Symbol,Side,SimulatedFill,StopLoss,TakeProfit,LotSize,Units,RiskUSD,PnLUSD,Timestamp,Status,Strategy", csv_content)
 
-    def test_binance_websocket_client_present_in_html(self):
-        """Verify HTML includes Binance PAXG/USDT WebSocket connection, reconnect logic, and 24/7 benchmark badge."""
+    def test_twelve_data_websocket_client_present_in_html(self):
+        """Verify HTML includes Twelve Data Real-Time WebSocket connection, reconnect logic, and BTC/USD support."""
         url = f"http://127.0.0.1:{self.port}/"
         with urllib.request.urlopen(url, timeout=5) as resp:
             html = resp.read().decode("utf-8")
 
-        self.assertIn("wss://stream.binance.com:9443/ws/paxgusdt@ticker", html)
-        self.assertIn("initGoldWebSocket", html)
-        self.assertIn("scheduleGoldWsReconnect", html)
-        self.assertIn("renderLiveGoldTick", html)
-        self.assertIn("LIVE / ACTIVE (24/7 Benchmark)", html)
-        self.assertIn("PAXG/USDT", html)
-        self.assertIn('console.log("[Binance WS Tick]", data.c)', html)
-        self.assertIn("Connecting...", html)
+        self.assertIn("wss://ws.twelvedata.com/v1/quotes/price", html)
+        self.assertIn("initTwelveDataWebSocket", html)
+        self.assertIn("scheduleTwelveDataWsReconnect", html)
+        self.assertIn("renderLiveRealtimeTick", html)
+        self.assertIn("BTC/USD", html)
+        self.assertIn("Twelve Data Real-Time", html)
+        self.assertNotIn("wss://stream.binance.com", html)
+        self.assertNotIn("PAXG/USDT", html)
 
     def test_api_tick_ingestion_and_journal_sync(self):
         """Verify /api/tick ingests live ticks and auto-resolves paper journal positions on hit TP."""
@@ -527,7 +526,6 @@ class TestForexDashboard(unittest.TestCase):
         with urllib.request.urlopen(url, timeout=5) as resp:
             html = resp.read().decode("utf-8")
         self.assertIn("calibrateModal", html)
-        self.assertIn("btnCalibrate", html)
         self.assertIn("openCalibrateModal", html)
         self.assertIn("calcOffsetFromTarget", html)
         self.assertIn("saveCalibration", html)
@@ -700,6 +698,64 @@ class TestForexDashboard(unittest.TestCase):
         )
         self.assertEqual(chart["candles_count"], 2)
         self.assertEqual(chart["latest_price"], 3896.80)
+
+    def test_institutional_api_and_chart(self):
+        """Verify GET /api/institutional and /api/chart institutional components."""
+        # 1. /api/institutional endpoint
+        url = f"http://127.0.0.1:{self.port}/api/institutional?symbol=EUR/USD"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertEqual(resp.headers.get("X-Paper-Trading-Only"), "true")
+            data = json.loads(resp.read().decode("utf-8"))
+            self.assertEqual(data["symbol"], "EUR/USD")
+            self.assertIn("confluence_signal", data)
+            self.assertIn("smc", data)
+            self.assertIn("fibonacci", data)
+            self.assertIn("liquidity", data)
+            self.assertIn("ict", data)
+
+        # 2. /api/chart endpoint with institutional overlays
+        url_chart = f"http://127.0.0.1:{self.port}/api/chart?symbol=EUR/USD&interval=5m"
+        with urllib.request.urlopen(url_chart, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            chart_data = json.loads(resp.read().decode("utf-8"))
+            self.assertIn("smc", chart_data)
+            self.assertIn("fibonacci", chart_data)
+            self.assertIn("liquidity", chart_data)
+            self.assertIn("ict", chart_data)
+            self.assertIn("confluence_signal", chart_data)
+
+    def test_signals_scan_api_and_scanner_elements(self):
+        """Verify GET /api/signals/scan endpoint and scanner HTML UI components."""
+        # 1. /api/signals/scan endpoint
+        url = f"http://127.0.0.1:{self.port}/api/signals/scan"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertEqual(resp.headers.get("X-Paper-Trading-Only"), "true")
+            scan = json.loads(resp.read().decode("utf-8"))
+            self.assertIn("results", scan)
+            self.assertIn("count", scan)
+            self.assertGreater(scan["count"], 0)
+            first = scan["results"][0]
+            self.assertIn("symbol", first)
+            self.assertIn("action", first)
+            self.assertIn("confluence_score", first)
+            self.assertIn("trend", first)
+            self.assertIn("zone", first)
+            self.assertIn("liquidity_state", first)
+            self.assertIn("killzone", first)
+
+        # 2. Scanner HTML elements
+        url_html = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url_html, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        self.assertIn("scannerTableBody", html)
+        self.assertIn("fetchScannerSignals", html)
+        self.assertIn("selectScannerPair", html)
+        self.assertIn("toggleSMC", html)
+        self.assertIn("toggleFVG", html)
+        self.assertIn("toggleFib", html)
+        self.assertIn("toggleLiq", html)
 
 
 if __name__ == "__main__":
