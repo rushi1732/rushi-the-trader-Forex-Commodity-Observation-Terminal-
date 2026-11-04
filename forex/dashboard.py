@@ -69,11 +69,12 @@ except Exception:
 
 def save_cached_live_tick(sym: str, tick: Dict[str, Any]) -> None:
     try:
+        canon = normalize_symbol(sym)
         data = {}
         if os.path.exists(TICK_CACHE_FILE):
             with open(TICK_CACHE_FILE, "r", encoding="utf-8") as _fh:
                 data = json.load(_fh)
-        data[sym] = tick
+        data[canon] = tick
         with open(TICK_CACHE_FILE, "w", encoding="utf-8") as _fh:
             json.dump(data, _fh)
     except Exception:
@@ -82,10 +83,11 @@ def save_cached_live_tick(sym: str, tick: Dict[str, Any]) -> None:
 
 def load_cached_live_tick(sym: str) -> Optional[Dict[str, Any]]:
     try:
+        canon = normalize_symbol(sym)
         if os.path.exists(TICK_CACHE_FILE):
             with open(TICK_CACHE_FILE, "r", encoding="utf-8") as _fh:
                 data = json.load(_fh)
-            return data.get(sym) or data.get("XAU/USD")
+            return data.get(canon)
     except Exception:
         pass
     return None
@@ -4724,6 +4726,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             super().finish()
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
             pass
+
+    def end_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+        super().end_headers()
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(200)
+        self.end_headers()
 
     def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)

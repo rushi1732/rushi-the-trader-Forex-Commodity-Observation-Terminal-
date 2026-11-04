@@ -14,12 +14,22 @@ from forex.dashboard import DashboardRequestHandler
 class handler(DashboardRequestHandler):
     """Vercel Serverless Function HTTP request handler."""
 
-    def do_GET(self) -> None:
-        # Route root or index paths to the dashboard UI
-        if self.path in ("/", "/index.html", "/api", "/api/", "/api/index.py", "/api/index"):
+    def _resolve_vercel_path(self) -> None:
+        forwarded = self.headers.get("x-forwarded-uri") or self.headers.get("x-now-route-matches")
+        if forwarded:
+            self.path = forwarded
+        elif self.path in ("/", "/index.html", "/api", "/api/", "/api/index.py", "/api/index"):
             self.path = "/"
+
+    def do_GET(self) -> None:
+        self._resolve_vercel_path()
         super().do_GET()
 
     def do_POST(self) -> None:
+        self._resolve_vercel_path()
         super().do_POST()
+
+    def do_OPTIONS(self) -> None:
+        self._resolve_vercel_path()
+        super().do_OPTIONS()
 
