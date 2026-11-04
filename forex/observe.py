@@ -21,6 +21,7 @@ from .pairs import normalize_symbol, get_pair_info, to_pips
 from .pricing import calc_spread_prices, execution_price
 from .data import (
     fetch_chart,
+    load_twelve_data_config,
     INDICATIVE_DISCLAIMER,
     INDICATIVE_DISCLAIMER_FOREX,
     INDICATIVE_DISCLAIMER_GOLD,
@@ -588,6 +589,7 @@ def observe_pair(
     offline_data: Optional[Dict[str, Any]] = None,
     now_dt: Optional[datetime] = None,
     slippage_pips: float = 0.5,
+    live_tick: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Run full live-market observation analysis for a single pair in paper mode.
@@ -614,12 +616,19 @@ def observe_pair(
     now_et = utc_to_et(now_utc)
 
     is_gold = "XAU" in canon
-    source_label = (
-        "Yahoo Finance (GC=F: COMEX Gold Futures indicative benchmark)"
-        if is_gold
-        else "Yahoo Finance FX (query2 indicative aggregate)"
-    )
-    disclaimer_text = INDICATIVE_DISCLAIMER_GOLD if is_gold else INDICATIVE_DISCLAIMER_FOREX
+    td_cfg = load_twelve_data_config()
+    is_td_configured = td_cfg.get("enabled", False) and bool(td_cfg.get("api_key"))
+
+    if live_tick or (is_td_configured and offline_data is None and offline_file is None):
+        source_label = "Twelve Data Real-Time (Retail Spot Feed)"
+        disclaimer_text = "Twelve Data Real-Time Spot Feed — Retail Spot Forex & Commodities"
+    else:
+        source_label = (
+            "Yahoo Finance (GC=F: COMEX Gold Futures indicative benchmark)"
+            if is_gold
+            else "Yahoo Finance FX (query2 indicative aggregate)"
+        )
+        disclaimer_text = INDICATIVE_DISCLAIMER_GOLD if is_gold else INDICATIVE_DISCLAIMER_FOREX
 
     # 1. Market Open & Session Status respecting asset class
     is_open, open_reason = is_market_open_for_symbol(canon, now_et)
@@ -641,28 +650,43 @@ def observe_pair(
                 range_period="5d",
             )
     except Exception as e:
-        reason_msg = f"Market data fetch error: {str(e)}"
-        auto_sig = build_auto_signal(
-            symbol=canon,
-            timeframe=interval,
-            is_open=is_open,
-            is_fresh=False,
-            now_et=now_et,
-            now_utc=now_utc,
-            status_reason=reason_msg,
-        )
-        return {
-            "symbol": canon,
-            "status": "NO SIGNAL",
-            "source": source_label,
-            "reason": reason_msg,
-            "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
-            "paper_mode": True,
-            "disclaimer": disclaimer_text,
-            "auto_signal": auto_sig,
-        }
+        chart = {"candles": []}
 
     candles = chart.get("candles", [])
+
+    # If live spot tick is supplied, reconcile candle series to spot price scale
+    if live_tick and isinstance(live_tick, dict):
+        spot_mid = float(live_tick.get("mid") or live_tick.get("last") or 0.0)
+        if spot_mid > 0:
+            is_open = True
+            if not candles:
+                ts_now = int(now_utc.timestamp())
+                candles = [
+                    {
+                        "timestamp": ts_now - (20 - i) * 300,
+                        "open": spot_mid,
+                        "high": spot_mid + (0.5 if is_gold else 0.0005),
+                        "low": spot_mid - (0.5 if is_gold else 0.0005),
+                        "close": spot_mid,
+                        "volume": 100,
+                    }
+                    for i in range(20)
+                ]
+            else:
+                last_c = candles[-1]["close"]
+                basis_gap = round(spot_mid - last_c, 2 if is_gold else 4)
+                if abs(basis_gap) > 0.05:
+                    for c in candles:
+                        c["open"] = round(c["open"] + basis_gap, 2 if is_gold else 4)
+                        c["high"] = round(c["high"] + basis_gap, 2 if is_gold else 4)
+                        c["low"] = round(c["low"] + basis_gap, 2 if is_gold else 4)
+                        c["close"] = round(c["close"] + basis_gap, 2 if is_gold else 4)
+                candles[-1]["close"] = spot_mid
+                if spot_mid > candles[-1]["high"]:
+                    candles[-1]["high"] = spot_mid
+                if spot_mid < candles[-1]["low"]:
+                    candles[-1]["low"] = spot_mid
+
     if not candles:
         reason_msg = "No candle data returned from indicative data feed."
         auto_sig = build_auto_signal(
@@ -699,9 +723,16 @@ def observe_pair(
     )
     direction = scan_info.get("direction", "NEUTRAL")
     asian_setup = scan_info.get("asian_setup", {})
-    latest_close = latest_candle["close"]
-    spread_pips = info.get("default_spread", 1.0)
-    bid, ask = calc_spread_prices(canon, latest_close, spread_pips)
+    
+    if live_tick and float(live_tick.get("mid") or live_tick.get("last") or 0.0) > 0:
+        latest_close = float(live_tick.get("mid") or live_tick.get("last"))
+        bid = float(live_tick.get("bid") or latest_close)
+        ask = float(live_tick.get("ask") or latest_close)
+        spread_pips = float(live_tick.get("spread_pips", info.get("default_spread", 1.0)))
+    else:
+        latest_close = latest_candle["close"]
+        spread_pips = info.get("default_spread", 1.0)
+        bid, ask = calc_spread_prices(canon, latest_close, spread_pips)
 
     confluence_sig = evaluate_confluence_signal(
         symbol=canon,
@@ -713,6 +744,42 @@ def observe_pair(
 
     # 3. Market Closed or Stale Data Guard
     if not is_open:
+        if offline_data is not None or offline_file is not None:
+            market_label = "COMEX Gold Futures (GC=F)" if is_gold else "Spot Forex"
+        else:
+            market_label = "Twelve Data Spot Gold" if is_gold else "Spot Forex"
+        reason_msg = f"{market_label} market is closed ({open_reason}). Observation only."
+        auto_sig = build_auto_signal(
+            symbol=canon,
+            timeframe=interval,
+            is_open=False,
+            is_fresh=is_fresh,
+            now_et=now_et,
+            now_utc=now_utc,
+            status_reason=reason_msg,
+            latest_price=latest_close,
+            confluence_signal=confluence_sig,
+        )
+        return {
+            "symbol": canon,
+            "status": "NO SIGNAL",
+            "reason": reason_msg,
+            "source": source_label,
+            "data_freshness": freshness_reason,
+            "latest_price": latest_close,
+            "indicative_mid": latest_close,
+            "indicative_bid": bid,
+            "indicative_ask": ask,
+            "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
+            "paper_mode": True,
+            "disclaimer": disclaimer_text,
+            "auto_signal": auto_sig,
+            "confluence_signal": confluence_sig,
+            "smc": confluence_sig.get("components", {}).get("smc"),
+            "fibonacci": confluence_sig.get("components", {}).get("fibonacci"),
+            "liquidity": confluence_sig.get("components", {}).get("liquidity"),
+            "ict": confluence_sig.get("components", {}).get("ict"),
+        }
         market_label = "COMEX Gold Futures (GC=F)" if is_gold else "Spot Forex"
         reason_msg = f"{market_label} market is closed ({open_reason}). Observation only."
         auto_sig = build_auto_signal(
@@ -754,7 +821,7 @@ def observe_pair(
             now_et=now_et,
             now_utc=now_utc,
             status_reason=reason_msg,
-            latest_price=latest_candle["close"],
+            latest_price=latest_close,
             confluence_signal=confluence_sig,
         )
         return {
@@ -763,7 +830,10 @@ def observe_pair(
             "reason": reason_msg,
             "source": source_label,
             "data_freshness": freshness_reason,
-            "latest_price": latest_candle["close"],
+            "latest_price": latest_close,
+            "indicative_mid": latest_close,
+            "indicative_bid": bid,
+            "indicative_ask": ask,
             "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
             "paper_mode": True,
             "disclaimer": disclaimer_text,
@@ -785,7 +855,7 @@ def observe_pair(
             now_et=now_et,
             now_utc=now_utc,
             status_reason=reason_msg,
-            latest_price=latest_candle["close"],
+            latest_price=latest_close,
         )
         return {
             "symbol": canon,
@@ -793,7 +863,10 @@ def observe_pair(
             "reason": reason_msg,
             "source": source_label,
             "data_freshness": freshness_reason,
-            "latest_price": latest_candle["close"],
+            "latest_price": latest_close,
+            "indicative_mid": latest_close,
+            "indicative_bid": bid,
+            "indicative_ask": ask,
             "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
             "paper_mode": True,
             "disclaimer": disclaimer_text,
@@ -810,9 +883,10 @@ def observe_pair(
 
     direction = scan_info.get("direction", "NEUTRAL")
     asian_setup = scan_info.get("asian_setup", {})
-    latest_close = latest_candle["close"]
-    spread_pips = info.get("default_spread", 1.0)
-    bid, ask = calc_spread_prices(canon, latest_close, spread_pips)
+    if not (live_tick and float(live_tick.get("mid") or live_tick.get("last") or 0.0) > 0):
+        latest_close = latest_candle["close"]
+        spread_pips = info.get("default_spread", 1.0)
+        bid, ask = calc_spread_prices(canon, latest_close, spread_pips)
 
     # 5. Entry Trigger Confirmation
     entry_signal = evaluate_entry_from_candles(

@@ -57,7 +57,38 @@ if os.path.exists(TWELVE_DATA_CONFIG_PATH):
         pass
 
 # In-memory live WebSocket tick cache for real-time streams (Twelve Data Real-Time)
+TICK_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "live_ticks_cache.json")
 LIVE_TICKS: Dict[str, Dict[str, Any]] = {}
+try:
+    if os.path.exists(TICK_CACHE_FILE):
+        with open(TICK_CACHE_FILE, "r", encoding="utf-8") as _fh:
+            LIVE_TICKS.update(json.load(_fh))
+except Exception:
+    pass
+
+
+def save_cached_live_tick(sym: str, tick: Dict[str, Any]) -> None:
+    try:
+        data = {}
+        if os.path.exists(TICK_CACHE_FILE):
+            with open(TICK_CACHE_FILE, "r", encoding="utf-8") as _fh:
+                data = json.load(_fh)
+        data[sym] = tick
+        with open(TICK_CACHE_FILE, "w", encoding="utf-8") as _fh:
+            json.dump(data, _fh)
+    except Exception:
+        pass
+
+
+def load_cached_live_tick(sym: str) -> Optional[Dict[str, Any]]:
+    try:
+        if os.path.exists(TICK_CACHE_FILE):
+            with open(TICK_CACHE_FILE, "r", encoding="utf-8") as _fh:
+                data = json.load(_fh)
+            return data.get(sym) or data.get("XAU/USD")
+    except Exception:
+        pass
+    return None
 
 # Spot Gold (XAU/USD) live price calibration / offset settings
 GOLD_CALIBRATION: Dict[str, Any] = {
@@ -1702,7 +1733,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <span>Market Session: <strong id="healthSession">Open (London / NY)</strong></span>
                 </div>
                 <div class="health-pill">
-                    <span>Benchmark: <strong id="healthBenchmark">COMEX GC=F Futures</strong></span>
+                    <span>Benchmark: <strong id="healthBenchmark">Twelve Data Real-Time Spot (XAU/USD)</strong></span>
                 </div>
                 <div class="health-pill">
                     <span>Broker Connected: <strong style="color:var(--accent-rose);">None (Permanently Disabled)</strong></span>
@@ -1752,7 +1783,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </div>
                         <div class="meta-item">
                             <span class="meta-k">Data Source</span>
-                            <span id="sourceDisplay" class="meta-v">Yahoo Finance</span>
+                            <span id="sourceDisplay" class="meta-v">Twelve Data Real-Time (Retail Spot Feed)</span>
                         </div>
                         <div class="meta-item">
                             <span class="meta-k">Feed Freshness</span>
@@ -2845,26 +2876,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const decimals = (isGold || isBtc) ? 2 : (isJpy ? 2 : 4);
 
             const mid = data.indicative_mid || data.latest_price;
-            if (mid !== undefined && mid !== null) {
-                if (priceMid) priceMid.textContent = Number(mid).toFixed(decimals);
-            } else {
-                if (priceMid) priceMid.textContent = '--.----';
-            }
+            // Prevent polling from overwriting live Twelve Data WebSocket streaming price
+            if (!isLiveStreaming || !tdLiveTick) {
+                if (mid !== undefined && mid !== null) {
+                    if (priceMid) priceMid.textContent = Number(mid).toFixed(decimals);
+                } else {
+                    if (priceMid) priceMid.textContent = '--.----';
+                }
 
-            if (data.indicative_bid !== undefined && data.indicative_bid !== null) {
-                if (priceBid) priceBid.textContent = Number(data.indicative_bid).toFixed(decimals);
-                if (priceAsk) priceAsk.textContent = Number(data.indicative_ask).toFixed(decimals);
-            } else if (mid !== undefined && mid !== null) {
-                if (priceBid) priceBid.textContent = Number(mid).toFixed(decimals);
-                if (priceAsk) priceAsk.textContent = Number(mid).toFixed(decimals);
-            } else {
-                if (priceBid) priceBid.textContent = '--.----';
-                if (priceAsk) priceAsk.textContent = '--.----';
+                if (data.indicative_bid !== undefined && data.indicative_bid !== null) {
+                    if (priceBid) priceBid.textContent = Number(data.indicative_bid).toFixed(decimals);
+                    if (priceAsk) priceAsk.textContent = Number(data.indicative_ask).toFixed(decimals);
+                } else if (mid !== undefined && mid !== null) {
+                    if (priceBid) priceBid.textContent = Number(mid).toFixed(decimals);
+                    if (priceAsk) priceAsk.textContent = Number(mid).toFixed(decimals);
+                } else {
+                    if (priceBid) priceBid.textContent = '--.----';
+                    if (priceAsk) priceAsk.textContent = '--.----';
+                }
             }
 
             // Meta List
             document.getElementById('spreadDisplay').textContent = (data.spread_pips !== undefined && data.spread_pips !== null) ? (Number(data.spread_pips).toFixed(1) + ' pips') : 'N/A';
-            document.getElementById('sourceDisplay').textContent = data.source || 'Twelve Data Real-Time';
+            const srcDisplay = document.getElementById('sourceDisplay');
+            if (srcDisplay) {
+                if (isLiveStreaming || isGold || isBtc || (data.source && data.source.includes('Twelve Data'))) {
+                    srcDisplay.textContent = 'Twelve Data Real-Time (Retail Spot Feed)';
+                } else {
+                    srcDisplay.textContent = data.source || 'Twelve Data Real-Time (Retail Spot Feed)';
+                }
+            }
             if (isLiveStreaming) {
                 document.getElementById('freshnessDisplay').innerHTML = '<span style="color:var(--accent-green); font-weight:700;">● LIVE (0s ago)</span>';
             } else {
@@ -2981,31 +3022,50 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     elTf.textContent = autoSig.timeframe || currentInterval || '5m';
                 }
                 if (elEntry) {
-                    const entryP = (autoSig.entry_reference !== null && autoSig.entry_reference !== undefined)
-                        ? autoSig.entry_reference
-                        : (confPlan.entry_price || mid);
+                    let entryP = autoSig.entry_reference;
+                    if (isLiveStreaming && tdLiveTick && tdLiveTick.mid) {
+                        if (!entryP || Math.abs(entryP - tdLiveTick.mid) > 10.0) {
+                            entryP = tdLiveTick.mid;
+                        }
+                    } else if (!entryP && mid) {
+                        entryP = mid;
+                    }
                     elEntry.textContent = (entryP !== null && entryP !== undefined) ? Number(entryP).toFixed(decimals) : '--';
                 }
+                const activeEntry = (elEntry && elEntry.textContent !== '--') ? Number(elEntry.textContent) : (mid || 0);
+
                 if (elStop) {
-                    const fallbackStop = action === 'BUY' ? (Number(mid) - (decimals === 2 ? 5.0 : 0.0025)) : (Number(mid) + (decimals === 2 ? 5.0 : 0.0025));
-                    const stopVal = (autoSig.stop_loss !== null && autoSig.stop_loss !== undefined)
-                        ? autoSig.stop_loss
-                        : (confPlan.stop_loss || fallbackStop);
+                    const fallbackStop = action === 'BUY' ? (Number(activeEntry) - (decimals === 2 ? 5.0 : 0.0025)) : (Number(activeEntry) + (decimals === 2 ? 5.0 : 0.0025));
+                    let stopVal = autoSig.stop_loss;
+                    if (!stopVal || (action === 'BUY' && stopVal >= activeEntry) || (action === 'SELL' && stopVal <= activeEntry)) {
+                        stopVal = confPlan.stop_loss || fallbackStop;
+                    }
+                    if ((action === 'BUY' && stopVal >= activeEntry) || (action === 'SELL' && stopVal <= activeEntry)) {
+                        stopVal = fallbackStop;
+                    }
                     const diffPips = autoSig.risk_pips ? ` (${autoSig.risk_pips} pips)` : '';
                     elStop.textContent = (stopVal !== null && stopVal !== undefined) ? Number(stopVal).toFixed(decimals) + diffPips : '--';
                 }
                 if (elTarget) {
-                    const fallbackTp1 = action === 'BUY' ? (Number(mid) + (decimals === 2 ? 10.0 : 0.0050)) : (Number(mid) - (decimals === 2 ? 10.0 : 0.0050));
-                    const tpVal = (autoSig.take_profit !== null && autoSig.take_profit !== undefined)
-                        ? autoSig.take_profit
-                        : (confPlan.take_profit_1 || fallbackTp1);
+                    const fallbackTp1 = action === 'BUY' ? (Number(activeEntry) + (decimals === 2 ? 10.0 : 0.0050)) : (Number(activeEntry) - (decimals === 2 ? 10.0 : 0.0050));
+                    let tpVal = autoSig.take_profit;
+                    if (!tpVal || (action === 'BUY' && tpVal <= activeEntry) || (action === 'SELL' && tpVal >= activeEntry)) {
+                        tpVal = confPlan.take_profit_1 || fallbackTp1;
+                    }
+                    if ((action === 'BUY' && tpVal <= activeEntry) || (action === 'SELL' && tpVal >= activeEntry)) {
+                        tpVal = fallbackTp1;
+                    }
                     elTarget.textContent = (tpVal !== null && tpVal !== undefined) ? Number(tpVal).toFixed(decimals) : '--';
                 }
                 if (elTarget2) {
-                    const fallbackTp2 = action === 'BUY' ? (Number(mid) + (decimals === 2 ? 17.5 : 0.0087)) : (Number(mid) - (decimals === 2 ? 17.5 : 0.0087));
-                    const tp2Val = (autoSig.take_profit_2 !== null && autoSig.take_profit_2 !== undefined)
-                        ? autoSig.take_profit_2
-                        : (confPlan.take_profit_2 || fallbackTp2);
+                    const fallbackTp2 = action === 'BUY' ? (Number(activeEntry) + (decimals === 2 ? 17.5 : 0.0087)) : (Number(activeEntry) - (decimals === 2 ? 17.5 : 0.0087));
+                    let tp2Val = autoSig.take_profit_2;
+                    if (!tp2Val || (action === 'BUY' && tp2Val <= activeEntry) || (action === 'SELL' && tp2Val >= activeEntry)) {
+                        tp2Val = confPlan.take_profit_2 || fallbackTp2;
+                    }
+                    if ((action === 'BUY' && tp2Val <= activeEntry) || (action === 'SELL' && tp2Val >= activeEntry)) {
+                        tp2Val = fallbackTp2;
+                    }
                     elTarget2.textContent = (tp2Val !== null && tp2Val !== undefined) ? Number(tp2Val).toFixed(decimals) : '--';
                 }
                 if (elConf) {
@@ -4676,14 +4736,14 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             interval = params.get("interval", ["5m"])[0]
             canon = normalize_symbol(sym)
             try:
-                obs = observe_pair(
-                    sym,
-                    interval=interval,
-                    offline_data=self.OFFLINE_DATA,
-                )
+                live = None
                 if self.OFFLINE_DATA is None:
                     live = LIVE_TICKS.get(canon)
-                    if not live or (time.time() - live.get("received_at", 0) >= 30):
+                    if not live and ("XAU" in canon and "XAU/USD" in LIVE_TICKS):
+                        live = LIVE_TICKS["XAU/USD"]
+                    if not live:
+                        live = load_cached_live_tick(canon)
+                    if not live or (time.time() - live.get("received_at", 0) >= 60):
                         td_quote = fetch_twelve_data_quote(canon)
                         if td_quote:
                             live = {
@@ -4696,26 +4756,42 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                                 "received_at": time.time(),
                             }
                             LIVE_TICKS[canon] = live
-                    if live:
-                        obs["indicative_mid"] = live["mid"]
-                        obs["latest_price"] = live["mid"]
-                        obs["indicative_bid"] = live["bid"]
-                        obs["indicative_ask"] = live["ask"]
-                        pip_div = 0.10 if "XAU" in canon else (1.0 if "BTC" in canon else (0.01 if "JPY" in canon else 0.0001))
-                        obs["spread_pips"] = round(max(0.0, live["ask"] - live["bid"]) / pip_div, 1)
-                        obs["data_freshness"] = "LIVE (0s ago)"
-                        obs["source"] = "Twelve Data Real-Time (Retail Spot Feed)"
-                        obs["status"] = "LIVE / ACTIVE (Twelve Data Spot Feed)"
-                        obs["market_state"] = "ACTIVE (24/7 Spot)" if ("XAU" in canon or "BTC" in canon) else "ACTIVE (Twelve Data Real-Time)"
-                        obs["is_market_open"] = True
-                        obs["is_live_24_7"] = ("XAU" in canon or "BTC" in canon)
-                        obs["active_sessions"] = ["24/7 Spot Benchmark"] if ("XAU" in canon or "BTC" in canon) else obs.get("active_sessions", ["Open Session"])
-                        obs["reason"] = f"Twelve Data Real-Time spot feed active for {canon}. Direct institutional spot rates."
-                        if obs.get("auto_signal"):
-                            auto = obs["auto_signal"]
-                            if auto.get("action") == "NO SIGNAL" and "closed" in (auto.get("reason") or "").lower():
-                                auto["is_market_open"] = True
-                                auto["reason"] = f"Twelve Data Real-Time live feed active for {canon}."
+                            save_cached_live_tick(canon, live)
+
+                obs = observe_pair(
+                    sym,
+                    interval=interval,
+                    offline_data=self.OFFLINE_DATA,
+                    live_tick=live,
+                )
+                if self.OFFLINE_DATA is None and live:
+                    obs["indicative_mid"] = live["mid"]
+                    obs["latest_price"] = live["mid"]
+                    obs["indicative_bid"] = live["bid"]
+                    obs["indicative_ask"] = live["ask"]
+                    pip_div = 0.10 if "XAU" in canon else (1.0 if "BTC" in canon else (0.01 if "JPY" in canon else 0.0001))
+                    obs["spread_pips"] = round(max(0.0, live["ask"] - live["bid"]) / pip_div, 1)
+                    obs["data_freshness"] = "LIVE (0s ago)"
+                    obs["source"] = "Twelve Data Real-Time (Retail Spot Feed)"
+                    obs["status"] = "LIVE / ACTIVE (Twelve Data Spot Feed)"
+                    obs["market_state"] = "ACTIVE (24/7 Spot)" if ("XAU" in canon or "BTC" in canon) else "ACTIVE (Twelve Data Real-Time)"
+                    obs["is_market_open"] = True
+                    obs["is_live_24_7"] = ("XAU" in canon or "BTC" in canon)
+                    obs["active_sessions"] = ["24/7 Spot Benchmark"] if ("XAU" in canon or "BTC" in canon) else obs.get("active_sessions", ["Open Session"])
+                    obs["reason"] = f"Twelve Data Real-Time spot feed active for {canon}. Direct institutional spot rates."
+                    if obs.get("auto_signal"):
+                        auto = obs["auto_signal"]
+                        auto["is_market_open"] = True
+                        if auto.get("action") in ("BUY", "SELL"):
+                            if auto.get("entry_reference") and abs(auto["entry_reference"] - live["mid"]) > 10.0:
+                                diff = round(live["mid"] - auto["entry_reference"], 2 if "XAU" in canon else 4)
+                                auto["entry_reference"] = live["mid"]
+                                if auto.get("stop_loss"):
+                                    auto["stop_loss"] = round(auto["stop_loss"] + diff, 2 if "XAU" in canon else 4)
+                                if auto.get("take_profit"):
+                                    auto["take_profit"] = round(auto["take_profit"] + diff, 2 if "XAU" in canon else 4)
+                                if auto.get("take_profit_2"):
+                                    auto["take_profit_2"] = round(auto["take_profit_2"] + diff, 2 if "XAU" in canon else 4)
                 if "XAU" in canon and GOLD_CALIBRATION["offset"] != 0.0:
                     c_off = GOLD_CALIBRATION["offset"]
                     if obs.get("indicative_mid") is not None:
@@ -4792,6 +4868,23 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         offline_data=self.OFFLINE_DATA,
                     )
                 candles = chart.get("candles", [])
+                live_c = None
+                if self.OFFLINE_DATA is None:
+                    live_c = LIVE_TICKS.get(canon) or load_cached_live_tick(canon)
+                if live_c and candles:
+                    spot_mid = float(live_c.get("mid") or live_c.get("last") or 0.0)
+                    if spot_mid > 0:
+                        last_c = candles[-1]["close"]
+                        basis_gap = round(spot_mid - last_c, 2 if "XAU" in canon else 4)
+                        if abs(basis_gap) > 0.05:
+                            for c in candles:
+                                c["open"] = round(c["open"] + basis_gap, 2)
+                                c["high"] = round(c["high"] + basis_gap, 2)
+                                c["low"] = round(c["low"] + basis_gap, 2)
+                                c["close"] = round(c["close"] + basis_gap, 2)
+                        candles[-1]["close"] = spot_mid
+                        source_feed = "Twelve Data Real-Time (Retail Spot Feed)"
+
                 for c in candles:
                     if "time" not in c:
                         c["time"] = c.get("timestamp")
@@ -4803,7 +4896,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 ema21 = calculate_ema(closes, 21)
 
                 try:
-                    obs = observe_pair(canon, interval=interval, offline_data=self.OFFLINE_DATA)
+                    obs = observe_pair(canon, interval=interval, offline_data=self.OFFLINE_DATA, live_tick=live_c)
                     auto_sig = obs.get("auto_signal") or {}
                 except Exception:
                     obs = {}
@@ -4826,11 +4919,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     ema9 = [round(v + c_offset, 2) if v is not None else None for v in ema9]
                     ema21 = [round(v + c_offset, 2) if v is not None else None for v in ema21]
 
-                is_twelve_data = "Twelve Data" in source_feed
+                is_twelve_data = "Twelve Data" in source_feed or (TWELVE_DATA_CONFIG.get("enabled", False) and self.OFFLINE_DATA is None)
                 res = {
                     "symbol": canon,
                     "interval": interval,
-                    "source": source_feed if is_twelve_data else obs.get("source", "Yahoo Finance Indicative"),
+                    "source": "Twelve Data Real-Time (Retail Spot Feed)" if is_twelve_data else obs.get("source", "Yahoo Finance Indicative"),
                     "provider": "twelvedata" if is_twelve_data else "yahoo",
                     "is_gold": "XAU" in canon,
                     "calibrated_offset": GOLD_CALIBRATION["offset"] if "XAU" in canon else 0.0,
@@ -5104,7 +5197,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             last = float(payload.get("last", mid))
             event_ts = payload.get("timestamp", int(time.time() * 1000))
             if mid > 0:
-                LIVE_TICKS[sym] = {
+                t_obj = {
                     "symbol": sym,
                     "mid": mid,
                     "bid": bid,
@@ -5113,6 +5206,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     "event_time": event_ts,
                     "received_at": time.time(),
                 }
+                LIVE_TICKS[sym] = t_obj
+                save_cached_live_tick(sym, t_obj)
                 update_journal_positions(mid, sym)
 
             self.send_response(200)

@@ -98,21 +98,32 @@ def load_twelve_data_config() -> Dict[str, Any]:
     return {"api_key": "73345dbfbdc94360af524b86732676d2", "enabled": True, "provider": "twelvedata"}
 
 
+_TD_QUOTE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_TD_CHART_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+
+
 def fetch_twelve_data_quote(symbol: str, api_key: str = "", timeout: int = 4) -> Optional[Dict[str, Any]]:
-    """Fetch live real-time spot quote for any symbol from Twelve Data API."""
+    """Fetch live real-time spot quote for any symbol from Twelve Data API with caching."""
     canon = normalize_symbol(symbol)
+    now_t = time.time()
+    
+    # Check fresh in-memory quote cache (15s validity to prevent 429 rate limit)
+    cached = _TD_QUOTE_CACHE.get(canon)
+    if cached and (now_t - cached[0] < 15):
+        return dict(cached[1])
+
     if not api_key:
         cfg = load_twelve_data_config()
         api_key = cfg.get("api_key", "73345dbfbdc94360af524b86732676d2")
     if not api_key:
-        return None
+        return dict(cached[1]) if cached else None
 
     try:
         url = f"https://api.twelvedata.com/quote?symbol={canon}&apikey={api_key}"
         raw = http_get(url, timeout=timeout)
         data = json.loads(raw)
         if not isinstance(data, dict) or data.get("status") == "error":
-            return None
+            return dict(cached[1]) if cached else None
         last_price = float(data.get("close") or data.get("price") or 0.0)
         bid = float(data.get("bid") or last_price)
         ask = float(data.get("ask") or last_price)
@@ -126,7 +137,7 @@ def fetch_twelve_data_quote(symbol: str, api_key: str = "", timeout: int = 4) ->
         pip_unit = 0.10 if is_gold else (1.0 if is_btc else (0.01 if "JPY" in canon else 0.0001))
         spread_pips = round(max(0.0, ask - bid) / pip_unit, 2)
 
-        return {
+        res = {
             "symbol": canon,
             "feed": "Twelve Data Real-Time (Retail Spot Feed)",
             "bid": bid,
@@ -138,7 +149,12 @@ def fetch_twelve_data_quote(symbol: str, api_key: str = "", timeout: int = 4) ->
             "timestamp": int(time.time()),
             "is_live_24_7": is_gold or is_btc,
         }
+        _TD_QUOTE_CACHE[canon] = (now_t, res)
+        return res
     except Exception:
+        # On 429 or network failure, return cached quote if available
+        if cached:
+            return dict(cached[1])
         return None
 
 
@@ -368,7 +384,7 @@ def fetch_twelve_data_chart(
     api_key: str = "",
     offline_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Fetch spot candles from Twelve Data API."""
+    """Fetch spot candles from Twelve Data API with in-memory & disk caching."""
     canon = normalize_symbol(symbol)
     if offline_data:
         if "values" in offline_data:
@@ -379,7 +395,18 @@ def fetch_twelve_data_chart(
                 return parse_twelve_data_chart(sub, canon, interval)
             raise KeyError(f"No offline Twelve Data format found for {canon}")
 
+    cache_key = f"{canon}_{interval}"
+    now_t = time.time()
+    cached = _TD_CHART_CACHE.get(cache_key)
+    if cached and (now_t - cached[0] < 90):
+        return dict(cached[1])
+
     if not api_key:
+        cfg = load_twelve_data_config()
+        api_key = cfg.get("api_key", "73345dbfbdc94360af524b86732676d2")
+    if not api_key:
+        if cached:
+            return dict(cached[1])
         raise ValueError("Twelve Data API key is required.")
 
     td_interval = "5min"
@@ -397,6 +424,18 @@ def fetch_twelve_data_chart(
         td_interval = "1day"
 
     url = f"https://api.twelvedata.com/time_series?symbol={canon}&interval={td_interval}&outputsize=60&apikey={api_key}"
-    raw_text = http_get(url)
-    data = json.loads(raw_text)
+    try:
+        raw_text = http_get(url)
+        data = json.loads(raw_text)
+        chart = parse_twelve_data_chart(data, canon, interval)
+        if chart.get("candles_count", 0) >= 10:
+            _TD_CHART_CACHE[cache_key] = (now_t, chart)
+            return chart
+    except Exception:
+        # On 429 or network error, return cached chart if available
+        if cached:
+            return dict(cached[1])
+        raise
+    if cached:
+        return dict(cached[1])
     return parse_twelve_data_chart(data, canon, interval)

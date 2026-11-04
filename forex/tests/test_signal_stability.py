@@ -353,6 +353,43 @@ class TestSignalStability(unittest.TestCase):
             self.assertLess(sig["take_profit"], sig["entry_reference"])
             self.assertLess(sig["take_profit_2"], sig["take_profit"])
 
+    def test_observe_pair_locks_to_twelve_data_spot_and_reconciles_entry_reference(self):
+        """Verify that when Twelve Data live tick is provided, observe_pair strictly uses Twelve Data spot price."""
+        from forex.observe import observe_pair
+        import time
+        mock_candles = {
+            "GC=F": {
+                "chart": {
+                    "result": [{
+                        "meta": {"currency": "USD", "symbol": "GC=F"},
+                        "timestamp": [1700000000 + i * 300 for i in range(20)],
+                        "indicators": {"quote": [{
+                            "open": [3900.0] * 20,
+                            "high": [3905.0] * 20,
+                            "low": [3898.0] * 20,
+                            "close": [3902.0] * 20,
+                            "volume": [100] * 20,
+                        }]}
+                    }],
+                    "error": None
+                }
+            }
+        }
+        live_spot = {
+            "symbol": "XAU/USD",
+            "mid": 4055.20,
+            "bid": 4055.05,
+            "ask": 4055.35,
+            "last": 4055.20,
+            "received_at": time.time(),
+        }
+        obs = observe_pair("XAU/USD", offline_data=mock_candles, live_tick=live_spot)
+        self.assertEqual(obs["indicative_mid"], 4055.20)
+        self.assertEqual(obs["latest_price"], 4055.20)
+        self.assertEqual(obs["source"], "Twelve Data Real-Time (Retail Spot Feed)")
+        if obs.get("auto_signal") and obs["auto_signal"].get("entry_reference"):
+            self.assertEqual(obs["auto_signal"]["entry_reference"], 4055.20)
+
 
 if __name__ == "__main__":
     unittest.main()
