@@ -225,12 +225,14 @@ def analyze_pair(
     signals = []
     direction = "NEUTRAL"
 
-    if orb_setup["direction"] == "LONG":
+    if orb_setup["direction"] == "LONG" and trend != "BEARISH":
         signals.append(f"Asian Breakout Long (+{orb_setup.get('pips_beyond', 0):.1f}p)")
         direction = "BULLISH"
-    elif orb_setup["direction"] == "SHORT":
+    elif orb_setup["direction"] == "SHORT" and trend != "BULLISH":
         signals.append(f"Asian Breakdown Short (-{orb_setup.get('pips_beyond', 0):.1f}p)")
         direction = "BEARISH"
+    elif trend != "NEUTRAL":
+        direction = trend
 
     if latest_rsi is not None:
         if latest_rsi < 30.0:

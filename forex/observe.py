@@ -274,15 +274,20 @@ class SignalStateManager:
                 if tp2 is not None and current_price <= tp2:
                     is_tp2_hit = True
 
-            # Check market structure opposite break
+            # Check market structure opposite break (BOS or CHoCH)
             is_struct_break = False
             if confluence_signal:
-                choch = confluence_signal.get("components", {}).get("smc", {}).get("structure", {}).get("latest_choch")
-                if choch and choch.get("bias"):
-                    if side == "BUY" and choch["bias"] == "BEARISH":
-                        is_struct_break = True
-                    elif side == "SELL" and choch["bias"] == "BULLISH":
-                        is_struct_break = True
+                smc_comp = confluence_signal.get("components", {}).get("smc") or {}
+                struct_comp = smc_comp.get("structure") or {}
+                choch = struct_comp.get("latest_choch") or {}
+                bos = struct_comp.get("latest_bos") or {}
+                choch_dir = choch.get("direction") or choch.get("bias")
+                bos_dir = bos.get("direction") or bos.get("bias")
+
+                if side == "BUY" and (choch_dir == "BEARISH" or bos_dir == "BEARISH"):
+                    is_struct_break = True
+                elif side == "SELL" and (choch_dir == "BULLISH" or bos_dir == "BULLISH"):
+                    is_struct_break = True
 
             if is_sl_hit or is_tp2_hit or is_struct_break:
                 # Signal is INVALIDATED! (Req 4: never switch directly from BUY to SELL. First invalidate, transition to waiting)

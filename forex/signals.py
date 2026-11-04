@@ -27,6 +27,7 @@ from .smc import analyze_smc
 from .ict import analyze_ict
 from .liquidity import analyze_liquidity
 from .data import fetch_chart, MAJOR_PAIRS
+from .backtest import calculate_ema
 
 
 def evaluate_confluence_signal(
@@ -73,6 +74,25 @@ def evaluate_confluence_signal(
     bearish_score = 0
     bullish_factors = []
     bearish_factors = []
+
+    # Factor 0: Short-term Trend & Exponential Moving Average (EMA) Momentum
+    closes = [c["close"] for c in candles]
+    ema9_series = calculate_ema(closes, 9)
+    ema21_series = calculate_ema(closes, 21)
+    ema9 = ema9_series[-1] if ema9_series and ema9_series[-1] is not None else None
+    ema21 = ema21_series[-1] if ema21_series and ema21_series[-1] is not None else None
+
+    is_bearish_momentum = False
+    is_bullish_momentum = False
+    if ema9 and ema21:
+        if current_price < ema9 < ema21:
+            is_bearish_momentum = True
+            bearish_score += 20
+            bearish_factors.append(f"Bearish Trend & Momentum: Price ({current_price:.2f}) < EMA-9 ({ema9:.2f}) < EMA-21 ({ema21:.2f})")
+        elif current_price > ema9 > ema21:
+            is_bullish_momentum = True
+            bullish_score += 20
+            bullish_factors.append(f"Bullish Trend & Momentum: Price ({current_price:.2f}) > EMA-9 ({ema9:.2f}) > EMA-21 ({ema21:.2f})")
 
     # Factor A: Market Structure (BOS / CHoCH)
     structure = smc_data.get("structure", {})
@@ -141,33 +161,41 @@ def evaluate_confluence_signal(
     sweet_spot = fib_data.get("ote_sweet_spot")
 
     if zone == "DISCOUNT":
-        bullish_score += 10
-        bullish_factors.append(f"Price in Discount Zone (< Equilibrium {fib_data.get('equilibrium')}) - Favorable for Longs")
+        if not is_bearish_momentum or (latest_choch and latest_choch.get("direction") == "BULLISH"):
+            bullish_score += 10
+            bullish_factors.append(f"Price in Discount Zone (< Equilibrium {fib_data.get('equilibrium')}) - Favorable for Longs")
     elif zone == "PREMIUM":
-        bearish_score += 10
-        bearish_factors.append(f"Price in Premium Zone (> Equilibrium {fib_data.get('equilibrium')}) - Favorable for Shorts")
+        if not is_bullish_momentum or (latest_choch and latest_choch.get("direction") == "BEARISH"):
+            bearish_score += 10
+            bearish_factors.append(f"Price in Premium Zone (> Equilibrium {fib_data.get('equilibrium')}) - Favorable for Shorts")
 
     if in_ote:
-        if zone == "DISCOUNT":
+        if zone == "DISCOUNT" and not is_bearish_momentum:
             bullish_score += 15
             bullish_factors.append(f"In ICT Optimal Trade Entry (OTE) 61.8% - 78.6% Golden Pocket (Sweet spot: {sweet_spot})")
-        elif zone == "PREMIUM":
+        elif zone == "PREMIUM" and not is_bullish_momentum:
             bearish_score += 15
             bearish_factors.append(f"In ICT Optimal Trade Entry (OTE) 61.8% - 78.6% Golden Pocket (Sweet spot: {sweet_spot})")
 
     # Factor E: Liquidity Sweeps & Stop-Loss Hunt (Turtle Soup)
     sweeps = liq_data.get("sweeps", {})
     if sweeps.get("has_bullish_sweep"):
-        bullish_score += 25
         latest_sw = sweeps.get("latest_sweep", {})
-        desc = latest_sw.get("description", "Sell-Side Liquidity Swept (Stop Hunt)")
-        bullish_factors.append(f"[LIQUIDITY HUNT] {desc}")
+        sw_idx = latest_sw.get("candle_index", 0)
+        c_last = candles[-1]
+        if sw_idx >= len(candles) - 3 and (c_last["close"] >= c_last["open"] or c_last["close"] > latest_sw.get("level_price", 0)):
+            bullish_score += 25
+            desc = latest_sw.get("description", "Sell-Side Liquidity Swept (Stop Hunt)")
+            bullish_factors.append(f"[LIQUIDITY HUNT] {desc}")
 
     if sweeps.get("has_bearish_sweep"):
-        bearish_score += 25
         latest_sw = sweeps.get("latest_sweep", {})
-        desc = latest_sw.get("description", "Buy-Side Liquidity Swept (Stop Hunt)")
-        bearish_factors.append(f"[LIQUIDITY HUNT] {desc}")
+        sw_idx = latest_sw.get("candle_index", 0)
+        c_last = candles[-1]
+        if sw_idx >= len(candles) - 3 and (c_last["close"] <= c_last["open"] or c_last["close"] < latest_sw.get("level_price", 0)):
+            bearish_score += 25
+            desc = latest_sw.get("description", "Buy-Side Liquidity Swept (Stop Hunt)")
+            bearish_factors.append(f"[LIQUIDITY HUNT] {desc}")
 
     # Factor F: ICT Session & Killzones
     kz_data = ict_data.get("killzones", {})
@@ -240,6 +268,17 @@ def evaluate_confluence_signal(
     recent_bsl = [s for s in recent_sweeps if s.get("sentiment") == "BEARISH" and s.get("candle_index", 0) >= len(candles) - 2]
     if recent_bsl and to_pips(canon, abs(current_price - recent_bsl[-1]["level_price"])) <= 5.0:
         bearish_entry_zones.append(f"Turtle Soup BSL Sweep Zone at {recent_bsl[-1]['level_price']}")
+
+    # Veto check: Never BUY into a falling knife with bearish momentum & red candle close
+    last_candle = candles[-1] if candles else {}
+    is_last_candle_bearish = (last_candle.get("close", 0) < last_candle.get("open", 0))
+    if is_bearish_momentum and is_last_candle_bearish and not (latest_choch and latest_choch.get("direction") == "BULLISH"):
+        bullish_entry_zones = []
+
+    # Never SELL into a vertical pump with bullish momentum & green candle close
+    is_last_candle_bullish = (last_candle.get("close", 0) > last_candle.get("open", 0))
+    if is_bullish_momentum and is_last_candle_bullish and not (latest_choch and latest_choch.get("direction") == "BEARISH"):
+        bearish_entry_zones = []
 
     in_bullish_entry_zone = len(bullish_entry_zones) > 0
     in_bearish_entry_zone = len(bearish_entry_zones) > 0
