@@ -2982,7 +2982,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             document.getElementById('biasDisplay').textContent = data.direction || 'NEUTRAL';
 
             // Automatic Signal Generation Engine Mapping (Synced with Institutional Strategy Matrix)
-            const autoSig = data.auto_signal || {};
+            const autoSigRaw = data.auto_signal || {};
+            // Strict symbol isolation check: verify that auto_signal strictly belongs to the currently selected pair
+            const autoSig = (autoSigRaw && autoSigRaw.symbol && normalizeSym(autoSigRaw.symbol) === normSym) ? autoSigRaw : {};
             const confSig = data.confluence_signal || {};
             const confPlan = (confSig && confSig.execution_plan) ? confSig.execution_plan : {};
             const autoBadge = document.getElementById('autoSignalBadge');
@@ -3034,12 +3036,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
                 if (elEntry) {
                     let entryP = autoSig.entry_reference;
+                    // Sanity check: ensure entry price is in range for this symbol and not leaked from another pair
                     if (isLiveStreaming && activeTick && activeTick.mid && normalizeSym(activeTick.symbol) === normSym) {
-                        if (!entryP || Math.abs(entryP - activeTick.mid) > (isBtc ? 1000.0 : 10.0)) {
+                        if (!entryP || Math.abs(entryP - activeTick.mid) > (isBtc ? 1500.0 : 25.0)) {
                             entryP = activeTick.mid;
                         }
-                    } else if (!entryP && mid) {
-                        entryP = mid;
+                    } else if (mid) {
+                        if (!entryP || Math.abs(entryP - mid) / mid > 0.25) {
+                            entryP = mid;
+                        }
                     }
                     elEntry.textContent = (entryP !== null && entryP !== undefined) ? Number(entryP).toFixed(decimals) : '--';
                 }
@@ -3052,6 +3057,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (elStop) {
                     const fallbackStop = action === 'BUY' ? (Number(activeEntry) - stopDist) : (Number(activeEntry) + stopDist);
                     let stopVal = autoSig.stop_loss;
+                    // Sanity check: discard cross-asset stop loss
+                    if (stopVal && activeEntry && Math.abs(stopVal - activeEntry) / activeEntry > 0.25) {
+                        stopVal = fallbackStop;
+                    }
                     if (!stopVal || (action === 'BUY' && stopVal >= activeEntry) || (action === 'SELL' && stopVal <= activeEntry)) {
                         stopVal = confPlan.stop_loss || fallbackStop;
                     }
@@ -3064,6 +3073,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (elTarget) {
                     const fallbackTp1 = action === 'BUY' ? (Number(activeEntry) + tp1Dist) : (Number(activeEntry) - tp1Dist);
                     let tpVal = autoSig.take_profit;
+                    // Sanity check: discard cross-asset take profit
+                    if (tpVal && activeEntry && Math.abs(tpVal - activeEntry) / activeEntry > 0.25) {
+                        tpVal = fallbackTp1;
+                    }
                     if (!tpVal || (action === 'BUY' && tpVal <= activeEntry) || (action === 'SELL' && tpVal >= activeEntry)) {
                         tpVal = confPlan.take_profit_1 || fallbackTp1;
                     }
@@ -3075,6 +3088,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (elTarget2) {
                     const fallbackTp2 = action === 'BUY' ? (Number(activeEntry) + tp2Dist) : (Number(activeEntry) - tp2Dist);
                     let tp2Val = autoSig.take_profit_2;
+                    // Sanity check: discard cross-asset take profit 2
+                    if (tp2Val && activeEntry && Math.abs(tp2Val - activeEntry) / activeEntry > 0.25) {
+                        tp2Val = fallbackTp2;
+                    }
                     if (!tp2Val || (action === 'BUY' && tp2Val <= activeEntry) || (action === 'SELL' && tp2Val >= activeEntry)) {
                         tp2Val = confPlan.take_profit_2 || fallbackTp2;
                     }

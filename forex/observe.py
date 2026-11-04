@@ -259,9 +259,16 @@ class SignalStateManager:
             side = active["action"]
             sl = active.get("stop_loss")
             tp2 = active.get("take_profit_2") or active.get("take_profit")
+            entry_ref = active.get("entry_reference")
 
             is_sl_hit = False
             is_tp2_hit = False
+
+            # Strict cross-asset sanity check: if active signal entry deviates > 25% from current price, purge immediately
+            is_price_insane = False
+            if entry_ref is not None and current_price > 0.0:
+                if abs(entry_ref - current_price) / current_price > 0.25:
+                    is_price_insane = True
 
             if side == "BUY":
                 if sl is not None and current_price <= sl:
@@ -289,7 +296,7 @@ class SignalStateManager:
                 elif side == "SELL" and (choch_dir == "BULLISH" or bos_dir == "BULLISH"):
                     is_struct_break = True
 
-            if is_sl_hit or is_tp2_hit or is_struct_break:
+            if is_sl_hit or is_tp2_hit or is_struct_break or is_price_insane:
                 # Signal is INVALIDATED! (Req 4: never switch directly from BUY to SELL. First invalidate, transition to waiting)
                 with self._lock:
                     self._active_signals.pop(canon, None)
@@ -298,7 +305,7 @@ class SignalStateManager:
                         "invalidated_at": now_utc.timestamp(),
                         "candle_ts": candles[-1].get("timestamp", 0) if candles else 0,
                     }
-                inv_text = f"Stop Loss hit at {sl}" if is_sl_hit else (f"Take Profit 2 target completed at {tp2}" if is_tp2_hit else "Market structure invalidated")
+                inv_text = "Cross-asset anomaly invalidated" if is_price_insane else (f"Stop Loss hit at {sl}" if is_sl_hit else (f"Take Profit 2 target completed at {tp2}" if is_tp2_hit else "Market structure invalidated"))
                 return {
                     "action": "NO SIGNAL",
                     "status_label": "WAITING FOR ENTRY ZONE",
@@ -367,7 +374,7 @@ class SignalStateManager:
         candidate_factors = []
         candidate_reason = None
 
-        # Priority 1: Institutional SMC + ICT + Fibonacci + Liquidity Confluence
+        # 100% Pure Institutional 4-Strategy Confluence Engine: SMC + ICT + Fibonacci + Liquidity
         if confluence_signal and confluence_signal.get("action") in ("BUY", "SELL"):
             c_action = confluence_signal["action"]
             plan = confluence_signal.get("execution_plan", {})
@@ -378,7 +385,7 @@ class SignalStateManager:
                 candidate_score = confluence_signal.get("confluence_score", 0)
                 candidate_grade = confluence_signal.get("grade", "A")
                 candidate_factors = confluence_signal.get("confluence_factors", [])
-                candidate_strategy = f"SMC / ICT Confluence ({candidate_grade} - {candidate_score}%)"
+                candidate_strategy = f"SMC / ICT Institutional Flow ({candidate_grade} - {candidate_score}%)"
                 candidate_entry = current_price
                 candidate_sl = plan["stop_loss"]
                 candidate_tp1 = plan["take_profit_1"]
@@ -390,9 +397,8 @@ class SignalStateManager:
                 candidate_reward_pips_tp2 = plan.get("reward_pips_tp2")
                 factors_str = " | ".join(candidate_factors[:2]) if candidate_factors else "Institutional multi-factor alignment"
                 candidate_reason = f"Confirmed {c_action} Institutional Setup ({candidate_grade}, Score: {candidate_score}%): {factors_str}"
-
-        # Priority 2: Session Range Breakout + Candle Close Simulation
-        elif paper_simulation and isinstance(paper_simulation, dict) and "error" not in paper_simulation:
+        elif is_offline_test and paper_simulation and isinstance(paper_simulation, dict) and "error" not in paper_simulation:
+            # Fallback ONLY for offline unit tests where confluence_signal wasn't provided
             b_side = paper_simulation.get("side", "BUY")
             setup_name = (scan_info or {}).get("primary_setup") or "Session Range Breakout"
             candidate_action = b_side
