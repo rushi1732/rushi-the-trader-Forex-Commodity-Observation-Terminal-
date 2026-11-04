@@ -1816,24 +1816,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
                             Automatic Signal Engine
                         </span>
-                        <span id="autoSignalBadge" class="badge badge-amber">NO SIGNAL</span>
+                        <span id="autoSignalBadge" class="badge badge-amber">WAITING FOR ENTRY ZONE</span>
                     </div>
 
                     <!-- Hero Action Display -->
                     <div id="autoSignalHero" class="signal-hero no-signal">
-                        <div id="autoSignalAction" class="signal-action">NO SIGNAL</div>
-                        <div id="autoSignalReason" class="signal-reason">Checking market schedule and data freshness...</div>
+                        <div id="autoSignalAction" class="signal-action">WAITING FOR ENTRY ZONE</div>
+                        <div id="autoSignalReason" class="signal-reason">Waiting for market price to reach valid entry zone...</div>
                     </div>
 
                     <!-- Signal Metadata List -->
                     <div class="meta-list" style="margin-bottom: 12px;">
                         <div class="meta-item">
                             <span class="meta-k">Active Strategy</span>
-                            <span id="autoSignalStrategy" class="meta-v" style="font-size:11px;">trader-scanner + trader-entry</span>
+                            <span id="autoSignalStrategy" class="meta-v" style="font-size:11px;">--</span>
                         </div>
                         <div class="meta-item">
                             <span class="meta-k">Timeframe</span>
-                            <span id="autoSignalTimeframe" class="meta-v">5m</span>
+                            <span id="autoSignalTimeframe" class="meta-v">--</span>
                         </div>
                         <div class="meta-item">
                             <span class="meta-k">Entry Reference</span>
@@ -2710,13 +2710,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (simTarget && !simTarget.value) simTarget.value = (tick.mid + (offsetP * 2)).toFixed(decimals);
                 recalcSimulation();
             }
-
-            // Live update of entry reference in Automatic Signal Engine if monitoring
-            const autoAction = document.getElementById('autoSignalAction');
-            if (autoAction && autoAction.textContent.includes('MONITORING')) {
-                const autoEntry = document.getElementById('autoSignalEntry');
-                if (autoEntry) autoEntry.textContent = tick.mid.toFixed(decimals);
-            }
         }
 
         // Backward compatibility alias
@@ -2945,117 +2938,97 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const btnLogSignal = document.getElementById('btnLogAutoSignal');
 
             let action = autoSig.action || 'NO SIGNAL';
-            if (action === 'NO SIGNAL' && confSig.action && confSig.action !== 'NEUTRAL') {
-                action = confSig.action;
-            }
 
-            const cScore = confSig.confluence_score !== undefined ? confSig.confluence_score : (autoSig.confluence_score || 0);
-            const cGrade = confSig.grade || autoSig.grade || 'Grade C';
+            if (action === 'BUY' || action === 'SELL') {
+                if (autoBadge) {
+                    autoBadge.textContent = action + ' (सक्रिय)';
+                    autoBadge.className = action === 'BUY' ? 'badge badge-green' : 'badge badge-rose';
+                }
+                if (autoAction) {
+                    autoAction.textContent = action + ' CONFIRMED';
+                }
+                if (autoReason) {
+                    autoReason.textContent = autoSig.reason || (action + ' Signal confirmed in entry zone.');
+                }
+                if (autoHero) {
+                    autoHero.className = action === 'BUY' ? 'signal-hero buy' : 'signal-hero sell';
+                }
+                if (btnLogSignal) {
+                    btnLogSignal.disabled = false;
+                    btnLogSignal.textContent = 'Log ' + action + ' Signal to Paper Journal';
+                    btnLogSignal.style.background = action === 'BUY' ? 'var(--accent-green)' : 'var(--accent-rose)';
+                    btnLogSignal.style.border = 'none';
+                    btnLogSignal.style.color = '#ffffff';
+                    btnLogSignal.style.cursor = 'pointer';
+                }
 
-            if (autoBadge) {
-                if (action === 'BUY') {
-                    autoBadge.textContent = 'BUY (सक्रिय)';
-                    autoBadge.className = 'badge badge-green';
-                } else if (action === 'SELL') {
-                    autoBadge.textContent = 'SELL (सक्रिय)';
-                    autoBadge.className = 'badge badge-rose';
-                } else {
-                    autoBadge.textContent = 'NO SIGNAL';
+                if (elStrategy) elStrategy.textContent = autoSig.strategy || '--';
+                if (elTf) elTf.textContent = autoSig.timeframe || currentInterval || '--';
+                if (elEntry) {
+                    const entryP = autoSig.entry_reference;
+                    elEntry.textContent = (entryP !== null && entryP !== undefined) ? Number(entryP).toFixed(decimals) : '--';
+                }
+                if (elStop) {
+                    const stopVal = autoSig.stop_loss;
+                    const diffPips = autoSig.risk_pips ? ` (${autoSig.risk_pips} pips)` : '';
+                    elStop.textContent = (stopVal !== null && stopVal !== undefined) ? Number(stopVal).toFixed(decimals) + diffPips : '--';
+                }
+                if (elTarget) {
+                    const tpVal = autoSig.take_profit;
+                    elTarget.textContent = (tpVal !== null && tpVal !== undefined) ? Number(tpVal).toFixed(decimals) : '--';
+                }
+                if (elTarget2) {
+                    const tp2Val = autoSig.take_profit_2;
+                    elTarget2.textContent = (tp2Val !== null && tp2Val !== undefined) ? Number(tp2Val).toFixed(decimals) : '--';
+                }
+                if (elConf) {
+                    const cScore = autoSig.confluence_score !== null && autoSig.confluence_score !== undefined ? autoSig.confluence_score : (confSig.confluence_score || 0);
+                    const cGrade = autoSig.grade || confSig.grade || 'Grade A';
+                    const col = cScore >= 70 ? 'var(--accent-green)' : (cScore >= 50 ? 'var(--accent-blue)' : (cScore >= 35 ? 'var(--accent-amber)' : 'var(--accent-rose)'));
+                    elConf.innerHTML = `<span style="font-weight:700; color:${col};">${cScore}% [${cGrade}]</span>`;
+                }
+                if (elRR) {
+                    const rr1 = autoSig.reward_risk || 2.0;
+                    const rr2 = autoSig.reward_risk_tp2 || 3.5;
+                    elRR.textContent = `${rr1}:1 (TP1) / ${rr2}:1 (TP2)`;
+                }
+                if (elTime) {
+                    elTime.textContent = autoSig.timestamp_et || autoSig.timestamp_utc || '--';
+                }
+            } else {
+                // WAITING FOR ENTRY ZONE / NO SIGNAL: Keep all signal-related fields completely blank (--)
+                if (autoBadge) {
+                    autoBadge.textContent = 'WAITING FOR ENTRY ZONE';
                     autoBadge.className = 'badge badge-amber';
                 }
-            }
-
-            if (autoAction) {
-                if (action === 'BUY') {
-                    autoAction.textContent = 'BUY CONFIRMED';
-                } else if (action === 'SELL') {
-                    autoAction.textContent = 'SELL CONFIRMED';
-                } else {
-                    autoAction.textContent = 'NO SIGNAL';
+                if (autoAction) {
+                    autoAction.textContent = 'WAITING FOR ENTRY ZONE';
                 }
-            }
-
-            let displayReason = autoSig.reason || data.reason || '';
-            const factors = confSig.confluence_factors || autoSig.confluence_factors || [];
-            if (!displayReason || displayReason.includes('schedule') || displayReason.includes('freshness')) {
-                if (factors.length) {
-                    displayReason = factors.slice(0, 2).join(' | ');
-                } else {
-                    displayReason = "Price is not in a valid entry zone. Monitoring for Order Block, FVG, OTE, or Breakout level.";
+                if (autoReason) {
+                    autoReason.textContent = autoSig.reason || 'Waiting for market price to reach valid entry zone...';
                 }
-            }
-            if (autoReason) autoReason.textContent = displayReason;
-
-            if (autoHero && btnLogSignal) {
-                if (action === 'BUY') {
-                    autoHero.className = 'signal-hero buy';
-                    btnLogSignal.disabled = false;
-                    btnLogSignal.textContent = 'Log BUY Signal to Paper Journal';
-                    btnLogSignal.style.background = 'var(--accent-green)';
-                    btnLogSignal.style.border = 'none';
-                    btnLogSignal.style.color = '#ffffff';
-                    btnLogSignal.style.cursor = 'pointer';
-                } else if (action === 'SELL') {
-                    autoHero.className = 'signal-hero sell';
-                    btnLogSignal.disabled = false;
-                    btnLogSignal.textContent = 'Log SELL Signal to Paper Journal';
-                    btnLogSignal.style.background = 'var(--accent-rose)';
-                    btnLogSignal.style.border = 'none';
-                    btnLogSignal.style.color = '#ffffff';
-                    btnLogSignal.style.cursor = 'pointer';
-                } else {
+                if (autoHero) {
                     autoHero.className = 'signal-hero no-signal';
+                }
+                if (btnLogSignal) {
                     btnLogSignal.disabled = true;
-                    btnLogSignal.textContent = 'No Signal (Price Outside Entry Zone)';
+                    btnLogSignal.textContent = 'Waiting for Entry Zone (No Signal)';
                     btnLogSignal.style.background = 'rgba(245, 158, 11, 0.15)';
                     btnLogSignal.style.border = '1px dashed #f59e0b';
                     btnLogSignal.style.color = '#fbbf24';
                     btnLogSignal.style.cursor = 'default';
                 }
+
+                if (elStrategy) elStrategy.textContent = '--';
+                if (elTf) elTf.textContent = '--';
+                if (elEntry) elEntry.textContent = '--';
+                if (elStop) elStop.textContent = '--';
+                if (elTarget) elTarget.textContent = '--';
+                if (elTarget2) elTarget2.textContent = '--';
+                if (elConf) elConf.textContent = '--';
+                if (elRR) elRR.textContent = '--';
+                if (elTime) elTime.textContent = '--';
             }
-
-            const elStrategy = document.getElementById('autoSignalStrategy');
-            if (elStrategy) elStrategy.textContent = autoSig.strategy || 'SMC / ICT Institutional Confluence Engine';
-            
-            const elTf = document.getElementById('autoSignalTimeframe');
-            if (elTf) elTf.textContent = autoSig.timeframe || currentInterval;
-
-            const entryVal = autoSig.entry_reference || confPlan.entry_price || mid || 0;
-            const elEntry = document.getElementById('autoSignalEntry');
-            if (elEntry) elEntry.textContent = entryVal ? Number(entryVal).toFixed(decimals) : '--';
-
-            const stopVal = autoSig.stop_loss || confPlan.stop_loss;
-            const elStop = document.getElementById('autoSignalStop');
-            if (elStop) {
-                if (stopVal) {
-                    const diffPips = confPlan.risk_pips ? ` (${confPlan.risk_pips} pips)` : '';
-                    elStop.textContent = Number(stopVal).toFixed(decimals) + diffPips;
-                } else {
-                    elStop.textContent = '--';
-                }
-            }
-
-            const tpVal = autoSig.take_profit || confPlan.take_profit_1;
-            const elTarget = document.getElementById('autoSignalTarget');
-            if (elTarget) elTarget.textContent = tpVal ? Number(tpVal).toFixed(decimals) : '--';
-
-            const tp2Val = autoSig.take_profit_2 || confPlan.take_profit_2;
-            const elTarget2 = document.getElementById('autoSignalTarget2');
-            if (elTarget2) elTarget2.textContent = tp2Val ? Number(tp2Val).toFixed(decimals) : '--';
-
-            const elConf = document.getElementById('autoSignalConfluence');
-            if (elConf) {
-                const col = cScore >= 70 ? 'var(--accent-green)' : (cScore >= 50 ? 'var(--accent-blue)' : (cScore >= 35 ? 'var(--accent-amber)' : 'var(--accent-rose)'));
-                elConf.innerHTML = `<span style="font-weight:700; color:${col};">${cScore}% [${cGrade}]</span>`;
-            }
-
-            const elRR = document.getElementById('autoSignalRR');
-            const rr1 = autoSig.reward_risk || confPlan.rr_ratio_tp1 || 2.0;
-            const rr2 = autoSig.reward_risk_tp2 || confPlan.rr_ratio_tp2 || 3.5;
-            if (elRR) elRR.textContent = `${rr1}:1 (TP1) / ${rr2}:1 (TP2)`;
-
-            const elTime = document.getElementById('autoSignalTime');
-            if (elTime) elTime.textContent = autoSig.timestamp_et || autoSig.timestamp_utc || data.timestamp_et || new Date().toLocaleTimeString();
 
             // Auto-fill simulator defaults if empty
             if (mid && !document.getElementById('simEntry').value) {
@@ -3660,44 +3633,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 ctx.restore();
             }
 
-            drawDashedLevel(levels.entry, "#60a5fa", "ENTRY");
-            drawDashedLevel(levels.stop, "#f43f5e", "STOP");
-            drawDashedLevel(levels.target, "#10b981", "TP1 2R");
-
-            // TP2 Extended Target if present
-            const confPlan = (currentChartData.confluence_signal && currentChartData.confluence_signal.execution_plan) || {};
-            if (confPlan.take_profit_2) {
-                drawDashedLevel(confPlan.take_profit_2, "#059669", "TP2 3.5R+");
-            }
-
-            // Draw Signal Markers (Arrows)
-            markers.forEach(m => {
-                const idx = n - 1; // latest confirmed bar
-                const x = idx * slotW + slotW / 2;
-                const isBuy = m.type === 'BUY';
-                const y = isBuy ? yPrice(candles[idx].low) + 24 : yPrice(candles[idx].high) - 24;
-
-                ctx.save();
-                ctx.fillStyle = isBuy ? "#10b981" : "#f43f5e";
-                ctx.beginPath();
-                if (isBuy) {
-                    ctx.moveTo(x, y - 10);
-                    ctx.lineTo(x - 6, y + 2);
-                    ctx.lineTo(x + 6, y + 2);
-                } else {
-                    ctx.moveTo(x, y + 10);
-                    ctx.lineTo(x - 6, y - 2);
-                    ctx.lineTo(x + 6, y - 2);
-                }
-                ctx.closePath();
-                ctx.fill();
-
-                // Marker text tag
-                ctx.font = "bold 10px JetBrains Mono, monospace";
-                ctx.textAlign = "center";
-                ctx.fillText(m.label, x, isBuy ? y + 14 : y - 8);
-                ctx.restore();
-            });
+            // Requirement 7: Keep chart completely free of trading signals, arrows, markers, or annotations
 
             // Interactive Crosshair & Hover Tooltip
             if (mouseX !== null && mouseY !== null && mouseX >= 0 && mouseX <= priceWidth) {
@@ -4803,21 +4739,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     obs = {}
                     auto_sig = {}
 
+                # Requirement 7: Keep chart completely free of trading signals, markers, arrows, labels, or signal annotations
                 signal_markers = []
-                if auto_sig.get("action") in ("BUY", "SELL") and candles:
-                    last_c = candles[-1]
-                    m_time = last_c.get("time") or last_c.get("timestamp")
-                    signal_markers.append({
-                        "time": m_time,
-                        "type": auto_sig["action"],
-                        "price": auto_sig.get("entry_reference") or last_c.get("close"),
-                        "label": f"{auto_sig['action']} ({auto_sig.get('timeframe', interval)})",
-                    })
-
                 levels = {
-                    "entry": auto_sig.get("entry_reference"),
-                    "stop": auto_sig.get("stop_loss"),
-                    "target": auto_sig.get("take_profit"),
+                    "entry": None,
+                    "stop": None,
+                    "target": None,
                 }
 
                 if "XAU" in canon and GOLD_CALIBRATION["offset"] != 0.0 and "Twelve Data" not in source_feed:
@@ -4828,12 +4755,6 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                                 c[k] = round(c[k] + c_offset, 2)
                     ema9 = [round(v + c_offset, 2) if v is not None else None for v in ema9]
                     ema21 = [round(v + c_offset, 2) if v is not None else None for v in ema21]
-                    for k in ("entry", "stop", "target"):
-                        if levels.get(k) is not None:
-                            levels[k] = round(levels[k] + c_offset, 2)
-                    for sm in signal_markers:
-                        if sm.get("price") is not None:
-                            sm["price"] = round(sm["price"] + c_offset, 2)
 
                 is_twelve_data = "Twelve Data" in source_feed
                 res = {

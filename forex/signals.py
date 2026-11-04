@@ -298,7 +298,7 @@ def evaluate_confluence_signal(
     sl_buffer = avg_bar_range * 0.5
 
     if signal_side == "BUY":
-        # Stop Loss below recent swing low or Order block bottom
+        # Stop Loss strictly below entry and below recent swing low or Order block bottom
         structural_low = min([c["low"] for c in candles[-5:]])
         if nearest_demand and nearest_demand["bottom"] < current_price:
             invalidation = min(structural_low, nearest_demand["bottom"]) - sl_buffer
@@ -306,18 +306,21 @@ def evaluate_confluence_signal(
             invalidation = structural_low - sl_buffer
 
         stop_loss = round(invalidation, decimals)
+        if stop_loss >= current_price:
+            stop_loss = round(current_price - max(pip_size * 5, sl_buffer), decimals)
+
         risk_dist = max(pip_size * 5, current_price - stop_loss)
         risk_pips = round(to_pips(canon, risk_dist), 1)
 
-        # TP1 = 1:2 R:R
+        # TP1 = 1:2 R:R from actual entry reference
         tp1_dist = risk_dist * 2.0
         take_profit_1 = round(current_price + tp1_dist, decimals)
         reward_pips_tp1 = round(to_pips(canon, tp1_dist), 1)
         rr_tp1 = 2.0
 
         # TP2 = 1:3.5 R:R or BSL liquidity pool
-        bsl_target = liq_data.get("bsl_target", current_price + risk_dist * 3.5)
-        if bsl_target > current_price + risk_dist * 2.5:
+        bsl_target = liq_data.get("bsl_target")
+        if bsl_target and bsl_target > current_price + risk_dist * 2.5:
             take_profit_2 = round(bsl_target, decimals)
             tp2_dist = take_profit_2 - current_price
         else:
@@ -328,7 +331,7 @@ def evaluate_confluence_signal(
         rr_tp2 = round(tp2_dist / risk_dist, 2)
 
     elif signal_side == "SELL":
-        # Stop Loss above recent swing high or Order block top
+        # Stop Loss strictly above entry and above recent swing high or Order block top
         structural_high = max([c["high"] for c in candles[-5:]])
         if nearest_supply and nearest_supply["top"] > current_price:
             invalidation = max(structural_high, nearest_supply["top"]) + sl_buffer
@@ -336,18 +339,21 @@ def evaluate_confluence_signal(
             invalidation = structural_high + sl_buffer
 
         stop_loss = round(invalidation, decimals)
+        if stop_loss <= current_price:
+            stop_loss = round(current_price + max(pip_size * 5, sl_buffer), decimals)
+
         risk_dist = max(pip_size * 5, stop_loss - current_price)
         risk_pips = round(to_pips(canon, risk_dist), 1)
 
-        # TP1 = 1:2 R:R
+        # TP1 = 1:2 R:R from actual entry reference
         tp1_dist = risk_dist * 2.0
         take_profit_1 = round(current_price - tp1_dist, decimals)
         reward_pips_tp1 = round(to_pips(canon, tp1_dist), 1)
         rr_tp1 = 2.0
 
         # TP2 = 1:3.5 R:R or SSL liquidity pool
-        ssl_target = liq_data.get("ssl_target", current_price - risk_dist * 3.5)
-        if ssl_target < current_price - risk_dist * 2.5:
+        ssl_target = liq_data.get("ssl_target")
+        if ssl_target and ssl_target < current_price - risk_dist * 2.5:
             take_profit_2 = round(ssl_target, decimals)
             tp2_dist = current_price - take_profit_2
         else:
@@ -358,29 +364,16 @@ def evaluate_confluence_signal(
         rr_tp2 = round(tp2_dist / risk_dist, 2)
 
     else:
-        # NEUTRAL / MONITORING: Compute planned institutional levels based on dominant bias
-        bias_bullish = bullish_score >= bearish_score
-        if bias_bullish:
-            structural_low = min([c["low"] for c in candles[-5:]])
-            invalidation = (nearest_demand["bottom"] if (nearest_demand and nearest_demand["bottom"] < current_price) else structural_low) - sl_buffer
-            stop_loss = round(invalidation, decimals)
-            risk_dist = max(pip_size * 5, current_price - stop_loss)
-            risk_pips = round(to_pips(canon, risk_dist), 1)
-            take_profit_1 = round(current_price + (risk_dist * 2.0), decimals)
-            take_profit_2 = round(current_price + (risk_dist * 3.5), decimals)
-        else:
-            structural_high = max([c["high"] for c in candles[-5:]])
-            invalidation = (nearest_supply["top"] if (nearest_supply and nearest_supply["top"] > current_price) else structural_high) + sl_buffer
-            stop_loss = round(invalidation, decimals)
-            risk_dist = max(pip_size * 5, stop_loss - current_price)
-            risk_pips = round(to_pips(canon, risk_dist), 1)
-            take_profit_1 = round(current_price - (risk_dist * 2.0), decimals)
-            take_profit_2 = round(current_price - (risk_dist * 3.5), decimals)
-
-        reward_pips_tp1 = round(to_pips(canon, risk_dist * 2.0), 1)
-        reward_pips_tp2 = round(to_pips(canon, risk_dist * 3.5), 1)
-        rr_tp1 = 2.0
-        rr_tp2 = 3.5
+        # NEUTRAL / NO SIGNAL: Keep all execution plan fields completely blank
+        entry_price = None
+        stop_loss = None
+        take_profit_1 = None
+        take_profit_2 = None
+        risk_pips = None
+        reward_pips_tp1 = None
+        reward_pips_tp2 = None
+        rr_tp1 = None
+        rr_tp2 = None
 
     return {
         "symbol": canon,

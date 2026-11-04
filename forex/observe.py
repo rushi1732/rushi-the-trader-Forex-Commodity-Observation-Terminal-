@@ -126,17 +126,23 @@ def build_auto_signal(
     if not is_open:
         return {
             "action": "NO SIGNAL",
-            "strategy": "trader-scanner + trader-entry + trader-exit",
-            "timeframe": timeframe,
+            "strategy": "--",
+            "timeframe": "--",
             "symbol": symbol,
             "entry_reference": None,
             "stop_loss": None,
             "take_profit": None,
+            "take_profit_2": None,
             "reward_risk": None,
+            "reward_risk_tp2": None,
             "risk_pips": None,
             "reward_pips": None,
-            "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
-            "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "reward_pips_tp2": None,
+            "confluence_score": None,
+            "grade": None,
+            "confluence_factors": [],
+            "timestamp_et": "--",
+            "timestamp_utc": "--",
             "is_market_open": False,
             "is_fresh": is_fresh,
             "reason": status_reason,
@@ -146,26 +152,25 @@ def build_auto_signal(
         }
 
     if not is_fresh:
-        plan = (confluence_signal or {}).get("execution_plan", {})
-        conf_score = (confluence_signal or {}).get("confluence_score", 0)
-        conf_grade = (confluence_signal or {}).get("grade", "C")
         return {
             "action": "NO SIGNAL",
-            "strategy": f"SMC / ICT Confluence Engine ({conf_grade})",
-            "timeframe": timeframe,
+            "strategy": "--",
+            "timeframe": "--",
             "symbol": symbol,
-            "entry_reference": plan.get("entry_price") or latest_price,
-            "stop_loss": plan.get("stop_loss"),
-            "take_profit": plan.get("take_profit_1"),
-            "take_profit_2": plan.get("take_profit_2"),
-            "reward_risk": plan.get("rr_ratio_tp1", 2.0),
-            "reward_risk_tp2": plan.get("rr_ratio_tp2", 3.5),
-            "risk_pips": plan.get("risk_pips"),
-            "reward_pips": plan.get("reward_pips_tp1"),
-            "confluence_score": conf_score,
-            "grade": conf_grade,
-            "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
-            "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "entry_reference": None,
+            "stop_loss": None,
+            "take_profit": None,
+            "take_profit_2": None,
+            "reward_risk": None,
+            "reward_risk_tp2": None,
+            "risk_pips": None,
+            "reward_pips": None,
+            "reward_pips_tp2": None,
+            "confluence_score": None,
+            "grade": None,
+            "confluence_factors": [],
+            "timestamp_et": "--",
+            "timestamp_utc": "--",
             "is_market_open": True,
             "is_fresh": False,
             "reason": status_reason,
@@ -187,13 +192,14 @@ def build_auto_signal(
         sim_lot = (paper_simulation or {}).get("paper_lot_size", 0.05)
         sim_units = (paper_simulation or {}).get("paper_units", 5000)
         sim_risk_usd = (paper_simulation or {}).get("simulated_max_loss_usd", 50.0)
+        entry_val = latest_price or plan.get("entry_price")
 
         return {
             "action": side,
             "strategy": strategy_label,
             "timeframe": timeframe,
             "symbol": symbol,
-            "entry_reference": plan.get("entry_price") or latest_price,
+            "entry_reference": entry_val,
             "stop_loss": plan.get("stop_loss"),
             "take_profit": plan.get("take_profit_1"),
             "take_profit_2": plan.get("take_profit_2"),
@@ -228,12 +234,17 @@ def build_auto_signal(
             "strategy": strategy,
             "timeframe": timeframe,
             "symbol": symbol,
-            "entry_reference": paper_simulation.get("simulated_fill"),
+            "entry_reference": paper_simulation.get("simulated_fill") or latest_price,
             "stop_loss": paper_simulation.get("stop_price"),
             "take_profit": paper_simulation.get("target_price"),
+            "take_profit_2": paper_simulation.get("target_price_2"),
             "reward_risk": paper_simulation.get("reward_risk", 2.0),
+            "reward_risk_tp2": 3.5,
             "risk_pips": paper_simulation.get("risk_pips"),
             "reward_pips": paper_simulation.get("target_pips"),
+            "confluence_score": 75,
+            "grade": "Grade A (Breakout Confirmed)",
+            "confluence_factors": ["Candle closed beyond breakout boundary in valid entry zone"],
             "lot_size": paper_simulation.get("paper_lot_size"),
             "units": paper_simulation.get("paper_units"),
             "risk_usd": paper_simulation.get("simulated_max_loss_usd", 50.0),
@@ -247,34 +258,31 @@ def build_auto_signal(
             "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
         }
 
-    # Market open & fresh, but no confirmed setup yet
-    setup_name = (scan_info or {}).get("primary_setup") or "Consolidation"
-    strategy = f"trader-scanner ({setup_name}) + SMC / ICT Confluence Engine"
-    conf_score = (confluence_signal or {}).get("confluence_score", 0)
-    conf_grade = (confluence_signal or {}).get("grade", "C")
+    # Market open & fresh, but no confirmed setup in valid entry zone yet
     if status_reason:
         final_reason = status_reason
     else:
         final_reason = "Price is not in a valid entry zone. Monitoring for Order Block, FVG, OTE, or Breakout level."
 
-    plan = (confluence_signal or {}).get("execution_plan", {})
     return {
         "action": "NO SIGNAL",
-        "strategy": strategy,
-        "timeframe": timeframe,
+        "strategy": "--",
+        "timeframe": "--",
         "symbol": symbol,
-        "entry_reference": plan.get("entry_price") or latest_price,
-        "stop_loss": plan.get("stop_loss"),
-        "take_profit": plan.get("take_profit_1"),
-        "take_profit_2": plan.get("take_profit_2"),
-        "reward_risk": plan.get("rr_ratio_tp1", 2.0),
-        "risk_pips": plan.get("risk_pips"),
-        "reward_pips": plan.get("reward_pips_tp1"),
-        "confluence_score": conf_score,
-        "grade": conf_grade,
-        "confluence_factors": (confluence_signal or {}).get("confluence_factors", []),
-        "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
-        "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "entry_reference": None,
+        "stop_loss": None,
+        "take_profit": None,
+        "take_profit_2": None,
+        "reward_risk": None,
+        "reward_risk_tp2": None,
+        "risk_pips": None,
+        "reward_pips": None,
+        "reward_pips_tp2": None,
+        "confluence_score": None,
+        "grade": None,
+        "confluence_factors": [],
+        "timestamp_et": "--",
+        "timestamp_utc": "--",
         "is_market_open": True,
         "is_fresh": True,
         "reason": final_reason,

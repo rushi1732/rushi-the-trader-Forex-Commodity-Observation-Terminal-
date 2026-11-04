@@ -22,3 +22,4 @@ class handler(DashboardRequestHandler):
 
     def do_POST(self) -> None:
         super().do_POST()
+
