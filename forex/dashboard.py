@@ -3187,14 +3187,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const summaryEl = document.getElementById('matrixDecisionSummary');
 
             if (box && actionEl && summaryEl) {
-                const plan = confSig.execution_plan || {};
-                const entryP = (plan.entry_price || autoSig.entry_reference || curPrice || 0).toFixed(decimals);
-                const slP = plan.stop_loss ? plan.stop_loss.toFixed(decimals) : (autoSig.stop_loss ? autoSig.stop_loss.toFixed(decimals) : '--');
-                const tp1P = plan.take_profit_1 ? plan.take_profit_1.toFixed(decimals) : (autoSig.take_profit ? autoSig.take_profit.toFixed(decimals) : '--');
-                const tp2P = plan.take_profit_2 ? plan.take_profit_2.toFixed(decimals) : '--';
-                const rr1 = plan.rr_ratio_tp1 || autoSig.reward_risk || 2.0;
-                const rr2 = plan.rr_ratio_tp2 || 3.5;
-                const riskPips = plan.risk_pips || autoSig.risk_pips || '--';
                 const factorListHtml = factors.length ? ('<ul style="margin:6px 0 6px 18px; font-size:11px;">' + factors.map(f => `<li>${f}</li>`).join('') + '</ul>') : '';
 
                 if (action === 'BUY') {
@@ -3204,7 +3196,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     summaryEl.innerHTML = `
                         <strong>का BUY करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बुलिश असून किंमत Discount Zone मध्ये आहे. लिक्विडिटी हंट किंवा ऑर्डर ब्लॉक टेस्ट नंतर 5m कँडलने स्पष्ट कन्फर्मेशन दिले आहे.<br>
                         ${factorListHtml}
-                        <strong>अचूक एक्झिक्युशन प्लॅन:</strong> Entry: <strong>${entryP}</strong> | Stop Loss: <strong>${slP}</strong> (Risk: ${riskPips} pips) | Target 1 (1:2 R:R): <strong>${tp1P}</strong> | Target 2 (1:${rr2} R:R): <strong>${tp2P}</strong> | Max Risk: <strong>$50.00</strong>
                     `;
                 } else if (action === 'SELL') {
                     box.className = 'decision-box sell-active';
@@ -3213,7 +3204,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     summaryEl.innerHTML = `
                         <strong>का SELL करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बेअरिश असून किंमत Premium Zone मध्ये आहे. Buy-Side Liquidity (BSL) स्वीप किंवा Supply Order Block रिजेक्शन नंतर मजबूत सेल-ऑफ दिसत आहे.<br>
                         ${factorListHtml}
-                        <strong>अचूक एक्झिक्युशन प्लॅन:</strong> Entry: <strong>${entryP}</strong> | Stop Loss: <strong>${slP}</strong> (Risk: ${riskPips} pips) | Target 1 (1:2 R:R): <strong>${tp1P}</strong> | Target 2 (1:${rr2} R:R): <strong>${tp2P}</strong> | Max Risk: <strong>$50.00</strong>
                     `;
                 } else {
                     box.className = 'decision-box wait-active';
