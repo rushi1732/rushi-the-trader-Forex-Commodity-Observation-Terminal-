@@ -294,6 +294,66 @@ class TestSignalStability(unittest.TestCase):
         self.assertEqual(sig_waiting["strategy"], "--")
         self.assertIsNone(sig_waiting["entry_reference"])
 
+    def test_active_signal_guarantees_all_metadata_fields_populated(self):
+        """Verify that confirmed signals strictly populate all 9 metadata fields without '--' or None."""
+        conf_sig = {
+            "action": "BUY",
+            "confluence_score": 75,
+            "grade": "Grade A",
+            "is_in_entry_zone": True,
+            "confluence_factors": ["Bullish Order Block in Discount", "BSL Liquidity Target"],
+            "execution_plan": {
+                "entry_price": 1.0850,
+                "stop_loss": 1.0825,
+                "take_profit_1": 1.0900,
+                "take_profit_2": 1.0938,
+                "risk_pips": 25.0,
+                "reward_pips_tp1": 50.0,
+                "rr_ratio_tp1": 2.0,
+            }
+        }
+        sig = self.manager.process(
+            symbol=self.symbol,
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=1.0850,
+            candles=self.candles,
+            confluence_signal=conf_sig,
+            is_offline_test=True,
+        )
+        self.assertIn(sig["action"], ("BUY", "SELL"))
+        self.assertIsNotNone(sig.get("strategy"))
+        self.assertNotEqual(sig.get("strategy"), "--")
+        self.assertIsNotNone(sig.get("timeframe"))
+        self.assertNotEqual(sig.get("timeframe"), "--")
+        self.assertIsNotNone(sig.get("entry_reference"))
+        self.assertIsInstance(sig.get("entry_reference"), (int, float))
+        self.assertIsNotNone(sig.get("stop_loss"))
+        self.assertIsInstance(sig.get("stop_loss"), (int, float))
+        self.assertIsNotNone(sig.get("take_profit"))
+        self.assertIsInstance(sig.get("take_profit"), (int, float))
+        self.assertIsNotNone(sig.get("take_profit_2"))
+        self.assertIsInstance(sig.get("take_profit_2"), (int, float))
+        self.assertIsNotNone(sig.get("reward_risk"))
+        self.assertIsNotNone(sig.get("confluence_score"))
+        self.assertIsNotNone(sig.get("grade"))
+        self.assertIsNotNone(sig.get("timestamp_et"))
+        self.assertNotEqual(sig.get("timestamp_et"), "--")
+
+        # Directional assertions
+        if sig["action"] == "BUY":
+            self.assertLess(sig["stop_loss"], sig["entry_reference"])
+            self.assertGreater(sig["take_profit"], sig["entry_reference"])
+            self.assertGreater(sig["take_profit_2"], sig["take_profit"])
+        else:
+            self.assertGreater(sig["stop_loss"], sig["entry_reference"])
+            self.assertLess(sig["take_profit"], sig["entry_reference"])
+            self.assertLess(sig["take_profit_2"], sig["take_profit"])
+
 
 if __name__ == "__main__":
     unittest.main()
+

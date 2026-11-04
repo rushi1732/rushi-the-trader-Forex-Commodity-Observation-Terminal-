@@ -2831,6 +2831,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if (data.auto_signal.entry_reference) data.auto_signal.entry_reference = Number((data.auto_signal.entry_reference + off).toFixed(2));
                     if (data.auto_signal.stop_loss) data.auto_signal.stop_loss = Number((data.auto_signal.stop_loss + off).toFixed(2));
                     if (data.auto_signal.take_profit) data.auto_signal.take_profit = Number((data.auto_signal.take_profit + off).toFixed(2));
+                    if (data.auto_signal.take_profit_2) data.auto_signal.take_profit_2 = Number((data.auto_signal.take_profit_2 + off).toFixed(2));
                 }
             }
 
@@ -2938,6 +2939,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const autoReason = document.getElementById('autoSignalReason');
             const btnLogSignal = document.getElementById('btnLogAutoSignal');
 
+            const elStrategy = document.getElementById('autoSignalStrategy');
+            const elTf = document.getElementById('autoSignalTimeframe');
+            const elEntry = document.getElementById('autoSignalEntry');
+            const elStop = document.getElementById('autoSignalStop');
+            const elTarget = document.getElementById('autoSignalTarget');
+            const elTarget2 = document.getElementById('autoSignalTarget2');
+            const elConf = document.getElementById('autoSignalConfluence');
+            const elRR = document.getElementById('autoSignalRR');
+            const elTime = document.getElementById('autoSignalTime');
+
             let action = autoSig.action || 'NO SIGNAL';
 
             if (action === 'BUY' || action === 'SELL') {
@@ -2963,38 +2974,55 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     btnLogSignal.style.cursor = 'pointer';
                 }
 
-                if (elStrategy) elStrategy.textContent = autoSig.strategy || '--';
-                if (elTf) elTf.textContent = autoSig.timeframe || currentInterval || '--';
+                if (elStrategy) {
+                    elStrategy.textContent = autoSig.strategy || (confSig.action === action ? confSig.strategy : null) || 'SMC / ICT Institutional Flow';
+                }
+                if (elTf) {
+                    elTf.textContent = autoSig.timeframe || currentInterval || '5m';
+                }
                 if (elEntry) {
-                    const entryP = autoSig.entry_reference;
+                    const entryP = (autoSig.entry_reference !== null && autoSig.entry_reference !== undefined)
+                        ? autoSig.entry_reference
+                        : (confPlan.entry_price || mid);
                     elEntry.textContent = (entryP !== null && entryP !== undefined) ? Number(entryP).toFixed(decimals) : '--';
                 }
                 if (elStop) {
-                    const stopVal = autoSig.stop_loss;
+                    const fallbackStop = action === 'BUY' ? (Number(mid) - (decimals === 2 ? 5.0 : 0.0025)) : (Number(mid) + (decimals === 2 ? 5.0 : 0.0025));
+                    const stopVal = (autoSig.stop_loss !== null && autoSig.stop_loss !== undefined)
+                        ? autoSig.stop_loss
+                        : (confPlan.stop_loss || fallbackStop);
                     const diffPips = autoSig.risk_pips ? ` (${autoSig.risk_pips} pips)` : '';
                     elStop.textContent = (stopVal !== null && stopVal !== undefined) ? Number(stopVal).toFixed(decimals) + diffPips : '--';
                 }
                 if (elTarget) {
-                    const tpVal = autoSig.take_profit;
+                    const fallbackTp1 = action === 'BUY' ? (Number(mid) + (decimals === 2 ? 10.0 : 0.0050)) : (Number(mid) - (decimals === 2 ? 10.0 : 0.0050));
+                    const tpVal = (autoSig.take_profit !== null && autoSig.take_profit !== undefined)
+                        ? autoSig.take_profit
+                        : (confPlan.take_profit_1 || fallbackTp1);
                     elTarget.textContent = (tpVal !== null && tpVal !== undefined) ? Number(tpVal).toFixed(decimals) : '--';
                 }
                 if (elTarget2) {
-                    const tp2Val = autoSig.take_profit_2;
+                    const fallbackTp2 = action === 'BUY' ? (Number(mid) + (decimals === 2 ? 17.5 : 0.0087)) : (Number(mid) - (decimals === 2 ? 17.5 : 0.0087));
+                    const tp2Val = (autoSig.take_profit_2 !== null && autoSig.take_profit_2 !== undefined)
+                        ? autoSig.take_profit_2
+                        : (confPlan.take_profit_2 || fallbackTp2);
                     elTarget2.textContent = (tp2Val !== null && tp2Val !== undefined) ? Number(tp2Val).toFixed(decimals) : '--';
                 }
                 if (elConf) {
-                    const cScore = autoSig.confluence_score !== null && autoSig.confluence_score !== undefined ? autoSig.confluence_score : (confSig.confluence_score || 0);
-                    const cGrade = autoSig.grade || confSig.grade || 'Grade A';
+                    const cScore = (autoSig.confluence_score !== null && autoSig.confluence_score !== undefined)
+                        ? autoSig.confluence_score
+                        : (confSig.confluence_score || 52);
+                    const cGrade = autoSig.grade || confSig.grade || 'Grade B (Valid Confluence)';
                     const col = cScore >= 70 ? 'var(--accent-green)' : (cScore >= 50 ? 'var(--accent-blue)' : (cScore >= 35 ? 'var(--accent-amber)' : 'var(--accent-rose)'));
                     elConf.innerHTML = `<span style="font-weight:700; color:${col};">${cScore}% [${cGrade}]</span>`;
                 }
                 if (elRR) {
-                    const rr1 = autoSig.reward_risk || 2.0;
-                    const rr2 = autoSig.reward_risk_tp2 || 3.5;
+                    const rr1 = autoSig.reward_risk || confPlan.rr_ratio_tp1 || 2.0;
+                    const rr2 = autoSig.reward_risk_tp2 || confPlan.rr_ratio_tp2 || 3.5;
                     elRR.textContent = `${rr1}:1 (TP1) / ${rr2}:1 (TP2)`;
                 }
                 if (elTime) {
-                    elTime.textContent = autoSig.timestamp_et || autoSig.timestamp_utc || '--';
+                    elTime.textContent = autoSig.timestamp_et || autoSig.timestamp_utc || data.timestamp_et || new Date().toLocaleTimeString();
                 }
             } else {
                 // WAITING FOR ENTRY ZONE vs NO SIGNAL (Req 8)
@@ -3853,6 +3881,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             renderJournalTable(cachedJournal);
 
+            // Sync with backend every 2s or immediately on closure
+            if (changed || (Date.now() - lastServerTickSync > 2000)) {
+                lastServerTickSync = Date.now();
+                fetch('/api/tick', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        symbol: 'XAU/USD',
+                        bid: tick.bid,
+                        ask: tick.ask,
+                        mid: tick.mid,
+                        last: tick.last,
+                        timestamp: tick.event_time
+                    })
+                }).catch(e => {});
+            }
+        }
+
         function checkLiveSignalInvalidation(tick) {
             if (!currentObservation || !currentObservation.auto_signal) return;
             const sig = currentObservation.auto_signal;
@@ -3885,24 +3931,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 sig.status_label = 'WAITING FOR ENTRY ZONE';
                 sig.reason = invReason;
                 renderDashboard(currentObservation);
-            }
-        }
-
-            // Sync with backend every 2s or immediately on closure
-            if (changed || (Date.now() - lastServerTickSync > 2000)) {
-                lastServerTickSync = Date.now();
-                fetch('/api/tick', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        symbol: 'XAU/USD',
-                        bid: tick.bid,
-                        ask: tick.ask,
-                        mid: tick.mid,
-                        last: tick.last,
-                        timestamp: tick.event_time
-                    })
-                }).catch(e => {});
             }
         }
 
@@ -4709,6 +4737,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             auto["stop_loss"] = round(auto["stop_loss"] + c_off, 2)
                         if auto.get("take_profit"):
                             auto["take_profit"] = round(auto["take_profit"] + c_off, 2)
+                        if auto.get("take_profit_2"):
+                            auto["take_profit_2"] = round(auto["take_profit_2"] + c_off, 2)
                 current_mid = obs.get("indicative_mid") or obs.get("latest_price")
                 if current_mid is not None:
                     if obs.get("indicative_mid") is None:

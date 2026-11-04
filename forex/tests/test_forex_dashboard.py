@@ -305,6 +305,16 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("btnLogAutoSignal", html)
         self.assertIn("autoSignalStrategy", html)
         self.assertIn("autoSignalTimeframe", html)
+        self.assertIn("autoSignalEntry", html)
+        self.assertIn("autoSignalStop", html)
+        self.assertIn("autoSignalTarget", html)
+        self.assertIn("autoSignalTarget2", html)
+        self.assertIn("autoSignalConfluence", html)
+        self.assertIn("autoSignalRR", html)
+        self.assertIn("autoSignalTime", html)
+        self.assertIn("const elStrategy = document.getElementById('autoSignalStrategy')", html)
+        self.assertIn("const elEntry = document.getElementById('autoSignalEntry')", html)
+        self.assertIn("const elStop = document.getElementById('autoSignalStop')", html)
 
     def test_api_paper_log_signal_success(self):
         """Verify confirmed automatic signal is logged into paper journal with AUTO- prefix."""

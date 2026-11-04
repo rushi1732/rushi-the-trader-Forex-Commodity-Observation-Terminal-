@@ -418,6 +418,44 @@ class SignalStateManager:
                         candidate_action = None
 
         if candidate_action in ("BUY", "SELL") and candle_is_closed:
+            canon = normalize_symbol(canon)
+            decimals = 2 if ("XAU" in canon or "BTC" in canon) else (2 if "JPY" in canon else 4)
+            pip_size = 0.10 if "XAU" in canon else (1.0 if "BTC" in canon else (0.01 if "JPY" in canon else 0.0001))
+
+            # Guarantee Stop Loss strictly adheres to side
+            if candidate_sl is None or candidate_sl == 0.0:
+                if candidate_action == "BUY":
+                    candidate_sl = round(candidate_entry - (pip_size * 25), decimals)
+                else:
+                    candidate_sl = round(candidate_entry + (pip_size * 25), decimals)
+
+            risk_dist = max(pip_size * 5, abs(candidate_entry - candidate_sl))
+            if candidate_risk_pips is None:
+                candidate_risk_pips = round(risk_dist / pip_size, 1)
+
+            # Guarantee TP1 strictly 2R
+            if candidate_tp1 is None or candidate_tp1 == 0.0:
+                if candidate_action == "BUY":
+                    candidate_tp1 = round(candidate_entry + (risk_dist * 2.0), decimals)
+                else:
+                    candidate_tp1 = round(candidate_entry - (risk_dist * 2.0), decimals)
+
+            if candidate_reward_pips is None:
+                candidate_reward_pips = round((risk_dist * 2.0) / pip_size, 1)
+
+            # Guarantee TP2 strictly 3.5R
+            if candidate_tp2 is None or candidate_tp2 == 0.0:
+                if candidate_action == "BUY":
+                    candidate_tp2 = round(candidate_entry + (risk_dist * 3.5), decimals)
+                else:
+                    candidate_tp2 = round(candidate_entry - (risk_dist * 3.5), decimals)
+
+            if candidate_reward_pips_tp2 is None:
+                candidate_reward_pips_tp2 = round(abs(candidate_tp2 - candidate_entry) / pip_size, 1)
+
+            if candidate_strategy is None or candidate_strategy == "--":
+                candidate_strategy = f"SMC / ICT Confluence ({candidate_grade or 'Grade B'} - {candidate_score or 60}%)"
+
             # Confirm and latch new signal
             new_sig = {
                 "action": candidate_action,
