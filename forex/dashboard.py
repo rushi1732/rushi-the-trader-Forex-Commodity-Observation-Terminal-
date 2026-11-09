@@ -1718,14 +1718,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <option value="BTC/USD">BTC/USD (Bitcoin / US Dollar)</option>
                 </select>
 
-                <button id="btnVoiceAlerts" class="btn" onclick="toggleVoiceAlerts()" title="Toggle Female Voice Notifications for Gold & BTC" style="border-color:rgba(236,72,153,0.5); color:#f472b6; display:inline-flex; align-items:center; gap:6px;">
+                <button id="btnVoiceAlerts" class="btn" onclick="toggleVoiceAlerts()" title="Toggle Indian English Female Voice Alerts for Gold & BTC" style="border-color:rgba(236,72,153,0.5); color:#f472b6; display:inline-flex; align-items:center; gap:6px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                    <span id="voiceStatusLabel">Voice Alert: Active</span>
+                    <span id="voiceStatusLabel">Indian Voice: Active</span>
                 </button>
 
-                <button id="btnTestVoice" class="btn" onclick="testFemaleVoice()" title="Test Female AI Voice" style="border-color:rgba(56,189,248,0.5); color:var(--accent-blue); display:inline-flex; align-items:center; gap:6px;">
+                <button id="btnTestVoice" class="btn" onclick="testFemaleVoice()" title="Test Indian English Female AI Voice" style="border-color:rgba(56,189,248,0.5); color:var(--accent-blue); display:inline-flex; align-items:center; gap:6px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-                    Test Voice
+                    Test Indian Voice
                 </button>
 
                 <button id="btnNotif" class="btn" onclick="toggleNotifications()">
@@ -1876,9 +1876,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             Automatic Signal Engine
                         </span>
                         <div style="display:flex; align-items:center; gap:6px;">
-                            <span id="voiceBadgeIndicator" class="badge badge-pink" onclick="testFemaleVoice()" title="Female Voice Notification Active (Click to test)" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:10px;">
+                            <span id="voiceBadgeIndicator" class="badge badge-pink" onclick="testFemaleVoice()" title="Indian English Female Voice Active (Click to test)" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:10px;">
                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
-                                Voice: ON
+                                Indian Voice: ON
                             </span>
                             <span id="autoSignalBadge" class="badge badge-amber">WAITING FOR ENTRY ZONE</span>
                         </div>
@@ -4246,33 +4246,62 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const voices = window.speechSynthesis.getVoices();
             if (!voices || voices.length === 0) return null;
 
-            // Preferred high-clarity natural female voices across Windows, Edge, Chrome, macOS, iOS, Android
-            const highPriority = [
+            // Tier 1: Dedicated Indian English Female Voices (Neerja, Heera, Veena, Sangeeta, Priya, Swara)
+            const indianFemalePatterns = [
+                /neerja/i,
+                /heera/i,
+                /veena/i,
+                /sangeeta/i,
+                /priya/i,
+                /swara/i,
+                /ananya/i,
+                /aditi/i,
+                /india.*female/i,
+                /female.*india/i
+            ];
+
+            for (const pat of indianFemalePatterns) {
+                const match = voices.find(v => (pat.test(v.name) || pat.test(v.voiceURI)) && !/madhur|prabhat|ravi|male|boy|man|guy/i.test(v.name));
+                if (match) return match;
+            }
+
+            // Tier 2: Any English (India) or Hindi voice that is not explicitly male
+            const indianVoices = voices.filter(v => {
+                const l = (v.lang || '').toLowerCase();
+                const n = (v.name || '').toLowerCase();
+                const isInd = l.includes('en-in') || l.includes('en_in') || l.includes('hi-in') || l.includes('hi_in') || n.includes('india') || n.includes('indian');
+                const isMale = /madhur|prabhat|ravi|male|boy|man|guy/i.test(n);
+                return isInd && !isMale;
+            });
+            if (indianVoices.length > 0) {
+                // Prefer Google Indian English if available
+                const googleInd = indianVoices.find(v => /google/i.test(v.name));
+                return googleInd || indianVoices[0];
+            }
+
+            // Tier 3: Any en-IN or hi-IN voice at all
+            const anyIndian = voices.find(v => {
+                const l = (v.lang || '').toLowerCase();
+                return l.includes('en-in') || l.includes('hi-in') || l.includes('en_in');
+            });
+            if (anyIndian) return anyIndian;
+
+            // Tier 4: Fallback to high-clarity natural female voice
+            const fallbackFemale = [
                 /zira/i,
                 /jenny/i,
                 /aria/i,
                 /samantha/i,
                 /victoria/i,
                 /karen/i,
-                /susan/i,
-                /veena/i,
-                /sangeeta/i,
-                /neerja/i,
                 /google us english/i,
-                /google uk english female/i,
-                /en-us.*female/i,
                 /female/i,
                 /woman/i
             ];
-
-            for (const pat of highPriority) {
-                const found = voices.find(v => (pat.test(v.name) || pat.test(v.voiceURI)) && (v.lang.startsWith('en') || v.lang.startsWith('hi')));
-                if (found) return found;
+            for (const pat of fallbackFemale) {
+                const match = voices.find(v => pat.test(v.name));
+                if (match) return match;
             }
-
-            // Fallback to any English voice that is not explicitly male
-            const enFemale = voices.find(v => (v.lang.startsWith('en') || v.lang.startsWith('hi')) && !/david|mark|george|guy|male|boy|richard/i.test(v.name));
-            if (enFemale) return enFemale;
 
             return voices[0];
         }
@@ -4297,9 +4326,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const voice = cachedFemaleVoice || findBestFemaleVoice();
                 if (voice) {
                     utter.voice = voice;
+                    utter.lang = voice.lang || 'en-IN';
+                } else {
+                    utter.lang = 'en-IN';
                 }
-                utter.rate = 0.92;   // Professional, clear institutional cadence
-                utter.pitch = 1.15;  // Pleasant, refined feminine pitch
+
+                // Indian English clarity settings:
+                // rate 0.88 gives a calm, deliberate, easy-to-understand pace without rapid foreign swallowing of words
+                utter.rate = 0.88;
+                utter.pitch = 1.05;  // Natural warm feminine tone
                 utter.volume = 1.0;  // Full volume
 
                 if (onComplete) {
@@ -4342,7 +4377,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>
                 <div>
                     <div style="font-size:12px; font-weight:700; color:${actionColor}; display:flex; align-items:center; gap:6px;">
-                        <span>FEMALE VOICE ALERT: ${action} ${asset.toUpperCase()}</span>
+                        <span>INDIAN FEMALE VOICE: ${action} ${asset.toUpperCase()}</span>
                     </div>
                     <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">
                         Confluence Grade: <strong style="color:var(--text-primary);">${grade}</strong>
@@ -4369,14 +4404,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             let priceDetails = '';
             if (sig.entry_reference) {
                 const dec = 2;
-                priceDetails += ` Entry at ${Number(sig.entry_reference).toFixed(dec)}.`;
+                priceDetails += ` Entry price ${Number(sig.entry_reference).toFixed(dec)}.`;
             }
             if (sig.stop_loss) {
                 const dec = 2;
-                priceDetails += ` Stop loss at ${Number(sig.stop_loss).toFixed(dec)}.`;
+                priceDetails += ` Stop loss ${Number(sig.stop_loss).toFixed(dec)}.`;
             }
 
-            const speechText = `Alert: ${actionText} signal confirmed for ${assetName}. Confluence Grade: ${gradeText}.${priceDetails}`;
+            // Natural Indian English announcement
+            const speechText = `Alert! ${actionText} signal confirmed for ${assetName}. Confluence Grade: ${gradeText}.${priceDetails}`;
 
             showVoiceToast(actionText, assetName, gradeText);
             speakFemaleVoice(speechText);
@@ -4389,7 +4425,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             updateVoiceAlertsUI();
 
             if (voiceAlertsEnabled) {
-                speakFemaleVoice("Female voice alerts enabled. Monitoring Gold and Bitcoin.");
+                speakFemaleVoice("Indian English voice alerts enabled. Monitoring Gold and Bitcoin.");
             }
         }
 
@@ -4404,7 +4440,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const asset = isGold ? 'Gold' : 'Bitcoin';
             const sampleGrade = 'Grade A Plus, Elite Institutional';
 
-            const testText = `Alert: BUY signal confirmed for ${asset}. Confluence Grade: ${sampleGrade}. Entry at 4045. Stop loss at 4038.`;
+            const testText = `Alert! BUY signal confirmed for ${asset}. Confluence Grade: ${sampleGrade}. Entry price 4045. Stop loss 4038.`;
             showVoiceToast('BUY', asset, sampleGrade);
             speakFemaleVoice(testText);
         }
@@ -4420,10 +4456,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     btn.style.color = "#f472b6";
                     btn.style.background = "rgba(236,72,153,0.12)";
                 }
-                if (lbl) lbl.textContent = "Voice Alert: Active";
+                if (lbl) lbl.textContent = "Indian Voice: Active";
                 if (badge) {
                     badge.className = "badge badge-pink";
-                    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Voice: ON`;
+                    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Indian Voice: ON`;
                 }
             } else {
                 if (btn) {
@@ -4431,10 +4467,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     btn.style.color = "var(--text-muted)";
                     btn.style.background = "transparent";
                 }
-                if (lbl) lbl.textContent = "Voice Alert: OFF";
+                if (lbl) lbl.textContent = "Indian Voice: OFF";
                 if (badge) {
                     badge.className = "badge";
-                    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><line x1="2" y1="2" x2="22" y2="22"/></svg> Voice: OFF`;
+                    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><line x1="2" y1="2" x2="22" y2="22"/></svg> Indian Voice: OFF`;
                 }
             }
         }

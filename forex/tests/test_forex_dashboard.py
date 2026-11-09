@@ -832,6 +832,10 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("voice-toast", html)
         self.assertIn("SpeechSynthesisUtterance", html)
         self.assertIn("playChime", html)
+        self.assertIn("neerja", html)
+        self.assertIn("en-IN", html)
+        self.assertIn("Test Indian Voice", html)
+        self.assertIn("Indian Voice: Active", html)
 
 
 if __name__ == "__main__":
