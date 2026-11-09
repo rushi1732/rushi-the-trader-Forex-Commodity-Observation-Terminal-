@@ -915,6 +915,27 @@ class TestForexDashboard(unittest.TestCase):
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 404)
 
+    def test_favicon_and_brand_logo(self):
+        """Verify favicon link, profile avatar, and image endpoints."""
+        url_home = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url_home, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        self.assertIn('href="/favicon.png"', html)
+        self.assertIn('href="/favicon.ico"', html)
+        self.assertIn('src="/rushi_profile.jpg"', html)
+
+        # Test favicon and image endpoints
+        for endpoint, ctype in (
+            ("/favicon.png", "image/png"),
+            ("/rushi_profile.jpg", "image/jpeg"),
+        ):
+            url_img = f"http://127.0.0.1:{self.port}{endpoint}"
+            with urllib.request.urlopen(url_img, timeout=5) as resp:
+                self.assertEqual(resp.status, 200)
+                self.assertIn(ctype, resp.headers.get_content_type())
+                data = resp.read()
+                self.assertGreater(len(data), 1000)
+
 
 if __name__ == "__main__":
     unittest.main()

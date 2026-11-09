@@ -637,6 +637,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <meta name="google-site-verification" content="googleb3e3c0a986c6ae10">
     <meta name="google-site-verification" content="googleb3e3c0a986c6ae10.html">
     <title>RUSHI THE TRADER - Forex & Commodity Observation Terminal</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/rushi_profile.jpg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -717,15 +720,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         .brand-icon {
-            width: 36px;
-            height: 36px;
+            width: 44px;
+            height: 44px;
             background: var(--bg-card);
-            border: 1px solid var(--border-strong);
-            border-radius: 8px;
+            border: 2px solid rgba(56, 189, 248, 0.7);
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--accent-blue);
+            overflow: hidden;
+            flex-shrink: 0;
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
+        }
+
+        .brand-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            display: block;
         }
 
         .brand-title {
@@ -1752,18 +1766,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         .welcome-logo-circle {
-            width: 70px;
-            height: 70px;
+            width: 86px;
+            height: 86px;
             margin: 0 auto 18px auto;
             border-radius: 50%;
             background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(236, 72, 153, 0.25));
-            border: 2px solid rgba(56, 189, 248, 0.6);
+            border: 2.5px solid rgba(56, 189, 248, 0.85);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--accent-blue);
-            box-shadow: 0 0 30px rgba(56, 189, 248, 0.35);
+            box-shadow: 0 0 35px rgba(56, 189, 248, 0.45);
             animation: welcomePulse 2s ease-in-out infinite alternate;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .welcome-logo-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            display: block;
         }
 
         @keyframes welcomePulse {
@@ -1894,7 +1918,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
             <div class="welcome-logo-circle">
-                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
+                <img src="/rushi_profile.jpg" alt="RUSHI THE TRADER" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <svg style="display:none;" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
             </div>
             <div class="welcome-brand-badge">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -1935,7 +1960,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <header>
             <div class="brand-block" onclick="replayWelcomeGreeting()" style="cursor:pointer;" title="Click to replay Welcome Greeting Voice">
                 <div class="brand-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
+                    <img src="/rushi_profile.jpg" alt="RUSHI THE TRADER" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <svg style="display:none;" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
                 </div>
                 <div>
                     <div style="font-size: 13px; font-weight: 800; letter-spacing: 0.12em; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
@@ -5707,6 +5733,33 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(HTML_TEMPLATE.encode("utf-8"))
             return
+
+        # Favicon and Brand Images
+        if path in ("/favicon.ico", "/favicon.png", "/favicon.jpg", "/logo.jpg", "/rushi_profile.jpg"):
+            filename = path.strip("/")
+            data = None
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            for candidate in (
+                filename,
+                os.path.join(base_dir, filename),
+                os.path.join(base_dir, "public", filename),
+                os.path.join("public", filename),
+            ):
+                if os.path.exists(candidate):
+                    try:
+                        with open(candidate, "rb") as f:
+                            data = f.read()
+                            break
+                    except Exception:
+                        pass
+            if data is not None:
+                ctype = "image/png" if path.endswith(".png") else ("image/x-icon" if path.endswith(".ico") else "image/jpeg")
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+                return
 
         # Google Search Console Verification File (Exact Token Only - Prevents Wildcard False-Positive Hack Flag)
         if path == "/googleb3e3c0a986c6ae10.html":
