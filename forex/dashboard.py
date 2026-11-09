@@ -1728,9 +1728,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     Test Indian Voice
                 </button>
 
-                <button id="btnNotif" class="btn" onclick="toggleNotifications()">
+                <button id="btnNotif" class="btn" onclick="toggleNotifications()" title="Toggle Browser Desktop Alerts for BUY/SELL Signals" style="border-color:rgba(100,116,139,0.5); color:var(--text-muted); display:inline-flex; align-items:center; gap:6px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                    Enable Alerts
+                    <span id="notifStatusLabel">Alerts: OFF</span>
                 </button>
 
                 <button class="btn" onclick="openRiskModal()">
@@ -2553,7 +2553,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let currentObservation = null;
         let currentChartData = null;
         let currentInterval = '5m';
-        let notificationsEnabled = false;
+        let notificationsEnabled = localStorage.getItem('notificationsEnabled') === 'true';
         let lastNotifiedSignal = null;
         let lastNotifiedSignalBySymbol = {};
         let voiceAlertsEnabled = localStorage.getItem('voiceAlertsEnabled') !== 'false';
@@ -4526,7 +4526,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             updateVoiceAlertsUI();
 
             if (voiceAlertsEnabled) {
-                speakFemaleVoice("Indian English voice alerts enabled. Monitoring Gold and Bitcoin.");
+                speakFemaleVoice("Indian English voice alerts activated. Monitoring Gold and Bitcoin.");
+            } else {
+                // Immediate full silence: cancel speech and clear queue
+                speechQueue = [];
+                isSpeakingNow = false;
+                window._activeSpeechUtterance = null;
+                if ('speechSynthesis' in window) {
+                    try {
+                        window.speechSynthesis.cancel();
+                    } catch (e) {}
+                }
+                const toast = document.getElementById('voiceAlertToast');
+                if (toast) toast.classList.remove('show');
             }
         }
 
@@ -4560,7 +4572,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (lbl) lbl.textContent = "Indian Voice: Active";
                 if (badge) {
                     badge.className = "badge badge-pink";
-                    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Indian Voice: ON`;
+                    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Indian Voice: Active`;
                 }
             } else {
                 if (btn) {
@@ -4568,7 +4580,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     btn.style.color = "var(--text-muted)";
                     btn.style.background = "transparent";
                 }
-                if (lbl) lbl.textContent = "Indian Voice: OFF";
+                if (lbl) lbl.textContent = "Indian Voice: Deactivated";
                 if (badge) {
                     badge.className = "badge";
                     badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><line x1="2" y1="2" x2="22" y2="22"/></svg> Indian Voice: OFF`;
@@ -4579,22 +4591,66 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         /* -------------------------------------------------------------
            Browser Notifications & Risk Controls
            ------------------------------------------------------------- */
+        function updateNotificationsUI() {
+            const btn = document.getElementById('btnNotif');
+            const lbl = document.getElementById('notifStatusLabel');
+            if (!btn) return;
+            if (notificationsEnabled) {
+                btn.style.borderColor = "rgba(34,197,94,0.7)";
+                btn.style.color = "var(--accent-green)";
+                btn.style.background = "rgba(34,197,94,0.12)";
+                if (lbl) lbl.textContent = "Alerts: Active";
+                else btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> <span id="notifStatusLabel">Alerts: Active</span>`;
+            } else {
+                btn.style.borderColor = "rgba(100,116,139,0.5)";
+                btn.style.color = "var(--text-muted)";
+                btn.style.background = "transparent";
+                if (lbl) lbl.textContent = "Alerts: Deactivated";
+                else btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> <span id="notifStatusLabel">Alerts: Deactivated</span>`;
+            }
+        }
+
         function toggleNotifications() {
             getAudioContext(); // Unlock audio context on user gesture
             if (!("Notification" in window)) {
                 alert("This browser does not support desktop notifications.");
                 return;
             }
-            Notification.requestPermission().then(permission => {
-                if (permission === "granted") {
-                    notificationsEnabled = true;
-                    document.getElementById('btnNotif').style.color = "var(--accent-green)";
-                    document.getElementById('btnNotif').innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> Alerts Active`;
-                    sendNotification("Forex Paper Terminal", "Desktop alerts successfully enabled for paper trade signals.");
-                } else {
-                    alert("Notification permission denied or dismissed.");
-                }
-            });
+
+            // If already enabled, toggle to DEACTIVATED
+            if (notificationsEnabled) {
+                notificationsEnabled = false;
+                localStorage.setItem('notificationsEnabled', 'false');
+                updateNotificationsUI();
+                return;
+            }
+
+            // If deactivated, toggle to ACTIVATED
+            if (Notification.permission === "granted") {
+                notificationsEnabled = true;
+                localStorage.setItem('notificationsEnabled', 'true');
+                updateNotificationsUI();
+                sendNotification("Forex Paper Terminal", "Desktop alerts activated for paper trade signals.");
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        notificationsEnabled = true;
+                        localStorage.setItem('notificationsEnabled', 'true');
+                        updateNotificationsUI();
+                        sendNotification("Forex Paper Terminal", "Desktop alerts activated for paper trade signals.");
+                    } else {
+                        notificationsEnabled = false;
+                        localStorage.setItem('notificationsEnabled', 'false');
+                        updateNotificationsUI();
+                        alert("Notification permission denied or dismissed.");
+                    }
+                });
+            } else {
+                alert("Desktop notifications are blocked by browser settings. Please allow notifications for this site in your browser URL bar.");
+                notificationsEnabled = false;
+                localStorage.setItem('notificationsEnabled', 'false');
+                updateNotificationsUI();
+            }
         }
 
         function sendNotification(title, body) {
@@ -5165,6 +5221,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             initTwelveDataWebSocket();
             fetchScannerSignals();
             updateVoiceAlertsUI();
+            updateNotificationsUI();
 
             // Unlock Web Audio API context and speech synthesis on user interaction
             const unlockHandler = () => {

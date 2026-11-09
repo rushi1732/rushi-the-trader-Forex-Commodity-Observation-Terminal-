@@ -854,6 +854,24 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("lastAnnouncedActionBySymbol", html)
 
 
+    def test_alert_buttons_toggle_active_and_deactive(self):
+        """Verify that alert buttons support bidirectional active / deactive toggle states."""
+        url = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+
+        self.assertIn("btnNotif", html)
+        self.assertIn("notifStatusLabel", html)
+        self.assertIn("toggleNotifications", html)
+        self.assertIn("updateNotificationsUI", html)
+        self.assertIn("toggleVoiceAlerts", html)
+        self.assertIn("updateVoiceAlertsUI", html)
+        self.assertIn("Indian Voice: Deactivated", html)
+        self.assertIn("Alerts: Deactivated", html)
+        self.assertIn("localStorage.setItem('notificationsEnabled'", html)
+        self.assertIn("localStorage.setItem('voiceAlertsEnabled'", html)
+
+
 if __name__ == "__main__":
     unittest.main()
 
