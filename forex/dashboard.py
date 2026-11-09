@@ -1898,8 +1898,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
     <!-- Opening Welcome Animated Splash Overlay -->
-    <div id="welcomeSplashOverlay" class="welcome-splash-overlay" onclick="onSplashBackdropClick(event)">
-        <div class="welcome-splash-card">
+    <div id="welcomeSplashOverlay" class="welcome-splash-overlay active" onclick="onSplashBackdropClick(event)">
+        <div class="welcome-splash-card" onclick="event.stopPropagation()">
+            <button onclick="closeWelcomeSplash()" style="position:absolute; top:14px; right:16px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:4px;" title="Close and enter terminal">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
             <div class="welcome-logo-circle">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
             </div>
@@ -1928,9 +1931,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <span class="welcome-grid-pill">Confluence Grades</span>
             </div>
             <div>
-                <button class="welcome-enter-btn" onclick="enterTerminalFromWelcome()">
+                <button id="welcomeEnterBtn" class="welcome-enter-btn" onclick="enterTerminalFromWelcome()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    <span>Enter Terminal</span>
+                    <span id="welcomeBtnText">Click to Enter Terminal & Play Voice</span>
                 </button>
             </div>
         </div>
@@ -4640,7 +4643,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     utter.pitch = 1.05;
                     utter.volume = 1.0;
 
-                    const finishSpeech = () => {
+                    const finishSpeech = (err) => {
                         if (speechSafetyTimer) {
                             clearTimeout(speechSafetyTimer);
                             speechSafetyTimer = null;
@@ -4648,15 +4651,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         window._activeSpeechUtterance = null;
                         isSpeakingNow = false;
                         if (onComplete) {
-                            try { onComplete(); } catch (err) {}
+                            try { onComplete(err); } catch (e) {}
                         }
                         setTimeout(processNextSpeechQueue, 350);
                     };
 
-                    utter.onend = finishSpeech;
+                    utter.onend = () => finishSpeech(null);
                     utter.onerror = (err) => {
                         console.warn("Speech synthesis error or interrupted:", err);
-                        finishSpeech();
+                        finishSpeech(err);
                     };
 
                     if (speechSafetyTimer) clearTimeout(speechSafetyTimer);
@@ -4842,7 +4845,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return "Good Morning";
             } else if (hour >= 12 && hour < 17) {
                 return "Good Afternoon";
-            } else if (hour >= 17 && hour < 21) {
+            } else if (hour >= 17 && hour < 22) {
                 return "Good Evening";
             } else {
                 return "Good Night";
@@ -4858,53 +4861,53 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const overlay = document.getElementById('welcomeSplashOverlay');
             const greetingEl = document.getElementById('welcomeGreetingText');
             const speechLabel = document.getElementById('welcomeSpeechLabel');
+            const btnText = document.getElementById('welcomeBtnText');
 
             if (greetingEl) {
                 greetingEl.innerHTML = `Hello, <span class="greeting-highlight">${greeting} Sir!</span>`;
             }
             if (speechLabel) {
-                speechLabel.textContent = `Indian Female Voice: ${greeting}`;
+                speechLabel.textContent = `Indian AI Female Voice: ${greeting}`;
             }
 
             if (overlay) {
                 overlay.style.display = 'flex';
-                setTimeout(() => {
-                    overlay.classList.add('active');
-                }, 20);
+                overlay.classList.add('active');
             }
 
-            function executeWelcomeVoice() {
-                if (hasSpokenWelcomeOnLoad && !forceReplay) return;
-                hasSpokenWelcomeOnLoad = true;
-                getAudioContext();
-                unlockAudioDirectly();
-                speakFemaleVoice(welcomeText, () => {
-                    setTimeout(closeWelcomeSplash, 1200);
-                });
-            }
-
+            // Attempt to speak
             if (!hasSpokenWelcomeOnLoad || forceReplay) {
                 try {
-                    executeWelcomeVoice();
-                } catch(e) {}
+                    getAudioContext();
+                    unlockAudioDirectly();
+                    speakFemaleVoice(welcomeText, (err) => {
+                        if (!err) {
+                            hasSpokenWelcomeOnLoad = true;
+                            // Speech finished smoothly! Dissolve splash after 1.2s
+                            setTimeout(closeWelcomeSplash, 1200);
+                        } else {
+                            // Autoplay was blocked by browser before user click
+                            hasSpokenWelcomeOnLoad = false;
+                            if (btnText) btnText.textContent = "Click to Enter Terminal & Play Voice";
+                            if (speechLabel) speechLabel.textContent = "Tap button below to launch audio";
+                        }
+                    });
+                } catch(e) {
+                    hasSpokenWelcomeOnLoad = false;
+                    if (btnText) btnText.textContent = "Click to Enter Terminal & Play Voice";
+                }
             }
-
-            if (window._welcomeAutoDismissTimer) clearTimeout(window._welcomeAutoDismissTimer);
-            window._welcomeAutoDismissTimer = setTimeout(() => {
-                closeWelcomeSplash();
-            }, 6000);
         }
 
         function enterTerminalFromWelcome() {
             const greeting = getTimeOfDayGreeting();
             const welcomeText = `Hello, ${greeting} Sir! Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal.`;
 
-            if (!hasSpokenWelcomeOnLoad) {
-                hasSpokenWelcomeOnLoad = true;
-                getAudioContext();
-                unlockAudioDirectly();
-                speakFemaleVoice(welcomeText);
-            }
+            // Always unlock and play voice on direct user click!
+            getAudioContext();
+            unlockAudioDirectly();
+            speakFemaleVoice(welcomeText);
+            hasSpokenWelcomeOnLoad = true;
             closeWelcomeSplash();
         }
 
@@ -5554,6 +5557,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         // Initialize on load
         window.addEventListener('DOMContentLoaded', () => {
+            // Trigger Opening Welcome Animation & Indian Female Voice Greeting immediately
+            try {
+                triggerWelcomeExperience();
+            } catch (e) {
+                console.error("Welcome experience error:", e);
+            }
+
             fetchHealth();
             fetchObservation();
             fetchChart();
@@ -5566,11 +5576,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             fetchScannerSignals();
             updateVoiceAlertsUI();
             updateNotificationsUI();
-
-            // Trigger Opening Welcome Animation & Indian Female Voice Greeting
-            setTimeout(() => {
-                triggerWelcomeExperience();
-            }, 300);
 
             // Unlock Web Audio API context and speech synthesis on user interaction
             const unlockHandler = () => {
