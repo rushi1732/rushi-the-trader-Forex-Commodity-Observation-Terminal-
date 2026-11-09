@@ -936,6 +936,26 @@ class TestForexDashboard(unittest.TestCase):
                 data = resp.read()
                 self.assertGreater(len(data), 1000)
 
+    def test_sitemap_and_robots(self):
+        """Verify sitemap.xml and robots.txt endpoints and contents."""
+        # 1. sitemap.xml
+        url_sitemap = f"http://127.0.0.1:{self.port}/sitemap.xml"
+        with urllib.request.urlopen(url_sitemap, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertIn("xml", resp.headers.get_content_type())
+            content = resp.read().decode("utf-8")
+            self.assertIn("<urlset", content)
+            self.assertIn("https://rushithetraderdashboard.vercel.app/", content)
+
+        # 2. robots.txt
+        url_robots = f"http://127.0.0.1:{self.port}/robots.txt"
+        with urllib.request.urlopen(url_robots, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertIn("text/plain", resp.headers.get_content_type())
+            content = resp.read().decode("utf-8")
+            self.assertIn("User-agent: *", content)
+            self.assertIn("Sitemap: https://rushithetraderdashboard.vercel.app/sitemap.xml", content)
+
 
 if __name__ == "__main__":
     unittest.main()

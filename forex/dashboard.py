@@ -640,6 +640,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="shortcut icon" href="/favicon.ico">
     <link rel="apple-touch-icon" href="/rushi_profile.jpg">
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -5767,6 +5768,34 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(b"google-site-verification: googleb3e3c0a986c6ae10.html")
+            return
+
+        # SEO: sitemap.xml
+        if path == "/sitemap.xml":
+            sitemap_content = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://rushithetraderdashboard.vercel.app/</loc>
+    <lastmod>2026-11-09</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>"""
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml; charset=utf-8")
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self.end_headers()
+            self.wfile.write(sitemap_content.strip().encode("utf-8"))
+            return
+
+        # SEO: robots.txt
+        if path == "/robots.txt":
+            robots_content = "User-agent: *\nAllow: /\nSitemap: https://rushithetraderdashboard.vercel.app/sitemap.xml\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self.end_headers()
+            self.wfile.write(robots_content.encode("utf-8"))
             return
 
         # 2. API: Observable Pairs
