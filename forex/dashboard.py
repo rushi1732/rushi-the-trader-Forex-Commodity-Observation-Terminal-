@@ -1753,6 +1753,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <!-- Data Health Status Bar -->
         <div class="health-bar">
             <div class="health-items">
+                <div id="audioUnlockPill" class="health-pill" onclick="unlockAudioDirectly()" style="cursor:pointer; border-color:rgba(236,72,153,0.6); background:rgba(236,72,153,0.12); color:#f472b6; display:none;" title="Click anywhere to unlock live browser audio">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                    <span>Click to Enable Sound Alerts</span>
+                </div>
                 <div class="health-pill">
                     <span id="healthDot" class="pulse-dot green"></span>
                     <span>Feed: <strong id="healthFeed">Healthy (200 OK)</strong></span>
@@ -2556,6 +2560,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let audioCtx = null;
         let cachedFemaleVoice = null;
         let notifiedTrades = new Set();
+        let speechQueue = [];
+        let isSpeakingNow = false;
+        let lastSpokenTimeBySymbol = { "XAU/USD": 0, "BTC/USD": 0 };
+        let lastSpokenGlobalTime = 0;
+        let lastAnnouncedActionBySymbol = { "XAU/USD": null, "BTC/USD": null };
+        let lastScannerNotifiedBySymbol = {};
+        const REPEAT_ALERT_INTERVAL_MS = 60000; // 60s periodic voice reminder while signal active
 
         /* -------------------------------------------------------------
            Twelve Data Real-Time WebSocket Client (XAU/USD, BTC/USD & Forex)
@@ -4203,9 +4214,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             }
             if (audioCtx && audioCtx.state === 'suspended') {
-                audioCtx.resume();
+                audioCtx.resume().catch(() => {});
             }
             return audioCtx;
+        }
+
+        function unlockAudioDirectly() {
+            getAudioContext();
+            if ('speechSynthesis' in window) {
+                try {
+                    window.speechSynthesis.resume();
+                } catch(e) {}
+            }
+            const pill = document.getElementById('audioUnlockPill');
+            if (pill) pill.style.display = 'none';
+        }
+
+        function checkAudioState() {
+            const pill = document.getElementById('audioUnlockPill');
+            if (!pill) return;
+            if (!audioCtx || audioCtx.state === 'suspended') {
+                pill.style.display = 'inline-flex';
+            } else {
+                pill.style.display = 'none';
+            }
         }
 
         // Institutional bell chime before speech announcement
@@ -4312,38 +4344,104 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             };
         }
 
+        window._activeSpeechUtterance = null;
+        let speechSafetyTimer = null;
+
+        // Keep-alive watchdog for Chromium speech synthesis freeze bug
+        if (window._speechWatchdog) clearInterval(window._speechWatchdog);
+        window._speechWatchdog = setInterval(() => {
+            if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+                // If audio paused or frozen by browser background throttling, resume
+                window.speechSynthesis.pause();
+                window.speechSynthesis.resume();
+            }
+        }, 3500);
+
+        function processNextSpeechQueue() {
+            if (isSpeakingNow) return;
+            if (!speechQueue || speechQueue.length === 0) return;
+
+            const nextItem = speechQueue.shift();
+            executeSpeech(nextItem.text, nextItem.onComplete);
+        }
+
+        function executeSpeech(text, onComplete) {
+            if (!('speechSynthesis' in window)) return;
+            isSpeakingNow = true;
+
+            try {
+                playChime();
+            } catch (e) {}
+
+            setTimeout(() => {
+                try {
+                    if (window.speechSynthesis.paused) {
+                        window.speechSynthesis.resume();
+                    }
+
+                    const utter = new SpeechSynthesisUtterance(text);
+                    // Crucial: Pin to window to prevent V8 garbage collection mid-speech!
+                    window._activeSpeechUtterance = utter;
+
+                    const voice = cachedFemaleVoice || findBestFemaleVoice();
+                    if (voice) {
+                        utter.voice = voice;
+                        utter.lang = voice.lang || 'en-IN';
+                    } else {
+                        utter.lang = 'en-IN';
+                    }
+
+                    utter.rate = 0.88;
+                    utter.pitch = 1.05;
+                    utter.volume = 1.0;
+
+                    const finishSpeech = () => {
+                        if (speechSafetyTimer) {
+                            clearTimeout(speechSafetyTimer);
+                            speechSafetyTimer = null;
+                        }
+                        window._activeSpeechUtterance = null;
+                        isSpeakingNow = false;
+                        if (onComplete) {
+                            try { onComplete(); } catch (err) {}
+                        }
+                        setTimeout(processNextSpeechQueue, 350);
+                    };
+
+                    utter.onend = finishSpeech;
+                    utter.onerror = (err) => {
+                        console.warn("Speech synthesis error or interrupted:", err);
+                        finishSpeech();
+                    };
+
+                    if (speechSafetyTimer) clearTimeout(speechSafetyTimer);
+                    speechSafetyTimer = setTimeout(() => {
+                        if (isSpeakingNow) {
+                            console.warn("Speech synthesis watchdog timed out. Advancing queue.");
+                            finishSpeech();
+                        }
+                    }, 14000);
+
+                    window.speechSynthesis.speak(utter);
+                } catch (e) {
+                    console.error("Speech execution exception:", e);
+                    window._activeSpeechUtterance = null;
+                    isSpeakingNow = false;
+                    setTimeout(processNextSpeechQueue, 300);
+                }
+            }, 200);
+        }
+
         function speakFemaleVoice(text, onComplete) {
             if (!('speechSynthesis' in window)) {
                 console.warn("Speech synthesis not supported on this browser.");
                 return;
             }
 
-            window.speechSynthesis.cancel();
-            playChime();
-
-            setTimeout(() => {
-                const utter = new SpeechSynthesisUtterance(text);
-                const voice = cachedFemaleVoice || findBestFemaleVoice();
-                if (voice) {
-                    utter.voice = voice;
-                    utter.lang = voice.lang || 'en-IN';
-                } else {
-                    utter.lang = 'en-IN';
-                }
-
-                // Indian English clarity settings:
-                // rate 0.88 gives a calm, deliberate, easy-to-understand pace without rapid foreign swallowing of words
-                utter.rate = 0.88;
-                utter.pitch = 1.05;  // Natural warm feminine tone
-                utter.volume = 1.0;  // Full volume
-
-                if (onComplete) {
-                    utter.onend = onComplete;
-                    utter.onerror = onComplete;
-                }
-
-                window.speechSynthesis.speak(utter);
-            }, 220);
+            speechQueue.push({ text: text, onComplete: onComplete });
+            if (!isSpeakingNow) {
+                processNextSpeechQueue();
+            }
         }
 
         function formatGradeForVoice(grade) {
@@ -4361,7 +4459,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             return str;
         }
 
-        function showVoiceToast(action, asset, grade) {
+        function showVoiceToast(action, asset, grade, isReminder = false) {
             let toast = document.getElementById('voiceAlertToast');
             if (!toast) {
                 toast = document.createElement('div');
@@ -4371,13 +4469,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
             const isBuy = action === 'BUY';
             const actionColor = isBuy ? 'var(--accent-green)' : 'var(--accent-rose)';
+            const titlePrefix = isReminder ? 'REMINDER' : 'NEW SIGNAL';
             toast.innerHTML = `
                 <div style="width:36px; height:36px; border-radius:50%; background:rgba(236,72,153,0.2); display:flex; align-items:center; justify-content:center; color:#f472b6; flex-shrink:0;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                 </div>
                 <div>
                     <div style="font-size:12px; font-weight:700; color:${actionColor}; display:flex; align-items:center; gap:6px;">
-                        <span>INDIAN FEMALE VOICE: ${action} ${asset.toUpperCase()}</span>
+                        <span>INDIAN FEMALE VOICE (${titlePrefix}): ${action} ${asset.toUpperCase()}</span>
                     </div>
                     <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">
                         Confluence Grade: <strong style="color:var(--text-primary);">${grade}</strong>
@@ -4390,7 +4489,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }, 6000);
         }
 
-        function announceSignalVoice(sig) {
+        function announceSignalVoice(sig, isReminder = false) {
             if (!voiceAlertsEnabled) return;
             if (!sig || (sig.action !== 'BUY' && sig.action !== 'SELL')) return;
 
@@ -4411,10 +4510,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 priceDetails += ` Stop loss ${Number(sig.stop_loss).toFixed(dec)}.`;
             }
 
-            // Natural Indian English announcement
-            const speechText = `Alert! ${actionText} signal confirmed for ${assetName}. Confluence Grade: ${gradeText}.${priceDetails}`;
+            // Natural Indian English announcement with reminder support
+            const prefix = isReminder ? 'Reminder: ' : 'Alert! ';
+            const statusWord = isReminder ? 'remains active' : 'confirmed';
+            const speechText = `${prefix}${actionText} signal ${statusWord} for ${assetName}. Confluence Grade: ${gradeText}.${priceDetails}`;
 
-            showVoiceToast(actionText, assetName, gradeText);
+            showVoiceToast(actionText, assetName, gradeText, isReminder);
             speakFemaleVoice(speechText);
         }
 
@@ -4508,17 +4609,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function checkNotifications(data) {
             if (!data || !data.auto_signal) return;
             const sig = data.auto_signal;
-            const sym = normalizeSym(sig.symbol || document.getElementById('pairSelect').value || 'XAU/USD');
+            const sym = normalizeSym(sig.symbol || (document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD'));
+            const now = Date.now();
+
             if (sig.action === 'BUY' || sig.action === 'SELL') {
                 const sigKey = `${sym}-${sig.action}-${sig.entry_reference || ''}-${sig.confirmed_candle_ts || sig.timestamp_et || ''}`;
-                if (lastNotifiedSignalBySymbol[sym] !== sigKey) {
+                const isNewSignal = (lastNotifiedSignalBySymbol[sym] !== sigKey) || (lastAnnouncedActionBySymbol[sym] !== sig.action);
+                const lastSpoken = lastSpokenTimeBySymbol[sym] || 0;
+                const shouldRepeatReminder = (now - lastSpoken >= REPEAT_ALERT_INTERVAL_MS);
+
+                if (isNewSignal || shouldRepeatReminder) {
                     lastNotifiedSignalBySymbol[sym] = sigKey;
                     lastNotifiedSignal = sigKey;
+                    lastAnnouncedActionBySymbol[sym] = sig.action;
+                    lastSpokenTimeBySymbol[sym] = now;
+                    lastSpokenGlobalTime = now;
 
-                    // Desktop push notification
-                    sendNotification(`New Paper Signal: ${sig.action} ${sym}`, `Grade: ${sig.grade || 'Valid'} | Entry: ${sig.entry_reference} | Stop: ${sig.stop_loss}`);
+                    if (isNewSignal) {
+                        // Desktop push notification
+                        sendNotification(`New Paper Signal: ${sig.action} ${sym}`, `Grade: ${sig.grade || 'Valid'} | Entry: ${sig.entry_reference} | Stop: ${sig.stop_loss}`);
+                    }
 
-                    // Female Voice audio alert with Confluence Grade
+                    // Female Voice audio alert with Confluence Grade (with repeat reminder support)
                     announceSignalVoice({
                         symbol: sym,
                         action: sig.action,
@@ -4526,8 +4638,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         entry_reference: sig.entry_reference,
                         stop_loss: sig.stop_loss,
                         take_profit: sig.take_profit
-                    });
+                    }, !isNewSignal);
                 }
+            } else {
+                // Signal has expired or returned to waiting/neutral
+                lastAnnouncedActionBySymbol[sym] = null;
+                delete lastNotifiedSignalBySymbol[sym];
             }
         }
 
@@ -4912,21 +5028,38 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 // Dual-pair female voice notification for Gold & Bitcoin background scanner
                 if (Array.isArray(results)) {
+                    const currentSelectedSym = normalizeSym(document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD');
+                    const now = Date.now();
                     results.forEach(r => {
                         const sym = normalizeSym(r.symbol || '');
-                        if ((sym.includes('XAU') || sym.includes('BTC')) && (r.action === 'BUY' || r.action === 'SELL')) {
+                        // Background scanner handles the alternate pair without colliding with active chart polling
+                        if (sym !== currentSelectedSym && (sym.includes('XAU') || sym.includes('BTC')) && (r.action === 'BUY' || r.action === 'SELL')) {
                             const scanKey = `${sym}-${r.action}-${r.price || ''}-${r.confluence_score || ''}`;
-                            if (lastNotifiedSignalBySymbol[sym] !== scanKey) {
-                                lastNotifiedSignalBySymbol[sym] = scanKey;
-                                sendNotification(`Scanner Signal: ${r.action} ${sym}`, `Grade: ${r.grade} | Price: ${r.price}`);
+                            const isNewScanSignal = (lastScannerNotifiedBySymbol[sym] !== scanKey) || (lastAnnouncedActionBySymbol[sym] !== r.action);
+                            const lastSpoken = lastSpokenTimeBySymbol[sym] || 0;
+                            const shouldRepeatScan = (now - lastSpoken >= REPEAT_ALERT_INTERVAL_MS);
+
+                            if (isNewScanSignal || shouldRepeatScan) {
+                                lastScannerNotifiedBySymbol[sym] = scanKey;
+                                lastAnnouncedActionBySymbol[sym] = r.action;
+                                lastSpokenTimeBySymbol[sym] = now;
+                                lastSpokenGlobalTime = now;
+
+                                if (isNewScanSignal) {
+                                    sendNotification(`Scanner Signal: ${r.action} ${sym}`, `Grade: ${r.grade} | Price: ${r.price}`);
+                                }
+
                                 announceSignalVoice({
                                     symbol: sym,
                                     action: r.action,
                                     grade: r.grade,
                                     entry_reference: r.price,
                                     stop_loss: r.stop_loss || (r.execution_plan ? r.execution_plan.stop_loss : null)
-                                });
+                                }, !isNewScanSignal);
                             }
+                        } else if (sym !== currentSelectedSym && r.action !== 'BUY' && r.action !== 'SELL') {
+                            lastAnnouncedActionBySymbol[sym] = null;
+                            delete lastScannerNotifiedBySymbol[sym];
                         }
                     });
                 }
@@ -5033,9 +5166,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             fetchScannerSignals();
             updateVoiceAlertsUI();
 
-            // Unlock Web Audio API context and speech synthesis on first user interaction
-            document.addEventListener('click', () => { getAudioContext(); }, { once: true });
-            document.addEventListener('touchstart', () => { getAudioContext(); }, { once: true });
+            // Unlock Web Audio API context and speech synthesis on user interaction
+            const unlockHandler = () => {
+                unlockAudioDirectly();
+            };
+            document.addEventListener('click', unlockHandler);
+            document.addEventListener('touchstart', unlockHandler);
+            document.addEventListener('keydown', unlockHandler);
+
+            // Visibility change watchdog: keep speech alive when user returns to tab
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    if (audioCtx && audioCtx.state === 'suspended') {
+                        audioCtx.resume().catch(() => {});
+                    }
+                    if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+                        window.speechSynthesis.resume();
+                    }
+                }
+            });
+
+            // Audio state monitor to show unlock pill if browser suspended audio
+            checkAudioState();
+            setInterval(checkAudioState, 2500);
 
             // Periodic multi-pair institutional scanner (25s)
             setInterval(fetchScannerSignals, 25000);

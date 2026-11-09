@@ -837,6 +837,22 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("Test Indian Voice", html)
         self.assertIn("Indian Voice: Active", html)
 
+    def test_female_voice_reliability_and_queue(self):
+        """Verify garbage collection keep-alive, sequential queue, and repeat heartbeat in HTML."""
+        url = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+
+        self.assertIn("audioUnlockPill", html)
+        self.assertIn("unlockAudioDirectly", html)
+        self.assertIn("window._activeSpeechUtterance", html)
+        self.assertIn("_speechWatchdog", html)
+        self.assertIn("speechQueue", html)
+        self.assertIn("processNextSpeechQueue", html)
+        self.assertIn("REPEAT_ALERT_INTERVAL_MS", html)
+        self.assertIn("lastScannerNotifiedBySymbol", html)
+        self.assertIn("lastAnnouncedActionBySymbol", html)
+
 
 if __name__ == "__main__":
     unittest.main()
