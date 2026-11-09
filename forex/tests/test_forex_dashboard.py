@@ -877,12 +877,12 @@ class TestForexDashboard(unittest.TestCase):
         with urllib.request.urlopen(url, timeout=5) as resp:
             html = resp.read().decode("utf-8")
 
-        self.assertIn("welcomeSplashOverlay", html)
-        self.assertIn("welcome-splash-card", html)
+        self.assertIn("welcomeFullPageOverlay", html)
+        self.assertIn("welcome-fullpage-card", html)
         self.assertIn("welcomeGreetingText", html)
         self.assertIn("getTimeOfDayGreeting", html)
         self.assertIn("triggerWelcomeExperience", html)
-        self.assertIn("enterTerminalFromWelcome", html)
+        self.assertIn("dismissCurtainScreen", html)
         self.assertIn("Good Morning", html)
         self.assertIn("Good Afternoon", html)
         self.assertIn("Good Evening", html)

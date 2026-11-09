@@ -1565,6 +1565,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             max-width: 460px;
             width: 90%;
             padding: 24px;
+        }
+
         /* Strategy Decision Matrix & Trade Rationale */
         .matrix-card {
             border: 1px solid rgba(56, 189, 248, 0.25);
@@ -1691,52 +1693,47 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         /* -------------------------------------------------------------
-           Welcome Splash Screen & Opening Animation
+           Full-Screen Welcome Curtain Screen & Slide-Up Reveal
            ------------------------------------------------------------- */
-        .welcome-splash-overlay {
+        .welcome-fullpage-overlay {
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(7, 10, 19, 0.88);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            z-index: 10000;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at 50% 35%, #131c2e 0%, #080c14 75%, #04060a 100%);
+            z-index: 999999;
             display: flex;
             align-items: center;
             justify-content: center;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.45s ease;
-            padding: 20px;
-        }
-
-        .welcome-splash-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .welcome-splash-card {
-            background: linear-gradient(145deg, rgba(17, 24, 39, 0.96), rgba(15, 23, 42, 0.94));
-            border: 1px solid rgba(56, 189, 248, 0.35);
-            border-radius: 16px;
-            padding: 34px 36px;
-            max-width: 560px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(56, 189, 248, 0.15);
-            transform: scale(0.92) translateY(16px);
-            transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-            position: relative;
+            padding: 24px;
+            box-sizing: border-box;
+            transform: translateY(0%);
+            transition: transform 0.85s cubic-bezier(0.77, 0, 0.175, 1);
+            will-change: transform;
             overflow: hidden;
         }
 
-        .welcome-splash-overlay.active .welcome-splash-card {
-            transform: scale(1) translateY(0);
+        .welcome-fullpage-overlay.slide-up {
+            transform: translateY(-100%);
+            pointer-events: none;
         }
 
-        .welcome-splash-card::before {
+        .welcome-fullpage-card {
+            background: rgba(17, 24, 39, 0.90);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            border-radius: 20px;
+            padding: 42px 48px;
+            max-width: 620px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.9), 0 0 60px rgba(56, 189, 248, 0.2);
+            position: relative;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        .welcome-fullpage-card::before {
             content: '';
             position: absolute;
             top: 0;
@@ -1754,47 +1751,47 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         .welcome-logo-circle {
-            width: 60px;
-            height: 60px;
-            margin: 0 auto 16px auto;
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 18px auto;
             border-radius: 50%;
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(236, 72, 153, 0.2));
-            border: 2px solid rgba(56, 189, 248, 0.5);
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(236, 72, 153, 0.25));
+            border: 2px solid rgba(56, 189, 248, 0.6);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--accent-blue);
-            box-shadow: 0 0 25px rgba(56, 189, 248, 0.3);
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.35);
             animation: welcomePulse 2s ease-in-out infinite alternate;
         }
 
         @keyframes welcomePulse {
-            0% { transform: scale(1); box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
-            100% { transform: scale(1.06); box-shadow: 0 0 30px rgba(236, 72, 153, 0.4); }
+            0% { transform: scale(1); box-shadow: 0 0 18px rgba(56, 189, 248, 0.25); }
+            100% { transform: scale(1.06); box-shadow: 0 0 40px rgba(236, 72, 153, 0.4); }
         }
 
         .welcome-brand-badge {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            background: rgba(56, 189, 248, 0.1);
-            border: 1px solid rgba(56, 189, 248, 0.3);
+            gap: 8px;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.35);
             color: #38bdf8;
-            padding: 5px 12px;
+            padding: 6px 14px;
             border-radius: 999px;
             font-size: 11px;
             font-weight: 700;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
         }
 
         .welcome-greeting-title {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: 800;
-            letter-spacing: -0.01em;
+            letter-spacing: -0.02em;
             color: #ffffff;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             line-height: 1.25;
         }
 
@@ -1805,38 +1802,39 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         .welcome-terminal-name {
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 600;
-            color: var(--text-secondary);
-            letter-spacing: 0.03em;
-            margin-bottom: 18px;
+            color: #cbd5e1;
+            letter-spacing: 0.02em;
+            margin-bottom: 22px;
             line-height: 1.5;
         }
 
         .welcome-terminal-name strong {
             color: #38bdf8;
             font-weight: 700;
+            letter-spacing: 0.04em;
         }
 
         .welcome-voice-indicator {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            background: rgba(236, 72, 153, 0.12);
-            border: 1px solid rgba(236, 72, 153, 0.35);
-            padding: 7px 16px;
-            border-radius: 8px;
+            gap: 12px;
+            background: rgba(236, 72, 153, 0.15);
+            border: 1px solid rgba(236, 72, 153, 0.4);
+            padding: 10px 20px;
+            border-radius: 10px;
             color: #f472b6;
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 600;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         .sound-wave-bars {
             display: flex;
             align-items: center;
-            gap: 3px;
-            height: 12px;
+            gap: 4px;
+            height: 16px;
         }
 
         .sound-wave-bars span {
@@ -1845,46 +1843,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border-radius: 2px;
             animation: soundWaveAnim 1.2s ease-in-out infinite alternate;
         }
-        .sound-wave-bars span:nth-child(1) { height: 5px; animation-delay: 0.1s; }
-        .sound-wave-bars span:nth-child(2) { height: 12px; animation-delay: 0.3s; }
-        .sound-wave-bars span:nth-child(3) { height: 8px; animation-delay: 0.2s; }
-        .sound-wave-bars span:nth-child(4) { height: 11px; animation-delay: 0.4s; }
+        .sound-wave-bars span:nth-child(1) { height: 6px; animation-delay: 0.1s; }
+        .sound-wave-bars span:nth-child(2) { height: 16px; animation-delay: 0.3s; }
+        .sound-wave-bars span:nth-child(3) { height: 10px; animation-delay: 0.2s; }
+        .sound-wave-bars span:nth-child(4) { height: 14px; animation-delay: 0.4s; }
+        .sound-wave-bars span:nth-child(5) { height: 8px; animation-delay: 0.25s; }
 
         @keyframes soundWaveAnim {
-            0% { transform: scaleY(0.4); }
-            100% { transform: scaleY(1.2); }
+            0% { transform: scaleY(0.3); }
+            100% { transform: scaleY(1.3); }
         }
 
-        .welcome-grid-pills {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 22px;
-        }
-
-        .welcome-grid-pill {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border-subtle);
-            padding: 4px 10px;
-            border-radius: 6px;
+        .welcome-fullpage-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 14px;
+            letter-spacing: 0.03em;
         }
 
         .welcome-enter-btn {
             background: linear-gradient(135deg, #0284c7, #2563eb);
             color: #ffffff;
-            border: 1px solid rgba(56, 189, 248, 0.4);
-            padding: 10px 24px;
-            font-size: 13px;
+            border: 1px solid rgba(56, 189, 248, 0.5);
+            padding: 12px 28px;
+            font-size: 14px;
             font-weight: 700;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 20px rgba(2, 132, 199, 0.35);
+            box-shadow: 0 4px 20px rgba(2, 132, 199, 0.4);
             display: inline-flex;
             align-items: center;
             gap: 8px;
@@ -1893,49 +1881,46 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .welcome-enter-btn:hover {
             background: linear-gradient(135deg, #0369a1, #1d4ed8);
             transform: translateY(-1px);
-            box-shadow: 0 6px 25px rgba(2, 132, 199, 0.45);
+            box-shadow: 0 6px 25px rgba(2, 132, 199, 0.5);
         }
     </style>
 </head>
 <body>
-    <!-- Opening Welcome Animated Splash Overlay -->
-    <div id="welcomeSplashOverlay" class="welcome-splash-overlay active" onclick="onSplashBackdropClick(event)">
-        <div class="welcome-splash-card" onclick="event.stopPropagation()">
-            <button onclick="closeWelcomeSplash()" style="position:absolute; top:14px; right:16px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:4px;" title="Close and enter terminal">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <!-- Full-Screen Welcome Curtain Screen -->
+    <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="triggerVoiceFromCurtainClick()">
+        <div class="welcome-fullpage-card">
+            <button onclick="event.stopPropagation(); dismissCurtainScreen();" style="position:absolute; top:16px; right:18px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:6px;" title="Skip and open terminal">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
             <div class="welcome-logo-circle">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
             </div>
             <div class="welcome-brand-badge">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                 <span>Institutional Market Terminal</span>
             </div>
             <div id="welcomeGreetingText" class="welcome-greeting-title">
-                Hello, <span class="greeting-highlight">Good Morning Sir!</span>
+                Hello, <span class="greeting-highlight">Good Evening Sir!</span>
             </div>
             <div class="welcome-terminal-name">
                 Welcome to <strong>RUSHI THE TRADER</strong><br>
                 Forex & Commodity Observation Terminal
             </div>
             <div class="welcome-voice-indicator">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                <span id="welcomeSpeechLabel">Indian AI Female Voice: Ready</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                <span id="welcomeSpeechLabel">Speaking Welcome Greeting...</span>
                 <div class="sound-wave-bars">
-                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span>
                 </div>
             </div>
-            <div class="welcome-grid-pills">
-                <span class="welcome-grid-pill">XAU/USD Spot Gold</span>
-                <span class="welcome-grid-pill">BTC/USD Bitcoin</span>
-                <span class="welcome-grid-pill">SMC + ICT Engine</span>
-                <span class="welcome-grid-pill">Confluence Grades</span>
-            </div>
             <div>
-                <button id="welcomeEnterBtn" class="welcome-enter-btn" onclick="enterTerminalFromWelcome()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    <span id="welcomeBtnText">Click to Enter Terminal & Play Voice</span>
+                <button id="welcomeEnterBtn" class="welcome-enter-btn" onclick="triggerVoiceFromCurtainClick()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span id="welcomeBtnText">Click Anywhere to Play Voice & Enter</span>
                 </button>
+            </div>
+            <div class="welcome-fullpage-hint">
+                Screen will automatically slide up when speech completes
             </div>
         </div>
     </div>
@@ -4838,7 +4823,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         /* -------------------------------------------------------------
-           Welcome Animation & Indian Female Voice Greeting Experience
+           Full-Screen Welcome Curtain Screen & Indian Female Voice Greeting
            ------------------------------------------------------------- */
         function getTimeOfDayGreeting() {
             const hour = new Date().getHours();
@@ -4853,13 +4838,31 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
-        let hasSpokenWelcomeOnLoad = false;
+        let isCurtainDismissed = false;
+        let isWelcomeSpeaking = false;
+        let welcomeDismissTimer = null;
 
-        function triggerWelcomeExperience(forceReplay = false) {
+        function dismissCurtainScreen() {
+            if (isCurtainDismissed) return;
+            isCurtainDismissed = true;
+            if (welcomeDismissTimer) {
+                clearTimeout(welcomeDismissTimer);
+                welcomeDismissTimer = null;
+            }
+            const overlay = document.getElementById('welcomeFullPageOverlay');
+            if (overlay) {
+                overlay.classList.add('slide-up');
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 900);
+            }
+        }
+
+        function playWelcomeCurtainVoice() {
+            if (isCurtainDismissed || isWelcomeSpeaking) return;
             const greeting = getTimeOfDayGreeting();
             const welcomeText = `Hello, ${greeting} Sir! Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal.`;
 
-            const overlay = document.getElementById('welcomeSplashOverlay');
             const greetingEl = document.getElementById('welcomeGreetingText');
             const speechLabel = document.getElementById('welcomeSpeechLabel');
             const btnText = document.getElementById('welcomeBtnText');
@@ -4867,73 +4870,74 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (greetingEl) {
                 greetingEl.innerHTML = `Hello, <span class="greeting-highlight">${greeting} Sir!</span>`;
             }
-            if (speechLabel) {
-                speechLabel.textContent = `Indian AI Female Voice: ${greeting}`;
-            }
 
-            if (overlay) {
-                overlay.style.display = 'flex';
-                overlay.classList.add('active');
-            }
-
-            // Attempt to speak
-            if (!hasSpokenWelcomeOnLoad || forceReplay) {
-                try {
-                    getAudioContext();
-                    unlockAudioDirectly();
-                    speakFemaleVoice(welcomeText, (err) => {
-                        if (!err) {
-                            hasSpokenWelcomeOnLoad = true;
-                            // Speech finished smoothly! Dissolve splash after 1.2s
-                            setTimeout(closeWelcomeSplash, 1200);
-                        } else {
-                            // Autoplay was blocked by browser before user click
-                            hasSpokenWelcomeOnLoad = false;
-                            if (btnText) btnText.textContent = "Click to Enter Terminal & Play Voice";
-                            if (speechLabel) speechLabel.textContent = "Tap button below to launch audio";
-                        }
-                    });
-                } catch(e) {
-                    hasSpokenWelcomeOnLoad = false;
-                    if (btnText) btnText.textContent = "Click to Enter Terminal & Play Voice";
-                }
-            }
-        }
-
-        function enterTerminalFromWelcome() {
-            const greeting = getTimeOfDayGreeting();
-            const welcomeText = `Hello, ${greeting} Sir! Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal.`;
-
-            // Always unlock and play voice on direct user click!
+            isWelcomeSpeaking = true;
             getAudioContext();
             unlockAudioDirectly();
-            speakFemaleVoice(welcomeText);
-            hasSpokenWelcomeOnLoad = true;
-            closeWelcomeSplash();
+
+            if (speechLabel) speechLabel.textContent = `Speaking: "${greeting} Sir..."`;
+            if (btnText) btnText.textContent = "Speaking Greeting... (Please wait)";
+
+            speakFemaleVoice(welcomeText, (err) => {
+                isWelcomeSpeaking = false;
+                if (!err) {
+                    if (speechLabel) speechLabel.textContent = "Welcome complete! Opening terminal...";
+                    if (btnText) btnText.textContent = "Welcome complete! Opening terminal...";
+                    welcomeDismissTimer = setTimeout(dismissCurtainScreen, 650);
+                } else {
+                    // Autoplay was blocked by browser policy without user gesture
+                    if (!isCurtainDismissed) {
+                        if (speechLabel) speechLabel.textContent = "Click anywhere to hear voice & enter";
+                        if (btnText) btnText.textContent = "Click Anywhere to Play Voice & Enter";
+                    }
+                }
+            });
         }
 
-        function closeWelcomeSplash() {
-            if (window._welcomeAutoDismissTimer) {
-                clearTimeout(window._welcomeAutoDismissTimer);
-                window._welcomeAutoDismissTimer = null;
+        function triggerVoiceFromCurtainClick(e) {
+            if (isCurtainDismissed) return;
+            getAudioContext();
+            unlockAudioDirectly();
+            if (!isWelcomeSpeaking) {
+                playWelcomeCurtainVoice();
             }
-            const overlay = document.getElementById('welcomeSplashOverlay');
+        }
+
+        function triggerWelcomeExperience(forceReplay = false) {
+            isCurtainDismissed = false;
+            isWelcomeSpeaking = false;
+            const overlay = document.getElementById('welcomeFullPageOverlay');
             if (overlay) {
-                overlay.classList.remove('active');
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                }, 480);
+                overlay.style.display = 'flex';
+                // Force reflow
+                void overlay.offsetWidth;
+                overlay.classList.remove('slide-up');
             }
-        }
 
-        function onSplashBackdropClick(event) {
-            if (event.target && event.target.id === 'welcomeSplashOverlay') {
-                enterTerminalFromWelcome();
+            const greeting = getTimeOfDayGreeting();
+            const greetingEl = document.getElementById('welcomeGreetingText');
+            if (greetingEl) {
+                greetingEl.innerHTML = `Hello, <span class="greeting-highlight">${greeting} Sir!</span>`;
+            }
+
+            // Immediately attempt speech playback on load/refresh
+            try {
+                playWelcomeCurtainVoice();
+            } catch (e) {
+                console.warn("Welcome voice initial playback error:", e);
             }
         }
 
         function replayWelcomeGreeting() {
             triggerWelcomeExperience(true);
+        }
+
+        // Backward compatibility helpers
+        function enterTerminalFromWelcome() {
+            dismissCurtainScreen();
+        }
+        function closeWelcomeSplash() {
+            dismissCurtainScreen();
         }
 
         /* -------------------------------------------------------------
