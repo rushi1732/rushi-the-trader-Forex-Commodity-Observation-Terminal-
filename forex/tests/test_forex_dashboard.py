@@ -891,6 +891,23 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal", html)
 
 
+    def test_google_site_verification(self):
+        """Verify Google Search Console HTML verification file and head meta tag."""
+        # 1. Verification HTML File Endpoint
+        url_file = f"http://127.0.0.1:{self.port}/googleb3e3c0a986c6ae10.html"
+        with urllib.request.urlopen(url_file, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertEqual(resp.headers.get_content_type(), "text/html")
+            body = resp.read().decode("utf-8")
+            self.assertEqual(body.strip(), "google-site-verification: googleb3e3c0a986c6ae10.html")
+
+        # 2. Verification Meta Tag in Head
+        url_home = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url_home, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        self.assertIn('<meta name="google-site-verification" content="googleb3e3c0a986c6ae10">', html)
+
+
 if __name__ == "__main__":
     unittest.main()
 

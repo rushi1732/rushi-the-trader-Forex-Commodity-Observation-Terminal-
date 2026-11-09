@@ -634,6 +634,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="googleb3e3c0a986c6ae10">
     <title>RUSHI THE TRADER — Forex & Commodity Observation Terminal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5700,6 +5701,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.send_header("X-Paper-Trading-Only", "true")
             self.end_headers()
             self.wfile.write(HTML_TEMPLATE.encode("utf-8"))
+            return
+
+        # Google Search Console Verification File
+        if path.startswith("/google") and path.endswith(".html"):
+            token = path.strip("/")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(f"google-site-verification: {token}".encode("utf-8"))
             return
 
         # 2. API: Observable Pairs
