@@ -907,6 +907,14 @@ class TestForexDashboard(unittest.TestCase):
             html = resp.read().decode("utf-8")
         self.assertIn('<meta name="google-site-verification" content="googleb3e3c0a986c6ae10">', html)
 
+        # 3. Security Anti-Hack Check: Random fake verification file MUST return 404
+        url_fake = f"http://127.0.0.1:{self.port}/google99999999fake.html"
+        try:
+            with urllib.request.urlopen(url_fake, timeout=5) as resp:
+                self.assertEqual(resp.status, 404)
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

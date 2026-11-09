@@ -5708,13 +5708,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(HTML_TEMPLATE.encode("utf-8"))
             return
 
-        # Google Search Console Verification File
-        if path.startswith("/google") and path.endswith(".html"):
-            token = path.strip("/")
+        # Google Search Console Verification File (Exact Token Only - Prevents Wildcard False-Positive Hack Flag)
+        if path == "/googleb3e3c0a986c6ae10.html":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            self.wfile.write(f"google-site-verification: {token}".encode("utf-8"))
+            self.wfile.write(b"google-site-verification: googleb3e3c0a986c6ae10.html")
             return
 
         # 2. API: Observable Pairs
