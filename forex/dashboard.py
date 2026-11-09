@@ -886,6 +886,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .badge-purple { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
         .badge-cyan { background: rgba(6, 182, 212, 0.15); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.3); }
         .badge-gold { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
+        .badge-pink { background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); }
+
+        .voice-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(236, 72, 153, 0.6);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 15px rgba(236, 72, 153, 0.25);
+            border-radius: 8px;
+            padding: 12px 18px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            z-index: 99999;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+            backdrop-filter: blur(8px);
+        }
+        .voice-toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
 
         .legend-toggle {
             display: inline-flex;
@@ -1692,6 +1718,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <option value="BTC/USD">BTC/USD (Bitcoin / US Dollar)</option>
                 </select>
 
+                <button id="btnVoiceAlerts" class="btn" onclick="toggleVoiceAlerts()" title="Toggle Female Voice Notifications for Gold & BTC" style="border-color:rgba(236,72,153,0.5); color:#f472b6; display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                    <span id="voiceStatusLabel">Voice Alert: Active</span>
+                </button>
+
+                <button id="btnTestVoice" class="btn" onclick="testFemaleVoice()" title="Test Female AI Voice" style="border-color:rgba(56,189,248,0.5); color:var(--accent-blue); display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                    Test Voice
+                </button>
+
                 <button id="btnNotif" class="btn" onclick="toggleNotifications()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                     Enable Alerts
@@ -1839,7 +1875,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
                             Automatic Signal Engine
                         </span>
-                        <span id="autoSignalBadge" class="badge badge-amber">WAITING FOR ENTRY ZONE</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span id="voiceBadgeIndicator" class="badge badge-pink" onclick="testFemaleVoice()" title="Female Voice Notification Active (Click to test)" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:10px;">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+                                Voice: ON
+                            </span>
+                            <span id="autoSignalBadge" class="badge badge-amber">WAITING FOR ENTRY ZONE</span>
+                        </div>
                     </div>
 
                     <!-- Hero Action Display -->
@@ -2509,6 +2551,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let currentInterval = '5m';
         let notificationsEnabled = false;
         let lastNotifiedSignal = null;
+        let lastNotifiedSignalBySymbol = {};
+        let voiceAlertsEnabled = localStorage.getItem('voiceAlertsEnabled') !== 'false';
+        let audioCtx = null;
+        let cachedFemaleVoice = null;
         let notifiedTrades = new Set();
 
         /* -------------------------------------------------------------
@@ -4147,9 +4193,257 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         /* -------------------------------------------------------------
+           Female Voice AI Audio Engine (Web Speech API + Web Audio Chime)
+           ------------------------------------------------------------- */
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        // Institutional bell chime before speech announcement
+        function playChime() {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const now = ctx.currentTime;
+                
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(659.25, now); // E5
+                gain1.gain.setValueAtTime(0.18, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.25);
+
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(880.00, now + 0.12); // A5
+                gain2.gain.setValueAtTime(0.22, now + 0.12);
+                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(now + 0.12);
+                osc2.stop(now + 0.48);
+            } catch (e) {
+                console.warn("Chime audio warning:", e);
+            }
+        }
+
+        function findBestFemaleVoice() {
+            if (!('speechSynthesis' in window)) return null;
+            const voices = window.speechSynthesis.getVoices();
+            if (!voices || voices.length === 0) return null;
+
+            // Preferred high-clarity natural female voices across Windows, Edge, Chrome, macOS, iOS, Android
+            const highPriority = [
+                /zira/i,
+                /jenny/i,
+                /aria/i,
+                /samantha/i,
+                /victoria/i,
+                /karen/i,
+                /susan/i,
+                /veena/i,
+                /sangeeta/i,
+                /neerja/i,
+                /google us english/i,
+                /google uk english female/i,
+                /en-us.*female/i,
+                /female/i,
+                /woman/i
+            ];
+
+            for (const pat of highPriority) {
+                const found = voices.find(v => (pat.test(v.name) || pat.test(v.voiceURI)) && (v.lang.startsWith('en') || v.lang.startsWith('hi')));
+                if (found) return found;
+            }
+
+            // Fallback to any English voice that is not explicitly male
+            const enFemale = voices.find(v => (v.lang.startsWith('en') || v.lang.startsWith('hi')) && !/david|mark|george|guy|male|boy|richard/i.test(v.name));
+            if (enFemale) return enFemale;
+
+            return voices[0];
+        }
+
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                cachedFemaleVoice = findBestFemaleVoice();
+            };
+        }
+
+        function speakFemaleVoice(text, onComplete) {
+            if (!('speechSynthesis' in window)) {
+                console.warn("Speech synthesis not supported on this browser.");
+                return;
+            }
+
+            window.speechSynthesis.cancel();
+            playChime();
+
+            setTimeout(() => {
+                const utter = new SpeechSynthesisUtterance(text);
+                const voice = cachedFemaleVoice || findBestFemaleVoice();
+                if (voice) {
+                    utter.voice = voice;
+                }
+                utter.rate = 0.92;   // Professional, clear institutional cadence
+                utter.pitch = 1.15;  // Pleasant, refined feminine pitch
+                utter.volume = 1.0;  // Full volume
+
+                if (onComplete) {
+                    utter.onend = onComplete;
+                    utter.onerror = onComplete;
+                }
+
+                window.speechSynthesis.speak(utter);
+            }, 220);
+        }
+
+        function formatGradeForVoice(grade) {
+            if (!grade || grade === '--' || grade === 'NONE') return 'Grade B, Valid Confluence';
+            let str = String(grade);
+            str = str.replace(/\+/g, ' Plus ')
+                     .replace(/\[|\]|\(|\)/g, ' ')
+                     .replace(/\d+%/g, '')
+                     .replace(/:/g, '')
+                     .replace(/\s+/g, ' ')
+                     .trim();
+            if (!str.toLowerCase().startsWith('grade') && !str.toLowerCase().startsWith('class')) {
+                str = 'Grade ' + str;
+            }
+            return str;
+        }
+
+        function showVoiceToast(action, asset, grade) {
+            let toast = document.getElementById('voiceAlertToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'voiceAlertToast';
+                toast.className = 'voice-toast';
+                document.body.appendChild(toast);
+            }
+            const isBuy = action === 'BUY';
+            const actionColor = isBuy ? 'var(--accent-green)' : 'var(--accent-rose)';
+            toast.innerHTML = `
+                <div style="width:36px; height:36px; border-radius:50%; background:rgba(236,72,153,0.2); display:flex; align-items:center; justify-content:center; color:#f472b6; flex-shrink:0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                </div>
+                <div>
+                    <div style="font-size:12px; font-weight:700; color:${actionColor}; display:flex; align-items:center; gap:6px;">
+                        <span>FEMALE VOICE ALERT: ${action} ${asset.toUpperCase()}</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">
+                        Confluence Grade: <strong style="color:var(--text-primary);">${grade}</strong>
+                    </div>
+                </div>
+            `;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 6000);
+        }
+
+        function announceSignalVoice(sig) {
+            if (!voiceAlertsEnabled) return;
+            if (!sig || (sig.action !== 'BUY' && sig.action !== 'SELL')) return;
+
+            const canon = normalizeSym(sig.symbol || '');
+            const isGold = canon.includes('XAU') || canon.includes('GOLD');
+            const assetName = isGold ? 'Gold' : 'Bitcoin';
+
+            const gradeText = formatGradeForVoice(sig.grade);
+            const actionText = sig.action; // 'BUY' or 'SELL'
+
+            let priceDetails = '';
+            if (sig.entry_reference) {
+                const dec = 2;
+                priceDetails += ` Entry at ${Number(sig.entry_reference).toFixed(dec)}.`;
+            }
+            if (sig.stop_loss) {
+                const dec = 2;
+                priceDetails += ` Stop loss at ${Number(sig.stop_loss).toFixed(dec)}.`;
+            }
+
+            const speechText = `Alert: ${actionText} signal confirmed for ${assetName}. Confluence Grade: ${gradeText}.${priceDetails}`;
+
+            showVoiceToast(actionText, assetName, gradeText);
+            speakFemaleVoice(speechText);
+        }
+
+        function toggleVoiceAlerts() {
+            getAudioContext();
+            voiceAlertsEnabled = !voiceAlertsEnabled;
+            localStorage.setItem('voiceAlertsEnabled', voiceAlertsEnabled);
+            updateVoiceAlertsUI();
+
+            if (voiceAlertsEnabled) {
+                speakFemaleVoice("Female voice alerts enabled. Monitoring Gold and Bitcoin.");
+            }
+        }
+
+        function testFemaleVoice() {
+            getAudioContext();
+            voiceAlertsEnabled = true;
+            localStorage.setItem('voiceAlertsEnabled', true);
+            updateVoiceAlertsUI();
+
+            const sym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
+            const isGold = sym.includes('XAU');
+            const asset = isGold ? 'Gold' : 'Bitcoin';
+            const sampleGrade = 'Grade A Plus, Elite Institutional';
+
+            const testText = `Alert: BUY signal confirmed for ${asset}. Confluence Grade: ${sampleGrade}. Entry at 4045. Stop loss at 4038.`;
+            showVoiceToast('BUY', asset, sampleGrade);
+            speakFemaleVoice(testText);
+        }
+
+        function updateVoiceAlertsUI() {
+            const btn = document.getElementById('btnVoiceAlerts');
+            const lbl = document.getElementById('voiceStatusLabel');
+            const badge = document.getElementById('voiceBadgeIndicator');
+
+            if (voiceAlertsEnabled) {
+                if (btn) {
+                    btn.style.borderColor = "rgba(236,72,153,0.8)";
+                    btn.style.color = "#f472b6";
+                    btn.style.background = "rgba(236,72,153,0.12)";
+                }
+                if (lbl) lbl.textContent = "Voice Alert: Active";
+                if (badge) {
+                    badge.className = "badge badge-pink";
+                    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Voice: ON`;
+                }
+            } else {
+                if (btn) {
+                    btn.style.borderColor = "rgba(100,116,139,0.5)";
+                    btn.style.color = "var(--text-muted)";
+                    btn.style.background = "transparent";
+                }
+                if (lbl) lbl.textContent = "Voice Alert: OFF";
+                if (badge) {
+                    badge.className = "badge";
+                    badge.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><line x1="2" y1="2" x2="22" y2="22"/></svg> Voice: OFF`;
+                }
+            }
+        }
+
+        /* -------------------------------------------------------------
            Browser Notifications & Risk Controls
            ------------------------------------------------------------- */
         function toggleNotifications() {
+            getAudioContext(); // Unlock audio context on user gesture
             if (!("Notification" in window)) {
                 alert("This browser does not support desktop notifications.");
                 return;
@@ -4178,11 +4472,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function checkNotifications(data) {
             if (!data || !data.auto_signal) return;
             const sig = data.auto_signal;
+            const sym = normalizeSym(sig.symbol || document.getElementById('pairSelect').value || 'XAU/USD');
             if (sig.action === 'BUY' || sig.action === 'SELL') {
-                const sigKey = `${sig.symbol}-${sig.action}-${sig.timestamp_utc || sig.timestamp_et}`;
-                if (sigKey !== lastNotifiedSignal) {
+                const sigKey = `${sym}-${sig.action}-${sig.entry_reference || ''}-${sig.confirmed_candle_ts || sig.timestamp_et || ''}`;
+                if (lastNotifiedSignalBySymbol[sym] !== sigKey) {
+                    lastNotifiedSignalBySymbol[sym] = sigKey;
                     lastNotifiedSignal = sigKey;
-                    sendNotification(`New Paper Signal: ${sig.action} ${sig.symbol}`, `Entry: ${sig.entry_reference} | Stop: ${sig.stop_loss} | Target: ${sig.take_profit} (2R)`);
+
+                    // Desktop push notification
+                    sendNotification(`New Paper Signal: ${sig.action} ${sym}`, `Grade: ${sig.grade || 'Valid'} | Entry: ${sig.entry_reference} | Stop: ${sig.stop_loss}`);
+
+                    // Female Voice audio alert with Confluence Grade
+                    announceSignalVoice({
+                        symbol: sym,
+                        action: sig.action,
+                        grade: sig.grade || (data.confluence_signal ? data.confluence_signal.grade : 'Grade B'),
+                        entry_reference: sig.entry_reference,
+                        stop_loss: sig.stop_loss,
+                        take_profit: sig.take_profit
+                    });
                 }
             }
         }
@@ -4566,6 +4874,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     statusEl.textContent = `Last scanned: ${dt}`;
                 }
 
+                // Dual-pair female voice notification for Gold & Bitcoin background scanner
+                if (Array.isArray(results)) {
+                    results.forEach(r => {
+                        const sym = normalizeSym(r.symbol || '');
+                        if ((sym.includes('XAU') || sym.includes('BTC')) && (r.action === 'BUY' || r.action === 'SELL')) {
+                            const scanKey = `${sym}-${r.action}-${r.price || ''}-${r.confluence_score || ''}`;
+                            if (lastNotifiedSignalBySymbol[sym] !== scanKey) {
+                                lastNotifiedSignalBySymbol[sym] = scanKey;
+                                sendNotification(`Scanner Signal: ${r.action} ${sym}`, `Grade: ${r.grade} | Price: ${r.price}`);
+                                announceSignalVoice({
+                                    symbol: sym,
+                                    action: r.action,
+                                    grade: r.grade,
+                                    entry_reference: r.price,
+                                    stop_loss: r.stop_loss || (r.execution_plan ? r.execution_plan.stop_loss : null)
+                                });
+                            }
+                        }
+                    });
+                }
+
                 renderScannerTable(results);
             } catch (err) {
                 console.error("Scanner fetch error:", err);
@@ -4666,6 +4995,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             fetchTwelveDataConfig();
             initTwelveDataWebSocket();
             fetchScannerSignals();
+            updateVoiceAlertsUI();
+
+            // Unlock Web Audio API context and speech synthesis on first user interaction
+            document.addEventListener('click', () => { getAudioContext(); }, { once: true });
+            document.addEventListener('touchstart', () => { getAudioContext(); }, { once: true });
 
             // Periodic multi-pair institutional scanner (25s)
             setInterval(fetchScannerSignals, 25000);

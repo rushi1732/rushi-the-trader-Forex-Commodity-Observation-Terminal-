@@ -813,6 +813,26 @@ class TestForexDashboard(unittest.TestCase):
         if auto_sig and auto_sig.get("entry_reference"):
             self.assertNotEqual(auto_sig.get("entry_reference"), 78549.99)
 
+    def test_female_voice_audio_alerts(self):
+        """Verify female voice AI audio alert engine, buttons, and toast in dashboard HTML."""
+        url = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+
+        self.assertIn("btnVoiceAlerts", html)
+        self.assertIn("voiceStatusLabel", html)
+        self.assertIn("btnTestVoice", html)
+        self.assertIn("testFemaleVoice", html)
+        self.assertIn("voiceBadgeIndicator", html)
+        self.assertIn("speakFemaleVoice", html)
+        self.assertIn("findBestFemaleVoice", html)
+        self.assertIn("announceSignalVoice", html)
+        self.assertIn("formatGradeForVoice", html)
+        self.assertIn("showVoiceToast", html)
+        self.assertIn("voice-toast", html)
+        self.assertIn("SpeechSynthesisUtterance", html)
+        self.assertIn("playChime", html)
+
 
 if __name__ == "__main__":
     unittest.main()
