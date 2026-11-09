@@ -871,6 +871,25 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("localStorage.setItem('notificationsEnabled'", html)
         self.assertIn("localStorage.setItem('voiceAlertsEnabled'", html)
 
+    def test_opening_welcome_animation_and_greeting(self):
+        """Verify the opening animation overlay, time-of-day greeting, and welcome voice engine."""
+        url = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+
+        self.assertIn("welcomeSplashOverlay", html)
+        self.assertIn("welcome-splash-card", html)
+        self.assertIn("welcomeGreetingText", html)
+        self.assertIn("getTimeOfDayGreeting", html)
+        self.assertIn("triggerWelcomeExperience", html)
+        self.assertIn("enterTerminalFromWelcome", html)
+        self.assertIn("Good Morning", html)
+        self.assertIn("Good Afternoon", html)
+        self.assertIn("Good Evening", html)
+        self.assertIn("welcome-voice-indicator", html)
+        self.assertIn("sound-wave-bars", html)
+        self.assertIn("Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal", html)
+
 
 if __name__ == "__main__":
     unittest.main()

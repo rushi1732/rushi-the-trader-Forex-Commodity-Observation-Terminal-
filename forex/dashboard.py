@@ -1688,9 +1688,254 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             font-family: var(--font-mono);
             color: var(--text-primary);
         }
+
+        /* -------------------------------------------------------------
+           Welcome Splash Screen & Opening Animation
+           ------------------------------------------------------------- */
+        .welcome-splash-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(7, 10, 19, 0.88);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.45s ease;
+            padding: 20px;
+        }
+
+        .welcome-splash-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .welcome-splash-card {
+            background: linear-gradient(145deg, rgba(17, 24, 39, 0.96), rgba(15, 23, 42, 0.94));
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 16px;
+            padding: 34px 36px;
+            max-width: 560px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(56, 189, 248, 0.15);
+            transform: scale(0.92) translateY(16px);
+            transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .welcome-splash-overlay.active .welcome-splash-card {
+            transform: scale(1) translateY(0);
+        }
+
+        .welcome-splash-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #38bdf8, #ec4899, #10b981, #f59e0b, #38bdf8);
+            background-size: 200% 100%;
+            animation: welcomeBarShimmer 3s linear infinite;
+        }
+
+        @keyframes welcomeBarShimmer {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+
+        .welcome-logo-circle {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 16px auto;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(236, 72, 153, 0.2));
+            border: 2px solid rgba(56, 189, 248, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-blue);
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.3);
+            animation: welcomePulse 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes welcomePulse {
+            0% { transform: scale(1); box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
+            100% { transform: scale(1.06); box-shadow: 0 0 30px rgba(236, 72, 153, 0.4); }
+        }
+
+        .welcome-brand-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: #38bdf8;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+
+        .welcome-greeting-title {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            color: #ffffff;
+            margin-bottom: 8px;
+            line-height: 1.25;
+        }
+
+        .welcome-greeting-title span.greeting-highlight {
+            background: linear-gradient(135deg, #38bdf8, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .welcome-terminal-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            letter-spacing: 0.03em;
+            margin-bottom: 18px;
+            line-height: 1.5;
+        }
+
+        .welcome-terminal-name strong {
+            color: #38bdf8;
+            font-weight: 700;
+        }
+
+        .welcome-voice-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(236, 72, 153, 0.12);
+            border: 1px solid rgba(236, 72, 153, 0.35);
+            padding: 7px 16px;
+            border-radius: 8px;
+            color: #f472b6;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .sound-wave-bars {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            height: 12px;
+        }
+
+        .sound-wave-bars span {
+            width: 3px;
+            background: #f472b6;
+            border-radius: 2px;
+            animation: soundWaveAnim 1.2s ease-in-out infinite alternate;
+        }
+        .sound-wave-bars span:nth-child(1) { height: 5px; animation-delay: 0.1s; }
+        .sound-wave-bars span:nth-child(2) { height: 12px; animation-delay: 0.3s; }
+        .sound-wave-bars span:nth-child(3) { height: 8px; animation-delay: 0.2s; }
+        .sound-wave-bars span:nth-child(4) { height: 11px; animation-delay: 0.4s; }
+
+        @keyframes soundWaveAnim {
+            0% { transform: scaleY(0.4); }
+            100% { transform: scaleY(1.2); }
+        }
+
+        .welcome-grid-pills {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 22px;
+        }
+
+        .welcome-grid-pill {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+
+        .welcome-enter-btn {
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            color: #ffffff;
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            padding: 10px 24px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 20px rgba(2, 132, 199, 0.35);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .welcome-enter-btn:hover {
+            background: linear-gradient(135deg, #0369a1, #1d4ed8);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 25px rgba(2, 132, 199, 0.45);
+        }
     </style>
 </head>
 <body>
+    <!-- Opening Welcome Animated Splash Overlay -->
+    <div id="welcomeSplashOverlay" class="welcome-splash-overlay" onclick="onSplashBackdropClick(event)">
+        <div class="welcome-splash-card">
+            <div class="welcome-logo-circle">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
+            </div>
+            <div class="welcome-brand-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <span>Institutional Market Terminal</span>
+            </div>
+            <div id="welcomeGreetingText" class="welcome-greeting-title">
+                Hello, <span class="greeting-highlight">Good Morning Sir!</span>
+            </div>
+            <div class="welcome-terminal-name">
+                Welcome to <strong>RUSHI THE TRADER</strong><br>
+                Forex & Commodity Observation Terminal
+            </div>
+            <div class="welcome-voice-indicator">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                <span id="welcomeSpeechLabel">Indian AI Female Voice: Ready</span>
+                <div class="sound-wave-bars">
+                    <span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+            <div class="welcome-grid-pills">
+                <span class="welcome-grid-pill">XAU/USD Spot Gold</span>
+                <span class="welcome-grid-pill">BTC/USD Bitcoin</span>
+                <span class="welcome-grid-pill">SMC + ICT Engine</span>
+                <span class="welcome-grid-pill">Confluence Grades</span>
+            </div>
+            <div>
+                <button class="welcome-enter-btn" onclick="enterTerminalFromWelcome()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span>Enter Terminal</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="safety-ribbon">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         <span>SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIVITY — REAL CAPITAL IS NEVER AT RISK</span>
@@ -1698,7 +1943,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <div class="container">
         <header>
-            <div class="brand-block">
+            <div class="brand-block" onclick="replayWelcomeGreeting()" style="cursor:pointer;" title="Click to replay Welcome Greeting Voice">
                 <div class="brand-icon">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
                 </div>
@@ -4589,6 +4834,105 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         /* -------------------------------------------------------------
+           Welcome Animation & Indian Female Voice Greeting Experience
+           ------------------------------------------------------------- */
+        function getTimeOfDayGreeting() {
+            const hour = new Date().getHours();
+            if (hour >= 4 && hour < 12) {
+                return "Good Morning";
+            } else if (hour >= 12 && hour < 17) {
+                return "Good Afternoon";
+            } else if (hour >= 17 && hour < 21) {
+                return "Good Evening";
+            } else {
+                return "Good Night";
+            }
+        }
+
+        let hasSpokenWelcomeOnLoad = false;
+
+        function triggerWelcomeExperience(forceReplay = false) {
+            const greeting = getTimeOfDayGreeting();
+            const welcomeText = `Hello, ${greeting} Sir! Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal.`;
+
+            const overlay = document.getElementById('welcomeSplashOverlay');
+            const greetingEl = document.getElementById('welcomeGreetingText');
+            const speechLabel = document.getElementById('welcomeSpeechLabel');
+
+            if (greetingEl) {
+                greetingEl.innerHTML = `Hello, <span class="greeting-highlight">${greeting} Sir!</span>`;
+            }
+            if (speechLabel) {
+                speechLabel.textContent = `Indian Female Voice: ${greeting}`;
+            }
+
+            if (overlay) {
+                overlay.style.display = 'flex';
+                setTimeout(() => {
+                    overlay.classList.add('active');
+                }, 20);
+            }
+
+            function executeWelcomeVoice() {
+                if (hasSpokenWelcomeOnLoad && !forceReplay) return;
+                hasSpokenWelcomeOnLoad = true;
+                getAudioContext();
+                unlockAudioDirectly();
+                speakFemaleVoice(welcomeText, () => {
+                    setTimeout(closeWelcomeSplash, 1200);
+                });
+            }
+
+            if (!hasSpokenWelcomeOnLoad || forceReplay) {
+                try {
+                    executeWelcomeVoice();
+                } catch(e) {}
+            }
+
+            if (window._welcomeAutoDismissTimer) clearTimeout(window._welcomeAutoDismissTimer);
+            window._welcomeAutoDismissTimer = setTimeout(() => {
+                closeWelcomeSplash();
+            }, 6000);
+        }
+
+        function enterTerminalFromWelcome() {
+            const greeting = getTimeOfDayGreeting();
+            const welcomeText = `Hello, ${greeting} Sir! Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal.`;
+
+            if (!hasSpokenWelcomeOnLoad) {
+                hasSpokenWelcomeOnLoad = true;
+                getAudioContext();
+                unlockAudioDirectly();
+                speakFemaleVoice(welcomeText);
+            }
+            closeWelcomeSplash();
+        }
+
+        function closeWelcomeSplash() {
+            if (window._welcomeAutoDismissTimer) {
+                clearTimeout(window._welcomeAutoDismissTimer);
+                window._welcomeAutoDismissTimer = null;
+            }
+            const overlay = document.getElementById('welcomeSplashOverlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 480);
+            }
+        }
+
+        function onSplashBackdropClick(event) {
+            if (event.target && event.target.id === 'welcomeSplashOverlay') {
+                enterTerminalFromWelcome();
+            }
+        }
+
+        function replayWelcomeGreeting() {
+            triggerWelcomeExperience(true);
+        }
+
+        /* -------------------------------------------------------------
            Browser Notifications & Risk Controls
            ------------------------------------------------------------- */
         function updateNotificationsUI() {
@@ -5222,6 +5566,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             fetchScannerSignals();
             updateVoiceAlertsUI();
             updateNotificationsUI();
+
+            // Trigger Opening Welcome Animation & Indian Female Voice Greeting
+            setTimeout(() => {
+                triggerWelcomeExperience();
+            }, 300);
 
             // Unlock Web Audio API context and speech synthesis on user interaction
             const unlockHandler = () => {
