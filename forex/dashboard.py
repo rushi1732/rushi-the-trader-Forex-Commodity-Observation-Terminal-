@@ -1977,8 +1977,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </style>
 </head>
 <body>
-    <!-- Persistent Mobile Unlocked Audio Player -->
+    <!-- Dedicated Mobile Pre-Unlocked Signal Audio Players (Zero Autoplay Restriction) -->
     <audio id="persistentVoiceAudio" preload="auto" playsinline style="display:none;"></audio>
+    <audio id="audioSignalBuyGold" src="/audio/signal_buy_gold.mp3" preload="auto" playsinline style="display:none;"></audio>
+    <audio id="audioSignalSellGold" src="/audio/signal_sell_gold.mp3" preload="auto" playsinline style="display:none;"></audio>
+    <audio id="audioSignalBuyBtc" src="/audio/signal_buy_btc.mp3" preload="auto" playsinline style="display:none;"></audio>
+    <audio id="audioSignalSellBtc" src="/audio/signal_sell_btc.mp3" preload="auto" playsinline style="display:none;"></audio>
+    <audio id="audioTestVoice" src="/audio/test_voice.mp3" preload="auto" playsinline style="display:none;"></audio>
+    <audio id="audioAlertsActive" src="/audio/voice_alerts_active.mp3" preload="auto" playsinline style="display:none;"></audio>
 
     <!-- Full-Screen Welcome Curtain Screen -->
     <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="triggerVoiceFromCurtainClick(event)">
@@ -4555,39 +4561,50 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function unlockMobileAudio() {
             try {
-                // 1. Resume Web Audio Context
+                // 1. Resume Web Audio Context & maintain continuous mobile keep-alive
                 const ctx = getAudioContext();
                 if (ctx && ctx.state !== 'running') {
                     ctx.resume().catch(() => {});
                 }
-
-                // 2. Play 1-sample silent Web Audio buffer to unlock iOS / Android audio hardware channel
-                if (ctx) {
+                if (ctx && !window._mobileAudioKeepAlive) {
                     try {
-                        const buffer = ctx.createBuffer(1, 1, 22050);
+                        const buffer = ctx.createBuffer(1, 22050, 22050);
                         const src = ctx.createBufferSource();
                         src.buffer = buffer;
+                        src.loop = true;
                         src.connect(ctx.destination);
                         src.start(0);
+                        window._mobileAudioKeepAlive = src;
                     } catch(e) {}
                 }
 
-                // 3. Unlock persistent HTML5 Audio element on mobile
-                const pAudio = document.getElementById('persistentVoiceAudio');
-                if (pAudio && !isPersistentAudioUnlocked) {
-                    // Micro 1-sample silent WAV data URI to unlock media playback privileges on mobile
-                    pAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-                    const playPromise = pAudio.play();
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            pAudio.pause();
-                            isPersistentAudioUnlocked = true;
-                            isAudioUnlocked = true;
-                        }).catch(e => {});
+                // 2. Prime and permanently unlock all dedicated signal audio elements on mobile
+                const signalAudioIds = [
+                    'audioSignalBuyGold',
+                    'audioSignalSellGold',
+                    'audioSignalBuyBtc',
+                    'audioSignalSellBtc',
+                    'audioTestVoice',
+                    'audioAlertsActive',
+                    'persistentVoiceAudio'
+                ];
+                signalAudioIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        try {
+                            el.volume = 1.0;
+                            const p = el.play();
+                            if (p !== undefined) {
+                                p.then(() => {
+                                    el.pause();
+                                    el.currentTime = 0;
+                                }).catch(() => {});
+                            }
+                        } catch(e) {}
                     }
-                }
+                });
 
-                // 4. Resume and prime SpeechSynthesis
+                // 3. Resume and prime SpeechSynthesis
                 if ('speechSynthesis' in window) {
                     try {
                         window.speechSynthesis.resume();
@@ -4595,6 +4612,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
 
                 isAudioUnlocked = true;
+                isPersistentAudioUnlocked = true;
                 const pill = document.getElementById('audioUnlockPill');
                 if (pill) pill.style.display = 'none';
             } catch (e) {
@@ -5147,12 +5165,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const gradeText = formatGradeForVoice(sig.grade);
             const actionText = sig.action; // 'BUY' or 'SELL'
 
-            // Pick dedicated studio HD MP3
+            // Match dedicated studio HD MP3 element & path
+            let targetEl = null;
             let staticAudio = null;
-            if (actionText === 'BUY' && isGold) staticAudio = '/audio/signal_buy_gold.mp3';
-            else if (actionText === 'SELL' && isGold) staticAudio = '/audio/signal_sell_gold.mp3';
-            else if (actionText === 'BUY' && !isGold) staticAudio = '/audio/signal_buy_btc.mp3';
-            else if (actionText === 'SELL' && !isGold) staticAudio = '/audio/signal_sell_btc.mp3';
+            if (actionText === 'BUY' && isGold) {
+                targetEl = document.getElementById('audioSignalBuyGold');
+                staticAudio = '/audio/signal_buy_gold.mp3';
+            } else if (actionText === 'SELL' && isGold) {
+                targetEl = document.getElementById('audioSignalSellGold');
+                staticAudio = '/audio/signal_sell_gold.mp3';
+            } else if (actionText === 'BUY' && !isGold) {
+                targetEl = document.getElementById('audioSignalBuyBtc');
+                staticAudio = '/audio/signal_buy_btc.mp3';
+            } else if (actionText === 'SELL' && !isGold) {
+                targetEl = document.getElementById('audioSignalSellBtc');
+                staticAudio = '/audio/signal_sell_btc.mp3';
+            }
 
             // Mark Mutex BUSY
             isGlobalVoiceBusy = true;
@@ -5160,7 +5188,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             lastSpokenTimeBySymbol[canon] = now;
             lastAnnouncedActionBySymbol[canon] = sig.action;
 
-            showVoiceToast(actionText, assetName, gradeText, isReminder);
+            showVoiceToast(actionText, assetName, gradeText, isReminder, sig.entry_reference, sig.stop_loss);
 
             // Play alert bell chime first
             try {
@@ -5192,14 +5220,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             }, 10000);
 
-            // Wait 350ms for chime, then play studio MP3
+            // Wait 350ms for chime, then play studio MP3 via pre-unlocked dedicated element
             setTimeout(() => {
-                if (staticAudio) {
+                if (targetEl) {
+                    try {
+                        targetEl.currentTime = 0;
+                        targetEl.volume = 1.0;
+                        targetEl.onended = onVoiceFinished;
+                        const p = targetEl.play();
+                        if (p !== undefined) {
+                            p.catch(err => {
+                                console.warn("Dedicated element play notice, trying Web Audio buffer:", err);
+                                if (!tryPlayViaWebAudio(staticAudio, onVoiceFinished)) {
+                                    playRealAudio(staticAudio, onVoiceFinished, onVoiceFinished);
+                                }
+                            });
+                        }
+                    } catch(err) {
+                        if (!tryPlayViaWebAudio(staticAudio, onVoiceFinished)) {
+                            onVoiceFinished();
+                        }
+                    }
+                } else if (staticAudio) {
                     playRealAudio(
                         staticAudio,
                         onVoiceFinished,
                         () => {
-                            // Web audio fallback
                             if (!tryPlayViaWebAudio(staticAudio, onVoiceFinished)) {
                                 onVoiceFinished();
                             }
@@ -5218,11 +5264,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             updateVoiceAlertsUI();
 
             if (voiceAlertsEnabled) {
-                playRealAudio(
-                    '/audio/voice_alerts_active.mp3',
-                    null,
-                    () => tryPlayViaWebAudio('/audio/voice_alerts_active.mp3')
-                );
+                const el = document.getElementById('audioAlertsActive');
+                if (el) {
+                    try {
+                        el.currentTime = 0;
+                        el.play().catch(() => playRealAudio('/audio/voice_alerts_active.mp3'));
+                    } catch(e) {
+                        playRealAudio('/audio/voice_alerts_active.mp3');
+                    }
+                } else {
+                    playRealAudio('/audio/voice_alerts_active.mp3');
+                }
             } else {
                 if (currentPlayingAudio) {
                     try { currentPlayingAudio.pause(); currentPlayingAudio.currentTime = 0; } catch(e) {}
@@ -5258,16 +5310,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 try { window.speechSynthesis.cancel(); } catch(e) {}
             }
 
-            showVoiceToast('BUY', asset, sampleGrade);
+            showVoiceToast('BUY', asset, sampleGrade, false, isGold ? '4045.20' : '98500.00', isGold ? '4038.00' : '97800.00');
 
             try { playChime(); } catch(e) {}
 
             setTimeout(() => {
-                playRealAudio(
-                    '/audio/test_voice.mp3',
-                    null,
-                    () => tryPlayViaWebAudio('/audio/test_voice.mp3')
-                );
+                const el = isGold ? document.getElementById('audioSignalBuyGold') : document.getElementById('audioSignalBuyBtc');
+                if (el) {
+                    try {
+                        el.currentTime = 0;
+                        el.volume = 1.0;
+                        const p = el.play();
+                        if (p !== undefined) {
+                            p.catch(() => {
+                                playRealAudio('/audio/test_voice.mp3', null, () => tryPlayViaWebAudio('/audio/test_voice.mp3'));
+                            });
+                        }
+                    } catch(e) {
+                        playRealAudio('/audio/test_voice.mp3', null, () => tryPlayViaWebAudio('/audio/test_voice.mp3'));
+                    }
+                } else {
+                    playRealAudio('/audio/test_voice.mp3', null, () => tryPlayViaWebAudio('/audio/test_voice.mp3'));
+                }
             }, 300);
         }
 
