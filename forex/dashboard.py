@@ -4590,14 +4590,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         let isPersistentAudioUnlocked = false;
 
-        function unlockAudio() {
+        function unlockAudio(skipAudioId = null) {
             try {
                 const ctx = getAudioContext();
                 if (ctx && ctx.state !== 'running') {
                     ctx.resume().catch(() => {});
                 }
 
-                // Audio keep-alive buffer source for mobile background session persistence
+                // Audio keep-alive buffer source for background session persistence
                 if (ctx && !window._audioKeepAliveNode) {
                     try {
                         const buffer = ctx.createBuffer(1, 22050, 22050);
@@ -4610,21 +4610,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     } catch(e) {}
                 }
 
-                // Prime dedicated audio elements
+                // Prime dedicated signal audio elements (NEVER pause the welcome audio!)
                 const signalAudioIds = [
                     'audioSignalBuyGold',
                     'audioSignalSellGold',
                     'audioSignalBuyBtc',
                     'audioSignalSellBtc',
-                    'audioWelcomeMorning',
-                    'audioWelcomeAfternoon',
-                    'audioWelcomeEvening',
-                    'audioWelcomeNight',
                     'audioTestVoice',
                     'audioAlertsActive',
                     'persistentVoiceAudio'
                 ];
                 signalAudioIds.forEach(id => {
+                    if (id === skipAudioId) return;
                     const el = document.getElementById(id);
                     if (el) {
                         try {
@@ -5565,14 +5562,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function triggerVoiceFromCurtainClick(e) {
             if (isCurtainDismissed) return;
-            unlockMobileAudio();
 
             // If already speaking, DO NOT INTERRUPT OR DISMISS EARLY!
-            // Speech must finish completely before the curtain automatically slides up!
             if (isWelcomeSpeaking) {
                 console.log("Welcome speech in progress. Waiting for audio to finish naturally.");
                 return;
             }
+
+            const greeting = getTimeOfDayGreeting();
+            let welcomeAudioId = 'audioWelcomeMorning';
+            if (greeting === 'Good Afternoon') welcomeAudioId = 'audioWelcomeAfternoon';
+            else if (greeting === 'Good Evening') welcomeAudioId = 'audioWelcomeEvening';
+            else if (greeting === 'Good Night') welcomeAudioId = 'audioWelcomeNight';
+
+            // Unlock audio without pausing the welcome audio!
+            unlockAudio(welcomeAudioId);
 
             playWelcomeCurtainVoice(true);
         }
