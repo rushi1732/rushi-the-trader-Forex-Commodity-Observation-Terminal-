@@ -1363,9 +1363,6 @@
     </style>
 </head>
 <body>
-    <!-- Permanent Silent Audio Keep-Alive for Mobile Media Session -->
-    <audio id="silentKeepAliveAudio" loop playsinline style="display:none;"></audio>
-
     <!-- Dedicated Audio Players -->
     <audio id="persistentVoiceAudio" preload="auto" playsinline style="display:none;"></audio>
     <audio id="audioSignalBuyGold" src="/audio/signal_buy_gold.mp3" preload="auto" playsinline style="display:none;"></audio>
@@ -3959,15 +3956,7 @@
                     ctx.resume().catch(() => {});
                 }
 
-                // 1. Permanent Silent Audio Loop: Mobile browsers never sleep an active media session!
-                const keepAliveEl = document.getElementById('silentKeepAliveAudio');
-                if (keepAliveEl && keepAliveEl.paused) {
-                    keepAliveEl.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-                    keepAliveEl.volume = 0.001;
-                    keepAliveEl.play().catch(() => {});
-                }
-
-                // 2. WebAudio keep-alive node
+                // 1. WebAudio keep-alive node
                 if (ctx && !window._audioKeepAliveNode) {
                     try {
                         const buffer = ctx.createBuffer(1, 22050, 22050);
@@ -3980,7 +3969,7 @@
                     } catch(e) {}
                 }
 
-                // 3. Pre-load all dedicated audio elements
+                // 2. Pre-unlock / warm up all dedicated HTML5 audio elements on mobile
                 const signalAudioIds = [
                     'audioSignalBuyGold',
                     'audioSignalSellGold',
@@ -3999,11 +3988,33 @@
                     const el = document.getElementById(id);
                     if (el) {
                         try {
+                            el.volume = 0.001;
+                            const p = el.play();
+                            if (p !== undefined) {
+                                p.then(() => {
+                                    el.pause();
+                                    el.currentTime = 0;
+                                    el.volume = 1.0;
+                                }).catch(() => {
+                                    el.volume = 1.0;
+                                });
+                            }
+                        } catch(e) {
                             el.volume = 1.0;
-                            el.load();
-                        } catch(e) {}
+                        }
                     }
                 });
+
+                // 3. Pre-load & decode all Studio Voice MP3s into WebAudio RAM buffers
+                const studioAudioUrls = [
+                    '/audio/signal_buy_gold.mp3',
+                    '/audio/signal_sell_gold.mp3',
+                    '/audio/signal_buy_btc.mp3',
+                    '/audio/signal_sell_btc.mp3',
+                    '/audio/test_voice.mp3',
+                    '/audio/voice_alerts_active.mp3'
+                ];
+                studioAudioUrls.forEach(url => preloadAudioBuffer(url));
 
                 if ('speechSynthesis' in window) {
                     try { window.speechSynthesis.resume(); } catch(e) {}
@@ -4620,61 +4631,63 @@
                 }
             }, 10000);
 
-            // Wait 350ms for chime, then play studio MP3 via pre-unlocked dedicated element
+            // Wait 350ms for chime, then play studio MP3 via pre-unlocked dedicated element or instant WebAudio
             setTimeout(() => {
-                if (targetEl) {
-                    try {
-                        targetEl.currentTime = 0;
-                        targetEl.volume = 1.0;
-                        targetEl.onended = onVoiceFinished;
-                        const p = targetEl.play();
-                        if (p !== undefined) {
-                            p.catch(err => {
-                                console.warn("Dedicated element play notice, trying Web Audio buffer:", err);
-                                if (!tryPlayViaWebAudio(staticAudio, onVoiceFinished)) {
-                                    playRealAudio(staticAudio, onVoiceFinished, onVoiceFinished);
-                                }
-                            });
-                        }
-                    } catch(err) {
-                        if (!tryPlayViaWebAudio(staticAudio, onVoiceFinished)) {
-                            onVoiceFinished();
-                        }
-                    }
-                } else if (staticAudio) {
-                    playRealAudio(
-                        staticAudio,
-                        onVoiceFinished,
-                        () => {
-                            if (!tryPlayViaWebAudio(staticAudio, onVoiceFinished)) {
-                                onVoiceFinished();
-                            }
-                        }
-                    );
-                } else {
-                    onVoiceFinished();
-                }
+                playStudioSignalVoice(targetEl, staticAudio, onVoiceFinished);
             }, 350);
         }
 
+        function playStudioSignalVoice(el, url, onFinished) {
+            let finished = false;
+            const done = () => {
+                if (finished) return;
+                finished = true;
+                if (onFinished) onFinished();
+            };
+
+            // Attempt 1: Try pre-unlocked dedicated HTML5 Audio element
+            if (el) {
+                try {
+                    el.currentTime = 0;
+                    el.volume = 1.0;
+                    el.onended = done;
+                    const p = el.play();
+                    if (p !== undefined) {
+                        p.then(() => {
+                            // HTML5 Audio playback started successfully
+                        }).catch(err => {
+                            console.warn("[Voice Engine] Dedicated element play notice, using WebAudio buffer:", err);
+                            // Attempt 2: Instant WebAudio buffer playback from RAM
+                            if (!tryPlayViaWebAudio(url, done)) {
+                                playRealAudio(url, done, done);
+                            }
+                        });
+                        return;
+                    }
+                } catch(e) {
+                    console.warn("[Voice Engine] Dedicated element exception:", e);
+                }
+            }
+
+            // Attempt 2: Instant WebAudio buffer playback from RAM
+            if (url) {
+                if (!tryPlayViaWebAudio(url, done)) {
+                    playRealAudio(url, done, done);
+                }
+            } else {
+                done();
+            }
+        }
+
         function toggleVoiceAlerts() {
-            unlockMobileAudio();
+            unlockAudio();
             voiceAlertsEnabled = !voiceAlertsEnabled;
             localStorage.setItem('voiceAlertsEnabled', voiceAlertsEnabled);
             updateVoiceAlertsUI();
 
             if (voiceAlertsEnabled) {
                 const el = document.getElementById('audioAlertsActive');
-                if (el) {
-                    try {
-                        el.currentTime = 0;
-                        el.play().catch(() => playRealAudio('/audio/voice_alerts_active.mp3'));
-                    } catch(e) {
-                        playRealAudio('/audio/voice_alerts_active.mp3');
-                    }
-                } else {
-                    playRealAudio('/audio/voice_alerts_active.mp3');
-                }
+                playStudioSignalVoice(el, '/audio/voice_alerts_active.mp3', null);
             } else {
                 if (currentPlayingAudio) {
                     try { currentPlayingAudio.pause(); currentPlayingAudio.currentTime = 0; } catch(e) {}
@@ -4695,7 +4708,7 @@
         }
 
         function testFemaleVoice() {
-            unlockMobileAudio();
+            unlockAudio();
             voiceAlertsEnabled = true;
             localStorage.setItem('voiceAlertsEnabled', true);
             updateVoiceAlertsUI();
@@ -4712,27 +4725,29 @@
 
             showVoiceToast('BUY', asset, sampleGrade, false, isGold ? '4045.20' : '98500.00', isGold ? '4038.00' : '97800.00');
 
+            const el = isGold ? document.getElementById('audioSignalBuyGold') : document.getElementById('audioSignalBuyBtc');
+            const mp3Url = isGold ? '/audio/signal_buy_gold.mp3' : '/audio/signal_buy_btc.mp3';
+
+            // Immediate user-gesture warmup of target element
+            if (el) {
+                try {
+                    el.volume = 0.001;
+                    const p = el.play();
+                    if (p !== undefined) {
+                        p.then(() => {
+                            el.pause();
+                            el.currentTime = 0;
+                            el.volume = 1.0;
+                        }).catch(() => { el.volume = 1.0; });
+                    }
+                } catch(e) { el.volume = 1.0; }
+            }
+
             try { playChime(); } catch(e) {}
 
             setTimeout(() => {
-                const el = isGold ? document.getElementById('audioSignalBuyGold') : document.getElementById('audioSignalBuyBtc');
-                if (el) {
-                    try {
-                        el.currentTime = 0;
-                        el.volume = 1.0;
-                        const p = el.play();
-                        if (p !== undefined) {
-                            p.catch(() => {
-                                playRealAudio('/audio/test_voice.mp3', null, () => tryPlayViaWebAudio('/audio/test_voice.mp3'));
-                            });
-                        }
-                    } catch(e) {
-                        playRealAudio('/audio/test_voice.mp3', null, () => tryPlayViaWebAudio('/audio/test_voice.mp3'));
-                    }
-                } else {
-                    playRealAudio('/audio/test_voice.mp3', null, () => tryPlayViaWebAudio('/audio/test_voice.mp3'));
-                }
-            }, 300);
+                playStudioSignalVoice(el, mp3Url, null);
+            }, 280);
         }
 
         function updateVoiceAlertsUI() {
