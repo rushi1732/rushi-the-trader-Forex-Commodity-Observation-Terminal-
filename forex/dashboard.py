@@ -4602,16 +4602,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     } catch(e) {}
                 }
 
-                // 2. Pre-unlock / warm up all dedicated HTML5 audio elements on mobile
+                // 2. Pre-unlock / warm up all dedicated HTML5 signal audio elements on mobile
+                // NOTE: DO NOT include welcome audios here to avoid muting or cutting welcome speech!
                 const signalAudioIds = [
                     'audioSignalBuyGold',
                     'audioSignalSellGold',
                     'audioSignalBuyBtc',
                     'audioSignalSellBtc',
-                    'audioWelcomeMorning',
-                    'audioWelcomeAfternoon',
-                    'audioWelcomeEvening',
-                    'audioWelcomeNight',
                     'audioTestVoice',
                     'audioAlertsActive',
                     'persistentVoiceAudio'
@@ -5491,7 +5488,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
 
             if (isUserGesture) {
-                unlockAudio();
+                unlockAudio(welcomeAudioId);
             }
 
             const onFinished = () => {
