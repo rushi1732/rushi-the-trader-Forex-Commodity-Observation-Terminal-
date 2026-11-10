@@ -635,7 +635,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0e17">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="RUSHI THE TRADER">
     <meta name="google-site-verification" content="googleb3e3c0a986c6ae10">
     <meta name="google-site-verification" content="googleb3e3c0a986c6ae10.html">
     <title>RUSHI THE TRADER - Forex & Commodity Observation Terminal</title>
@@ -6363,7 +6368,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             document.addEventListener('touchstart', unlockHandler);
             document.addEventListener('keydown', unlockHandler);
 
-            // Visibility change watchdog: keep speech alive when user returns to tab
+            // Visibility change watchdog: keep speech alive and refresh live data on tab return
             document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState === 'visible') {
                     if (audioCtx && audioCtx.state === 'suspended') {
@@ -6372,6 +6377,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if ('speechSynthesis' in window && window.speechSynthesis.paused) {
                         window.speechSynthesis.resume();
                     }
+                    fetchObservation();
+                    fetchChart();
                 }
             });
 
