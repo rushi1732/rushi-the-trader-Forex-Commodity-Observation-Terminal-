@@ -1909,11 +1909,52 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             transform: translateY(-1px);
             box-shadow: 0 6px 25px rgba(2, 132, 199, 0.5);
         }
+
+        @keyframes mobileBtnPulse {
+            0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7); }
+            70% { box-shadow: 0 0 0 14px rgba(56, 189, 248, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+        }
+
+        .welcome-enter-btn.pulse-ready {
+            animation: mobileBtnPulse 1.8s infinite;
+            border-color: #38bdf8;
+            background: linear-gradient(135deg, #0284c7, #ec4899);
+        }
+
+        @media (max-width: 640px) {
+            .welcome-fullpage-overlay {
+                padding: 16px;
+            }
+            .welcome-fullpage-card {
+                padding: 30px 18px;
+                border-radius: 16px;
+            }
+            .welcome-logo-circle {
+                width: 76px;
+                height: 76px;
+                margin-bottom: 12px;
+            }
+            .welcome-greeting-title {
+                font-size: 22px;
+                line-height: 1.3;
+            }
+            .welcome-terminal-name {
+                font-size: 13px;
+                margin-bottom: 16px;
+            }
+            .welcome-enter-btn {
+                width: 100%;
+                padding: 14px 18px;
+                font-size: 14px;
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
     <!-- Full-Screen Welcome Curtain Screen -->
-    <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="triggerVoiceFromCurtainClick()">
+    <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="triggerVoiceFromCurtainClick(event)" ontouchstart="triggerVoiceFromCurtainClick(event)">
         <div class="welcome-fullpage-card">
             <button onclick="event.stopPropagation(); dismissCurtainScreen();" style="position:absolute; top:16px; right:18px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:6px;" title="Skip and open terminal">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1941,7 +1982,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>
             </div>
             <div>
-                <button id="welcomeEnterBtn" class="welcome-enter-btn" onclick="triggerVoiceFromCurtainClick()">
+                <button id="welcomeEnterBtn" class="welcome-enter-btn" onclick="triggerVoiceFromCurtainClick(event)" ontouchstart="triggerVoiceFromCurtainClick(event)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     <span id="welcomeBtnText">Click Anywhere to Play Voice & Enter</span>
                 </button>
@@ -4466,8 +4507,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         /* -------------------------------------------------------------
-           Female Voice AI Audio Engine (Web Speech API + Web Audio Chime)
+           Female Voice AI Audio Engine (Mobile & Desktop Ultra-Reliable)
            ------------------------------------------------------------- */
+        let isAudioUnlocked = false;
+
         function getAudioContext() {
             if (!audioCtx) {
                 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -4481,15 +4524,62 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             return audioCtx;
         }
 
-        function unlockAudioDirectly() {
-            getAudioContext();
-            if ('speechSynthesis' in window) {
-                try {
-                    window.speechSynthesis.resume();
-                } catch(e) {}
+        function unlockMobileAudio() {
+            try {
+                // 1. Resume Web Audio Context
+                const ctx = getAudioContext();
+                if (ctx && ctx.state !== 'running') {
+                    ctx.resume().catch(() => {});
+                }
+
+                // 2. Play 1-sample silent Web Audio buffer to unlock iOS / Android audio hardware channel
+                if (ctx) {
+                    try {
+                        const buffer = ctx.createBuffer(1, 1, 22050);
+                        const src = ctx.createBufferSource();
+                        src.buffer = buffer;
+                        src.connect(ctx.destination);
+                        src.start(0);
+                    } catch(e) {}
+                }
+
+                // 3. Resume and prime SpeechSynthesis
+                if ('speechSynthesis' in window) {
+                    try {
+                        window.speechSynthesis.resume();
+                    } catch(e) {}
+                }
+
+                isAudioUnlocked = true;
+                const pill = document.getElementById('audioUnlockPill');
+                if (pill) pill.style.display = 'none';
+            } catch (e) {
+                console.warn("Mobile audio unlock notice:", e);
             }
-            const pill = document.getElementById('audioUnlockPill');
-            if (pill) pill.style.display = 'none';
+        }
+
+        function unlockAudioDirectly() {
+            unlockMobileAudio();
+        }
+
+        // Global touch / click listeners to unlock audio immediately on first user interaction
+        if (typeof window !== 'undefined') {
+            ['touchstart', 'touchend', 'pointerdown', 'click'].forEach(evt => {
+                window.addEventListener(evt, () => {
+                    if (!isAudioUnlocked) {
+                        unlockMobileAudio();
+                    }
+                }, { passive: true, once: false });
+            });
+        }
+
+        // Keep mobile AudioContext awake while observing charts
+        if (typeof window !== 'undefined') {
+            setInterval(() => {
+                if (voiceAlertsEnabled && audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume().catch(() => {});
+                }
+            }, 20000);
         }
 
         function checkAudioState() {
@@ -4502,34 +4592,39 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
-        // Institutional bell chime before speech announcement
+        // Institutional melodic double chime before speech announcement (boosted volume for phone speakers)
         function playChime() {
             try {
                 const ctx = getAudioContext();
                 if (!ctx) return;
+                if (ctx.state === 'suspended') {
+                    ctx.resume().catch(() => {});
+                }
                 const now = ctx.currentTime;
                 
+                // Clear high bell chime tone 1: 880 Hz (A5)
                 const osc1 = ctx.createOscillator();
                 const gain1 = ctx.createGain();
                 osc1.type = 'sine';
-                osc1.frequency.setValueAtTime(659.25, now); // E5
-                gain1.gain.setValueAtTime(0.18, now);
-                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                osc1.frequency.setValueAtTime(880.00, now);
+                gain1.gain.setValueAtTime(0.36, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
                 osc1.connect(gain1);
                 gain1.connect(ctx.destination);
                 osc1.start(now);
-                osc1.stop(now + 0.25);
+                osc1.stop(now + 0.32);
 
+                // Harmonious chime tone 2: 1318.51 Hz (E6)
                 const osc2 = ctx.createOscillator();
                 const gain2 = ctx.createGain();
                 osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(880.00, now + 0.12); // A5
-                gain2.gain.setValueAtTime(0.22, now + 0.12);
-                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+                osc2.frequency.setValueAtTime(1318.51, now + 0.14);
+                gain2.gain.setValueAtTime(0.40, now + 0.14);
+                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.54);
                 osc2.connect(gain2);
                 gain2.connect(ctx.destination);
-                osc2.start(now + 0.12);
-                osc2.stop(now + 0.48);
+                osc2.start(now + 0.14);
+                osc2.stop(now + 0.54);
             } catch (e) {
                 console.warn("Chime audio warning:", e);
             }
@@ -4537,10 +4632,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function findBestFemaleVoice() {
             if (!('speechSynthesis' in window)) return null;
-            const voices = window.speechSynthesis.getVoices();
+            let voices = [];
+            try {
+                voices = window.speechSynthesis.getVoices() || [];
+            } catch (e) {
+                voices = [];
+            }
             if (!voices || voices.length === 0) return null;
 
-            // Tier 1: Dedicated Indian English Female Voices (Neerja, Heera, Veena, Sangeeta, Priya, Swara)
+            // Tier 1: Dedicated Indian English / Hindi Female Voices (Neerja, Heera, Veena, Sangeeta, Priya, Swara, Ananya, Aditi, Kalpana)
             const indianFemalePatterns = [
                 /neerja/i,
                 /heera/i,
@@ -4550,26 +4650,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 /swara/i,
                 /ananya/i,
                 /aditi/i,
+                /kalpana/i,
                 /india.*female/i,
                 /female.*india/i
             ];
 
             for (const pat of indianFemalePatterns) {
-                const match = voices.find(v => (pat.test(v.name) || pat.test(v.voiceURI)) && !/madhur|prabhat|ravi|male|boy|man|guy/i.test(v.name));
+                const match = voices.find(v => (pat.test(v.name) || pat.test(v.voiceURI || '')) && !/madhur|prabhat|ravi|male|boy|man|guy/i.test(v.name));
                 if (match) return match;
             }
 
-            // Tier 2: Any English (India) or Hindi voice that is not explicitly male
+            // Tier 2: Any English (India) or Hindi that is not explicitly male
             const indianVoices = voices.filter(v => {
                 const l = (v.lang || '').toLowerCase();
                 const n = (v.name || '').toLowerCase();
-                const isInd = l.includes('en-in') || l.includes('en_in') || l.includes('hi-in') || l.includes('hi_in') || n.includes('india') || n.includes('indian');
+                const isInd = l.includes('en-in') || l.includes('en_in') || l.includes('hi-in') || l.includes('hi_in') || n.includes('india');
                 const isMale = /madhur|prabhat|ravi|male|boy|man|guy/i.test(n);
                 return isInd && !isMale;
             });
             if (indianVoices.length > 0) {
-                // Prefer Google Indian English if available
-                const googleInd = indianVoices.find(v => /google/i.test(v.name));
+                const googleInd = indianVoices.find(v => /google|natural|online|enhanced/i.test(v.name));
                 return googleInd || indianVoices[0];
             }
 
@@ -4580,14 +4680,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             });
             if (anyIndian) return anyIndian;
 
-            // Tier 4: Fallback to high-clarity natural female voice
+            // Tier 4: Fallback to high-clarity natural female voice (iOS Siri / Samantha / Karen)
             const fallbackFemale = [
+                /samantha/i,
+                /karen/i,
                 /zira/i,
                 /jenny/i,
                 /aria/i,
-                /samantha/i,
                 /victoria/i,
-                /karen/i,
                 /google us english/i,
                 /female/i,
                 /woman/i
@@ -4609,13 +4709,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         window._activeSpeechUtterance = null;
         let speechSafetyTimer = null;
 
-        // Keep-alive watchdog for Chromium speech synthesis freeze bug
+        // Keep-alive watchdog for Chromium & WebKit speech freeze bug
         if (window._speechWatchdog) clearInterval(window._speechWatchdog);
         window._speechWatchdog = setInterval(() => {
             if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-                // If audio paused or frozen by browser background throttling, resume
-                window.speechSynthesis.pause();
-                window.speechSynthesis.resume();
+                try {
+                    window.speechSynthesis.pause();
+                    window.speechSynthesis.resume();
+                } catch(e) {}
             }
         }, 3500);
 
@@ -4628,8 +4729,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function executeSpeech(text, onComplete) {
-            if (!('speechSynthesis' in window)) return;
+            if (!('speechSynthesis' in window)) {
+                if (onComplete) onComplete(new Error("speechSynthesis not supported"));
+                return;
+            }
             isSpeakingNow = true;
+
+            // Wake up Web Audio on mobile
+            try {
+                const ctx = getAudioContext();
+                if (ctx && ctx.state !== 'running') {
+                    ctx.resume().catch(() => {});
+                }
+            } catch (e) {}
 
             try {
                 playChime();
@@ -4642,22 +4754,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     }
 
                     const utter = new SpeechSynthesisUtterance(text);
-                    // Crucial: Pin to window to prevent V8 garbage collection mid-speech!
                     window._activeSpeechUtterance = utter;
 
-                    const voice = cachedFemaleVoice || findBestFemaleVoice();
+                    const voice = findBestFemaleVoice();
                     if (voice) {
-                        utter.voice = voice;
+                        try {
+                            utter.voice = voice;
+                        } catch(e) {}
                         utter.lang = voice.lang || 'en-IN';
                     } else {
                         utter.lang = 'en-IN';
                     }
 
-                    utter.rate = 0.88;
+                    // Mobile articulation rate: 0.95 gives clean speech without word drops
+                    utter.rate = 0.95;
                     utter.pitch = 1.05;
                     utter.volume = 1.0;
 
+                    let hasEnded = false;
                     const finishSpeech = (err) => {
+                        if (hasEnded) return;
+                        hasEnded = true;
                         if (speechSafetyTimer) {
                             clearTimeout(speechSafetyTimer);
                             speechSafetyTimer = null;
@@ -4667,7 +4784,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         if (onComplete) {
                             try { onComplete(err); } catch (e) {}
                         }
-                        setTimeout(processNextSpeechQueue, 350);
+                        setTimeout(processNextSpeechQueue, 300);
                     };
 
                     utter.onend = () => finishSpeech(null);
@@ -4676,27 +4793,43 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         finishSpeech(err);
                     };
 
+                    // Dynamic safety watchdog: text length * 85ms (min 3.5s, max 9.5s)
+                    const safetyMs = Math.min(9500, Math.max(3500, text.length * 85));
                     if (speechSafetyTimer) clearTimeout(speechSafetyTimer);
                     speechSafetyTimer = setTimeout(() => {
-                        if (isSpeakingNow) {
+                        if (isSpeakingNow && !hasEnded) {
                             console.warn("Speech synthesis watchdog timed out. Advancing queue.");
-                            finishSpeech();
+                            finishSpeech(null);
                         }
-                    }, 14000);
+                    }, safetyMs);
 
                     window.speechSynthesis.speak(utter);
+
+                    // Mobile iOS Safari bugfix: ensure resume is called immediately after speak
+                    setTimeout(() => {
+                        try {
+                            if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+                                window.speechSynthesis.resume();
+                            }
+                        } catch(e) {}
+                    }, 50);
+
                 } catch (e) {
                     console.error("Speech execution exception:", e);
                     window._activeSpeechUtterance = null;
                     isSpeakingNow = false;
+                    if (onComplete) {
+                        try { onComplete(e); } catch(ex) {}
+                    }
                     setTimeout(processNextSpeechQueue, 300);
                 }
-            }, 200);
+            }, 180);
         }
 
         function speakFemaleVoice(text, onComplete) {
             if (!('speechSynthesis' in window)) {
                 console.warn("Speech synthesis not supported on this browser.");
+                if (onComplete) onComplete(new Error("No speechSynthesis"));
                 return;
             }
 
@@ -4755,6 +4888,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (!voiceAlertsEnabled) return;
             if (!sig || (sig.action !== 'BUY' && sig.action !== 'SELL')) return;
 
+            // Wake up audio on mobile
+            unlockMobileAudio();
+
+            // Mobile haptic vibration feedback
+            try {
+                if ('vibrate' in navigator) {
+                    if (sig.action === 'BUY') {
+                        navigator.vibrate([200, 100, 200]);
+                    } else {
+                        navigator.vibrate([160, 80, 160, 80, 200]);
+                    }
+                }
+            } catch(e) {}
+
             const canon = normalizeSym(sig.symbol || '');
             const isGold = canon.includes('XAU') || canon.includes('GOLD');
             const assetName = isGold ? 'Gold' : 'Bitcoin';
@@ -4782,7 +4929,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function toggleVoiceAlerts() {
-            getAudioContext();
+            unlockMobileAudio();
             voiceAlertsEnabled = !voiceAlertsEnabled;
             localStorage.setItem('voiceAlertsEnabled', voiceAlertsEnabled);
             updateVoiceAlertsUI();
@@ -4805,7 +4952,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function testFemaleVoice() {
-            getAudioContext();
+            unlockMobileAudio();
             voiceAlertsEnabled = true;
             localStorage.setItem('voiceAlertsEnabled', true);
             updateVoiceAlertsUI();
@@ -4887,36 +5034,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function playWelcomeCurtainVoice() {
-            if (isCurtainDismissed || isWelcomeSpeaking) return;
+            if (isCurtainDismissed) return;
             const greeting = getTimeOfDayGreeting();
             const welcomeText = `Hello, ${greeting} Sir! Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal.`;
 
             const greetingEl = document.getElementById('welcomeGreetingText');
             const speechLabel = document.getElementById('welcomeSpeechLabel');
             const btnText = document.getElementById('welcomeBtnText');
+            const enterBtn = document.getElementById('welcomeEnterBtn');
 
             if (greetingEl) {
                 greetingEl.innerHTML = `Hello, <span class="greeting-highlight">${greeting} Sir!</span>`;
             }
 
             isWelcomeSpeaking = true;
-            getAudioContext();
-            unlockAudioDirectly();
+            unlockMobileAudio();
 
             if (speechLabel) speechLabel.textContent = `Speaking: "${greeting} Sir..."`;
-            if (btnText) btnText.textContent = "Speaking Greeting... (Please wait)";
+            if (btnText) btnText.textContent = "🔊 Speaking Greeting... (Please wait)";
+            if (enterBtn) enterBtn.classList.remove('pulse-ready');
 
             speakFemaleVoice(welcomeText, (err) => {
                 isWelcomeSpeaking = false;
                 if (!err) {
                     if (speechLabel) speechLabel.textContent = "Welcome complete! Opening terminal...";
-                    if (btnText) btnText.textContent = "Welcome complete! Opening terminal...";
+                    if (btnText) btnText.textContent = "Opening Terminal...";
                     welcomeDismissTimer = setTimeout(dismissCurtainScreen, 650);
                 } else {
-                    // Autoplay was blocked by browser policy without user gesture
                     if (!isCurtainDismissed) {
-                        if (speechLabel) speechLabel.textContent = "Click anywhere to hear voice & enter";
-                        if (btnText) btnText.textContent = "Click Anywhere to Play Voice & Enter";
+                        if (speechLabel) speechLabel.textContent = "Tap below to hear voice & enter";
+                        if (btnText) btnText.textContent = "🔊 Tap to Play Voice & Enter Terminal";
+                        if (enterBtn) enterBtn.classList.add('pulse-ready');
                     }
                 }
             });
@@ -4924,8 +5072,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function triggerVoiceFromCurtainClick(e) {
             if (isCurtainDismissed) return;
-            getAudioContext();
-            unlockAudioDirectly();
+            unlockMobileAudio();
+
+            // Cancel any stuck previous synthesis so user tap always starts voice
+            if ('speechSynthesis' in window && !window.speechSynthesis.speaking) {
+                isWelcomeSpeaking = false;
+            }
+
             if (!isWelcomeSpeaking) {
                 playWelcomeCurtainVoice();
             }
@@ -4937,22 +5090,35 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const overlay = document.getElementById('welcomeFullPageOverlay');
             if (overlay) {
                 overlay.style.display = 'flex';
-                // Force reflow
                 void overlay.offsetWidth;
                 overlay.classList.remove('slide-up');
             }
 
             const greeting = getTimeOfDayGreeting();
             const greetingEl = document.getElementById('welcomeGreetingText');
+            const speechLabel = document.getElementById('welcomeSpeechLabel');
+            const btnText = document.getElementById('welcomeBtnText');
+            const enterBtn = document.getElementById('welcomeEnterBtn');
+
             if (greetingEl) {
                 greetingEl.innerHTML = `Hello, <span class="greeting-highlight">${greeting} Sir!</span>`;
             }
 
-            // Immediately attempt speech playback on load/refresh
-            try {
-                playWelcomeCurtainVoice();
-            } catch (e) {
-                console.warn("Welcome voice initial playback error:", e);
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window) || (window.innerWidth <= 768);
+
+            if (isMobile && !forceReplay && !isAudioUnlocked) {
+                // Mobile Autoplay Policy: Mobile browsers require a direct tap/touch to start audio
+                if (speechLabel) speechLabel.textContent = "Tap below to play Indian voice greeting";
+                if (btnText) btnText.textContent = "🔊 Tap to Play Voice & Enter Terminal";
+                if (enterBtn) enterBtn.classList.add('pulse-ready');
+            } else {
+                // Desktop or already unlocked: attempt immediate playback
+                if (enterBtn) enterBtn.classList.remove('pulse-ready');
+                try {
+                    playWelcomeCurtainVoice();
+                } catch (e) {
+                    console.warn("Welcome voice initial playback error:", e);
+                }
             }
         }
 
