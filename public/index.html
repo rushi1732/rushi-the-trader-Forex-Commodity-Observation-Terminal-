@@ -1322,6 +1322,9 @@
     </style>
 </head>
 <body>
+    <!-- Persistent Mobile Unlocked Audio Player -->
+    <audio id="persistentVoiceAudio" preload="auto" playsinline style="display:none;"></audio>
+
     <!-- Full-Screen Welcome Curtain Screen -->
     <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="triggerVoiceFromCurtainClick(event)" ontouchstart="triggerVoiceFromCurtainClick(event)">
         <div class="welcome-fullpage-card">
@@ -3893,6 +3896,8 @@
             return audioCtx;
         }
 
+        let isPersistentAudioUnlocked = false;
+
         function unlockMobileAudio() {
             try {
                 // 1. Resume Web Audio Context
@@ -3912,7 +3917,22 @@
                     } catch(e) {}
                 }
 
-                // 3. Resume and prime SpeechSynthesis
+                // 3. Unlock persistent HTML5 Audio element on mobile
+                const pAudio = document.getElementById('persistentVoiceAudio');
+                if (pAudio && !isPersistentAudioUnlocked) {
+                    // Micro 1-sample silent WAV data URI to unlock media playback privileges on mobile
+                    pAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+                    const playPromise = pAudio.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            pAudio.pause();
+                            isPersistentAudioUnlocked = true;
+                            isAudioUnlocked = true;
+                        }).catch(e => {});
+                    }
+                }
+
+                // 4. Resume and prime SpeechSynthesis
                 if ('speechSynthesis' in window) {
                     try {
                         window.speechSynthesis.resume();
@@ -4254,19 +4274,98 @@
         }
 
         /* -------------------------------------------------------------
-           Studio HD Audio MP3 Player (Mobile & Desktop Native Audio)
+           Studio HD Audio MP3 Player & Web Audio Buffer Engine (Mobile & Desktop)
            ------------------------------------------------------------- */
         let currentPlayingAudio = null;
+        let activeWebAudioSource = null;
+        const audioBufferCache = {};
+
+        function preloadAudioBuffer(url) {
+            if (!url || audioBufferCache[url]) return;
+            fetch(url)
+                .then(r => {
+                    if (!r.ok) throw new Error('Fetch failed: ' + r.status);
+                    return r.arrayBuffer();
+                })
+                .then(buf => {
+                    const ctx = getAudioContext();
+                    if (ctx) {
+                        ctx.decodeAudioData(buf, decoded => {
+                            audioBufferCache[url] = decoded;
+                        }, () => {});
+                    }
+                })
+                .catch(() => {});
+        }
+
+        function tryPlayViaWebAudio(url, onEnded) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return false;
+                if (ctx.state === 'suspended') {
+                    ctx.resume().catch(() => {});
+                }
+
+                const playDecodedBuffer = (buf) => {
+                    if (activeWebAudioSource) {
+                        try { activeWebAudioSource.stop(); } catch(e) {}
+                        activeWebAudioSource = null;
+                    }
+                    const src = ctx.createBufferSource();
+                    src.buffer = buf;
+                    src.connect(ctx.destination);
+                    src.onended = () => {
+                        activeWebAudioSource = null;
+                        if (onEnded) onEnded();
+                    };
+                    src.start(0);
+                    activeWebAudioSource = src;
+                };
+
+                if (audioBufferCache[url]) {
+                    playDecodedBuffer(audioBufferCache[url]);
+                    return true;
+                }
+
+                // If not yet cached, fetch and decode immediately
+                fetch(url)
+                    .then(r => r.arrayBuffer())
+                    .then(buf => ctx.decodeAudioData(buf))
+                    .then(decoded => {
+                        audioBufferCache[url] = decoded;
+                        playDecodedBuffer(decoded);
+                    })
+                    .catch(e => {
+                        console.warn("WebAudio buffer load failed:", e);
+                        if (onEnded) onEnded();
+                    });
+                return true;
+            } catch(e) {
+                console.warn("tryPlayViaWebAudio exception:", e);
+                return false;
+            }
+        }
 
         function playRealAudio(url, onEnded, onError) {
             try {
+                // Cancel SpeechSynthesis to prevent any dual-voice collision
+                if ('speechSynthesis' in window) {
+                    try { window.speechSynthesis.cancel(); } catch(e) {}
+                }
+
                 if (currentPlayingAudio) {
-                    try { currentPlayingAudio.pause(); } catch(e) {}
+                    try { currentPlayingAudio.pause(); currentPlayingAudio.currentTime = 0; } catch(e) {}
                     currentPlayingAudio = null;
                 }
-                const audio = new Audio(url);
+                if (activeWebAudioSource) {
+                    try { activeWebAudioSource.stop(); } catch(e) {}
+                    activeWebAudioSource = null;
+                }
+
+                // Use persistent pre-unlocked mobile audio element when available
+                const pAudio = document.getElementById('persistentVoiceAudio');
+                const audio = pAudio || new Audio();
                 currentPlayingAudio = audio;
-                audio.preload = 'auto';
 
                 let finished = false;
                 const cleanup = () => {
@@ -4280,106 +4379,164 @@
                 audio.onerror = (e) => {
                     console.warn("RealAudio error on " + url + ":", e);
                     if (finished) return;
-                    finished = true;
-                    if (currentPlayingAudio === audio) currentPlayingAudio = null;
-                    if (onError) onError(e);
-                    else if (onEnded) onEnded();
+                    // Mobile Safari/Chrome fallback: Play via Web Audio buffer
+                    if (!tryPlayViaWebAudio(url, cleanup)) {
+                        finished = true;
+                        if (currentPlayingAudio === audio) currentPlayingAudio = null;
+                        if (onError) onError(e);
+                        else if (onEnded) onEnded();
+                    }
                 };
 
+                audio.src = url;
+                audio.currentTime = 0;
                 const p = audio.play();
                 if (p !== undefined) {
                     p.catch((err) => {
                         console.warn("Audio play() catch on " + url + ":", err);
                         if (!finished) {
-                            finished = true;
-                            if (currentPlayingAudio === audio) currentPlayingAudio = null;
-                            if (onError) onError(err);
-                            else if (onEnded) onEnded();
+                            // On mobile browsers where .play() is blocked, Web Audio buffer always plays!
+                            if (tryPlayViaWebAudio(url, cleanup)) {
+                                console.log("Web Audio buffer playback started for mobile.");
+                            } else {
+                                finished = true;
+                                if (currentPlayingAudio === audio) currentPlayingAudio = null;
+                                if (onError) onError(err);
+                                else if (onEnded) onEnded();
+                            }
                         }
                     });
                 }
                 return audio;
             } catch (e) {
                 console.warn("playRealAudio exception:", e);
-                if (onError) onError(e);
-                else if (onEnded) onEnded();
+                if (!tryPlayViaWebAudio(url, onEnded)) {
+                    if (onError) onError(e);
+                    else if (onEnded) onEnded();
+                }
             }
         }
 
-        function speakOrFetchTTS(text, onEnded) {
-            const ttsUrl = '/api/tts?text=' + encodeURIComponent(text);
-            playRealAudio(
-                ttsUrl,
-                onEnded,
-                () => {
-                    // Fallback to SpeechSynthesis
-                    speakFemaleVoice(text, onEnded);
-                }
-            );
-        }
+        /* -------------------------------------------------------------
+           Single-Voice-At-A-Time Signal Voice Alert Engine (Strict Mutex)
+           Guarantees NO overlapping voices under any circumstances
+           ------------------------------------------------------------- */
+        let isGlobalVoiceBusy = false;
+        let signalVoiceQueue = [];
+        let lastGlobalSpokenTime = 0;
+        let voiceSafetyWatchdogTimer = null;
 
         function announceSignalVoice(sig, isReminder = false) {
             if (!voiceAlertsEnabled) return;
             if (!sig || (sig.action !== 'BUY' && sig.action !== 'SELL')) return;
 
-            // Wake up audio on mobile
+            const canon = normalizeSym(sig.symbol || '');
+            const now = Date.now();
+
+            // 1. Strict Mutex: If a voice is ALREADY speaking, DO NOT OVERLAP!
+            if (isGlobalVoiceBusy || (currentPlayingAudio && !currentPlayingAudio.paused) || activeWebAudioSource) {
+                const alreadyQueued = signalVoiceQueue.some(item => item.symbol === canon);
+                if (!alreadyQueued && signalVoiceQueue.length < 2) {
+                    console.log(`[Voice Mutex] Busy. Queuing ${canon} ${sig.action} for next playback.`);
+                    signalVoiceQueue.push({ sig: sig, isReminder: isReminder, symbol: canon });
+                }
+                return;
+            }
+
+            // 2. Global Cooldown: At least 12 seconds between ANY consecutive voice announcements
+            if (now - lastGlobalSpokenTime < 12000) {
+                return;
+            }
+
+            // 3. Symbol Cooldown: At least 45 seconds between alerts for the same symbol & same action
+            const lastSpokenForSym = lastSpokenTimeBySymbol[canon] || 0;
+            if (lastAnnouncedActionBySymbol[canon] === sig.action && (now - lastSpokenForSym < 45000)) {
+                return;
+            }
+
+            // Wake up and unlock mobile audio
             unlockMobileAudio();
 
             // Mobile haptic vibration feedback
             try {
                 if ('vibrate' in navigator) {
-                    if (sig.action === 'BUY') {
-                        navigator.vibrate([200, 100, 200]);
-                    } else {
-                        navigator.vibrate([160, 80, 160, 80, 200]);
-                    }
+                    if (sig.action === 'BUY') navigator.vibrate([250, 100, 250]);
+                    else navigator.vibrate([180, 80, 180, 80, 250]);
                 }
             } catch(e) {}
 
-            // Play trading alert bell chime
-            try {
-                playChime();
-            } catch(e) {}
+            // STOP any speech synthesis immediately to guarantee ZERO dual-voice overlap
+            if ('speechSynthesis' in window) {
+                try { window.speechSynthesis.cancel(); } catch(e) {}
+            }
 
-            const canon = normalizeSym(sig.symbol || '');
             const isGold = canon.includes('XAU') || canon.includes('GOLD');
             const assetName = isGold ? 'Gold' : 'Bitcoin';
-
             const gradeText = formatGradeForVoice(sig.grade);
             const actionText = sig.action; // 'BUY' or 'SELL'
 
-            let priceDetails = '';
-            if (sig.entry_reference) {
-                const dec = 2;
-                priceDetails += ` Entry price ${Number(sig.entry_reference).toFixed(dec)}.`;
-            }
-            if (sig.stop_loss) {
-                const dec = 2;
-                priceDetails += ` Stop loss ${Number(sig.stop_loss).toFixed(dec)}.`;
-            }
-
-            const prefix = isReminder ? 'Reminder: ' : 'Alert! ';
-            const statusWord = isReminder ? 'remains active' : 'confirmed';
-            const speechText = `${prefix}${actionText} signal ${statusWord} for ${assetName}. Confluence Grade: ${gradeText}.${priceDetails}`;
-
-            showVoiceToast(actionText, assetName, gradeText, isReminder);
-
-            // Match dedicated studio MP3 audio if available
+            // Pick dedicated studio HD MP3
             let staticAudio = null;
             if (actionText === 'BUY' && isGold) staticAudio = '/audio/signal_buy_gold.mp3';
             else if (actionText === 'SELL' && isGold) staticAudio = '/audio/signal_sell_gold.mp3';
             else if (actionText === 'BUY' && !isGold) staticAudio = '/audio/signal_buy_btc.mp3';
             else if (actionText === 'SELL' && !isGold) staticAudio = '/audio/signal_sell_btc.mp3';
 
-            if (staticAudio && !isReminder) {
-                playRealAudio(
-                    staticAudio,
-                    null,
-                    () => speakOrFetchTTS(speechText)
-                );
-            } else {
-                speakOrFetchTTS(speechText);
-            }
+            // Mark Mutex BUSY
+            isGlobalVoiceBusy = true;
+            lastGlobalSpokenTime = now;
+            lastSpokenTimeBySymbol[canon] = now;
+            lastAnnouncedActionBySymbol[canon] = sig.action;
+
+            showVoiceToast(actionText, assetName, gradeText, isReminder);
+
+            // Play alert bell chime first
+            try {
+                playChime();
+            } catch(e) {}
+
+            const onVoiceFinished = () => {
+                if (voiceSafetyWatchdogTimer) {
+                    clearTimeout(voiceSafetyWatchdogTimer);
+                    voiceSafetyWatchdogTimer = null;
+                }
+                // Grace pause of 1.2s before releasing mutex lock
+                setTimeout(() => {
+                    isGlobalVoiceBusy = false;
+                    // Process next queued signal if any
+                    if (signalVoiceQueue.length > 0) {
+                        const nextItem = signalVoiceQueue.shift();
+                        announceSignalVoice(nextItem.sig, nextItem.isReminder);
+                    }
+                }, 1200);
+            };
+
+            // Hard safety watchdog: auto-release mutex after 10 seconds if anything hangs
+            if (voiceSafetyWatchdogTimer) clearTimeout(voiceSafetyWatchdogTimer);
+            voiceSafetyWatchdogTimer = setTimeout(() => {
+                if (isGlobalVoiceBusy) {
+                    console.warn("[Voice Watchdog] Voice timeout reached. Releasing mutex.");
+                    onVoiceFinished();
+                }
+            }, 10000);
+
+            // Wait 350ms for chime, then play studio MP3
+            setTimeout(() => {
+                if (staticAudio) {
+                    playRealAudio(
+                        staticAudio,
+                        onVoiceFinished,
+                        () => {
+                            // Web audio fallback
+                            if (!tryPlayViaWebAudio(staticAudio, onVoiceFinished)) {
+                                onVoiceFinished();
+                            }
+                        }
+                    );
+                } else {
+                    onVoiceFinished();
+                }
+            }, 350);
         }
 
         function toggleVoiceAlerts() {
@@ -4392,16 +4549,19 @@
                 playRealAudio(
                     '/audio/voice_alerts_active.mp3',
                     null,
-                    () => speakFemaleVoice("Indian English voice alerts activated. Monitoring Gold and Bitcoin.")
+                    () => tryPlayViaWebAudio('/audio/voice_alerts_active.mp3')
                 );
             } else {
                 if (currentPlayingAudio) {
-                    try { currentPlayingAudio.pause(); } catch(e) {}
+                    try { currentPlayingAudio.pause(); currentPlayingAudio.currentTime = 0; } catch(e) {}
                     currentPlayingAudio = null;
                 }
-                speechQueue = [];
-                isSpeakingNow = false;
-                window._activeSpeechUtterance = null;
+                if (activeWebAudioSource) {
+                    try { activeWebAudioSource.stop(); } catch(e) {}
+                    activeWebAudioSource = null;
+                }
+                isGlobalVoiceBusy = false;
+                signalVoiceQueue = [];
                 if ('speechSynthesis' in window) {
                     try { window.speechSynthesis.cancel(); } catch(e) {}
                 }
@@ -4421,16 +4581,22 @@
             const asset = isGold ? 'Gold' : 'Bitcoin';
             const sampleGrade = 'Grade A Plus, Elite Institutional';
 
+            // Cancel any speech synthesis
+            if ('speechSynthesis' in window) {
+                try { window.speechSynthesis.cancel(); } catch(e) {}
+            }
+
             showVoiceToast('BUY', asset, sampleGrade);
 
-            playRealAudio(
-                '/audio/test_voice.mp3',
-                null,
-                () => {
-                    const testText = `Alert! BUY signal confirmed for ${asset}. Confluence Grade: ${sampleGrade}. Entry price 4045. Stop loss 4038.`;
-                    speakFemaleVoice(testText);
-                }
-            );
+            try { playChime(); } catch(e) {}
+
+            setTimeout(() => {
+                playRealAudio(
+                    '/audio/test_voice.mp3',
+                    null,
+                    () => tryPlayViaWebAudio('/audio/test_voice.mp3')
+                );
+            }, 300);
         }
 
         function updateVoiceAlertsUI() {
@@ -4719,24 +4885,17 @@
             const now = Date.now();
 
             if (sig.action === 'BUY' || sig.action === 'SELL') {
-                const sigKey = `${sym}-${sig.action}-${sig.entry_reference || ''}-${sig.confirmed_candle_ts || sig.timestamp_et || ''}`;
-                const isNewSignal = (lastNotifiedSignalBySymbol[sym] !== sigKey) || (lastAnnouncedActionBySymbol[sym] !== sig.action);
+                const isNewSignal = (lastAnnouncedActionBySymbol[sym] !== sig.action);
                 const lastSpoken = lastSpokenTimeBySymbol[sym] || 0;
-                const shouldRepeatReminder = (now - lastSpoken >= REPEAT_ALERT_INTERVAL_MS);
+                const shouldRepeatReminder = (now - lastSpoken >= 60000);
 
                 if (isNewSignal || shouldRepeatReminder) {
-                    lastNotifiedSignalBySymbol[sym] = sigKey;
-                    lastNotifiedSignal = sigKey;
-                    lastAnnouncedActionBySymbol[sym] = sig.action;
-                    lastSpokenTimeBySymbol[sym] = now;
-                    lastSpokenGlobalTime = now;
-
                     if (isNewSignal) {
                         // Desktop push notification
                         sendNotification(`New Paper Signal: ${sig.action} ${sym}`, `Grade: ${sig.grade || 'Valid'} | Entry: ${sig.entry_reference} | Stop: ${sig.stop_loss}`);
                     }
 
-                    // Female Voice audio alert with Confluence Grade (with repeat reminder support)
+                    // Strict single-voice announcement
                     announceSignalVoice({
                         symbol: sym,
                         action: sig.action,
@@ -5140,17 +5299,11 @@
                         const sym = normalizeSym(r.symbol || '');
                         // Background scanner handles the alternate pair without colliding with active chart polling
                         if (sym !== currentSelectedSym && (sym.includes('XAU') || sym.includes('BTC')) && (r.action === 'BUY' || r.action === 'SELL')) {
-                            const scanKey = `${sym}-${r.action}-${r.price || ''}-${r.confluence_score || ''}`;
-                            const isNewScanSignal = (lastScannerNotifiedBySymbol[sym] !== scanKey) || (lastAnnouncedActionBySymbol[sym] !== r.action);
+                            const isNewScanSignal = (lastAnnouncedActionBySymbol[sym] !== r.action);
                             const lastSpoken = lastSpokenTimeBySymbol[sym] || 0;
-                            const shouldRepeatScan = (now - lastSpoken >= REPEAT_ALERT_INTERVAL_MS);
+                            const shouldRepeatScan = (now - lastSpoken >= 60000);
 
                             if (isNewScanSignal || shouldRepeatScan) {
-                                lastScannerNotifiedBySymbol[sym] = scanKey;
-                                lastAnnouncedActionBySymbol[sym] = r.action;
-                                lastSpokenTimeBySymbol[sym] = now;
-                                lastSpokenGlobalTime = now;
-
                                 if (isNewScanSignal) {
                                     sendNotification(`Scanner Signal: ${r.action} ${sym}`, `Grade: ${r.grade} | Price: ${r.price}`);
                                 }
@@ -5279,6 +5432,21 @@
             fetchScannerSignals();
             updateVoiceAlertsUI();
             updateNotificationsUI();
+
+            // Preload studio MP3 audio buffers in memory for zero-latency mobile playback
+            const studioAudios = [
+                '/audio/welcome_morning.mp3',
+                '/audio/welcome_afternoon.mp3',
+                '/audio/welcome_evening.mp3',
+                '/audio/welcome_night.mp3',
+                '/audio/signal_buy_gold.mp3',
+                '/audio/signal_sell_gold.mp3',
+                '/audio/signal_buy_btc.mp3',
+                '/audio/signal_sell_btc.mp3',
+                '/audio/test_voice.mp3',
+                '/audio/voice_alerts_active.mp3'
+            ];
+            studioAudios.forEach(url => preloadAudioBuffer(url));
 
             // Unlock Web Audio API context and speech synthesis on user interaction
             const unlockHandler = () => {
