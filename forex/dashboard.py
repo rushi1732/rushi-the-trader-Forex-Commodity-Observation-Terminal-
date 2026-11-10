@@ -4969,6 +4969,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             } catch(e) {}
 
+            // Play trading alert bell chime
+            try {
+                playChime();
+            } catch(e) {}
+
             const canon = normalizeSym(sig.symbol || '');
             const isGold = canon.includes('XAU') || canon.includes('GOLD');
             const assetName = isGold ? 'Gold' : 'Bitcoin';
@@ -5118,6 +5123,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 clearTimeout(welcomeDismissTimer);
                 welcomeDismissTimer = null;
             }
+            if (window._curtainSafetyTimer) {
+                clearTimeout(window._curtainSafetyTimer);
+                window._curtainSafetyTimer = null;
+            }
             const overlay = document.getElementById('welcomeFullPageOverlay');
             if (overlay) {
                 overlay.classList.add('slide-up');
@@ -5127,7 +5136,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
-        function playWelcomeCurtainVoice() {
+        function playWelcomeCurtainVoice(isUserGesture = false) {
             if (isCurtainDismissed) return;
             const greeting = getTimeOfDayGreeting();
             const welcomeText = `Hello, ${greeting} Sir! Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal.`;
@@ -5146,30 +5155,55 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 greetingEl.innerHTML = `Hello, <span class="greeting-highlight">${greeting} Sir!</span>`;
             }
 
-            isWelcomeSpeaking = true;
-            unlockMobileAudio();
+            if (isUserGesture) {
+                unlockMobileAudio();
+            }
 
+            const onFinished = () => {
+                isWelcomeSpeaking = false;
+                if (speechLabel) speechLabel.textContent = "Welcome complete! Opening terminal...";
+                if (btnText) btnText.textContent = "Opening Terminal...";
+                if (welcomeDismissTimer) clearTimeout(welcomeDismissTimer);
+                welcomeDismissTimer = setTimeout(dismissCurtainScreen, 650);
+            };
+
+            const onBlocked = () => {
+                isWelcomeSpeaking = false;
+                if (speechLabel) speechLabel.textContent = "Click or tap below to play voice greeting";
+                if (btnText) btnText.textContent = "Click / Tap to Play Voice & Enter Terminal";
+                if (enterBtn) enterBtn.classList.add('pulse-ready');
+            };
+
+            isWelcomeSpeaking = true;
             if (speechLabel) speechLabel.textContent = `Speaking: "${greeting} Sir..."`;
-            if (btnText) btnText.textContent = "🔊 Speaking Greeting... (Please wait)";
+            if (btnText) btnText.textContent = "Speaking Greeting... (Please wait)";
             if (enterBtn) enterBtn.classList.remove('pulse-ready');
 
-            // Play the studio MP3 directly
+            // Hard safety fallback watchdog: Auto-reveal dashboard if sound hangs or takes > 8s
+            if (window._curtainSafetyTimer) clearTimeout(window._curtainSafetyTimer);
+            window._curtainSafetyTimer = setTimeout(() => {
+                if (!isCurtainDismissed) {
+                    console.warn("Welcome curtain speech timeout. Auto-revealing terminal.");
+                    onFinished();
+                }
+            }, 8000);
+
             playRealAudio(
                 mp3File,
-                () => {
-                    isWelcomeSpeaking = false;
-                    if (speechLabel) speechLabel.textContent = "Welcome complete! Opening terminal...";
-                    if (btnText) btnText.textContent = "Opening Terminal...";
-                    welcomeDismissTimer = setTimeout(dismissCurtainScreen, 650);
-                },
+                onFinished,
                 (err) => {
-                    console.warn("MP3 failed, trying SpeechSynthesis fallback:", err);
-                    speakFemaleVoice(welcomeText, () => {
-                        isWelcomeSpeaking = false;
-                        if (speechLabel) speechLabel.textContent = "Welcome complete! Opening terminal...";
-                        if (btnText) btnText.textContent = "Opening Terminal...";
-                        welcomeDismissTimer = setTimeout(dismissCurtainScreen, 650);
-                    });
+                    console.warn("MP3 play error, checking fallback:", err);
+                    if (!isUserGesture && (err && (err.name === 'NotAllowedError' || String(err).includes('NotAllowedError')))) {
+                        onBlocked();
+                    } else {
+                        speakFemaleVoice(welcomeText, (speechErr) => {
+                            if (!speechErr) onFinished();
+                            else {
+                                if (!isUserGesture) onBlocked();
+                                else onFinished();
+                            }
+                        });
+                    }
                 }
             );
         }
@@ -5178,16 +5212,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (isCurtainDismissed) return;
             unlockMobileAudio();
 
-            // Cancel any stuck previous synthesis so user tap always starts voice
-            if ('speechSynthesis' in window && !window.speechSynthesis.speaking) {
-                isWelcomeSpeaking = false;
+            // If already speaking and user clicks again, immediately skip to terminal!
+            if (isWelcomeSpeaking && currentPlayingAudio && !currentPlayingAudio.paused) {
+                dismissCurtainScreen();
+                return;
             }
 
-            if (!isWelcomeSpeaking) {
-                playWelcomeCurtainVoice();
-            }
-        }
-            }
+            isWelcomeSpeaking = false;
+            playWelcomeCurtainVoice(true);
         }
 
         function triggerWelcomeExperience(forceReplay = false) {
@@ -5215,13 +5247,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (isMobile && !forceReplay && !isAudioUnlocked) {
                 // Mobile Autoplay Policy: Mobile browsers require a direct tap/touch to start audio
                 if (speechLabel) speechLabel.textContent = "Tap below to play Indian voice greeting";
-                if (btnText) btnText.textContent = "🔊 Tap to Play Voice & Enter Terminal";
+                if (btnText) btnText.textContent = "Tap to Play Voice & Enter Terminal";
                 if (enterBtn) enterBtn.classList.add('pulse-ready');
             } else {
-                // Desktop or already unlocked: attempt immediate playback
                 if (enterBtn) enterBtn.classList.remove('pulse-ready');
                 try {
-                    playWelcomeCurtainVoice();
+                    playWelcomeCurtainVoice(false);
                 } catch (e) {
                     console.warn("Welcome voice initial playback error:", e);
                 }
