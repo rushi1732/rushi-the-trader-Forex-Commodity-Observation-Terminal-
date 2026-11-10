@@ -956,6 +956,31 @@ class TestForexDashboard(unittest.TestCase):
             self.assertIn("User-agent: *", content)
             self.assertIn("Sitemap: https://rushithetraderdashboard.vercel.app/sitemap.xml", content)
 
+    def test_audio_mp3_and_tts_endpoints(self):
+        """Verify studio MP3 audio files and Cloud TTS endpoint."""
+        # 1. Studio MP3 File Endpoint
+        url_audio = f"http://127.0.0.1:{self.port}/audio/welcome_morning.mp3"
+        with urllib.request.urlopen(url_audio, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertIn("audio/mpeg", resp.headers.get_content_type())
+            data = resp.read()
+            self.assertGreater(len(data), 5000)
+
+        # 2. Test Voice MP3
+        url_test = f"http://127.0.0.1:{self.port}/audio/test_voice.mp3"
+        with urllib.request.urlopen(url_test, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertIn("audio/mpeg", resp.headers.get_content_type())
+            data = resp.read()
+            self.assertGreater(len(data), 5000)
+
+        # 3. HTML includes playRealAudio
+        url_home = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url_home, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        self.assertIn("playRealAudio", html)
+        self.assertIn("/audio/welcome_morning.mp3", html)
+
 
 if __name__ == "__main__":
     unittest.main()

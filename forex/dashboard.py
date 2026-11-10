@@ -66,6 +66,8 @@ try:
 except Exception:
     pass
 
+TTS_AUDIO_CACHE: Dict[str, bytes] = {}
+
 
 def save_cached_live_tick(sym: str, tick: Dict[str, Any]) -> None:
     try:
@@ -4884,6 +4886,71 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }, 6000);
         }
 
+        /* -------------------------------------------------------------
+           Studio HD Audio MP3 Player (Mobile & Desktop Native Audio)
+           ------------------------------------------------------------- */
+        let currentPlayingAudio = null;
+
+        function playRealAudio(url, onEnded, onError) {
+            try {
+                if (currentPlayingAudio) {
+                    try { currentPlayingAudio.pause(); } catch(e) {}
+                    currentPlayingAudio = null;
+                }
+                const audio = new Audio(url);
+                currentPlayingAudio = audio;
+                audio.preload = 'auto';
+
+                let finished = false;
+                const cleanup = () => {
+                    if (finished) return;
+                    finished = true;
+                    if (currentPlayingAudio === audio) currentPlayingAudio = null;
+                    if (onEnded) onEnded();
+                };
+
+                audio.onended = cleanup;
+                audio.onerror = (e) => {
+                    console.warn("RealAudio error on " + url + ":", e);
+                    if (finished) return;
+                    finished = true;
+                    if (currentPlayingAudio === audio) currentPlayingAudio = null;
+                    if (onError) onError(e);
+                    else if (onEnded) onEnded();
+                };
+
+                const p = audio.play();
+                if (p !== undefined) {
+                    p.catch((err) => {
+                        console.warn("Audio play() catch on " + url + ":", err);
+                        if (!finished) {
+                            finished = true;
+                            if (currentPlayingAudio === audio) currentPlayingAudio = null;
+                            if (onError) onError(err);
+                            else if (onEnded) onEnded();
+                        }
+                    });
+                }
+                return audio;
+            } catch (e) {
+                console.warn("playRealAudio exception:", e);
+                if (onError) onError(e);
+                else if (onEnded) onEnded();
+            }
+        }
+
+        function speakOrFetchTTS(text, onEnded) {
+            const ttsUrl = '/api/tts?text=' + encodeURIComponent(text);
+            playRealAudio(
+                ttsUrl,
+                onEnded,
+                () => {
+                    // Fallback to SpeechSynthesis
+                    speakFemaleVoice(text, onEnded);
+                }
+            );
+        }
+
         function announceSignalVoice(sig, isReminder = false) {
             if (!voiceAlertsEnabled) return;
             if (!sig || (sig.action !== 'BUY' && sig.action !== 'SELL')) return;
@@ -4919,13 +4986,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 priceDetails += ` Stop loss ${Number(sig.stop_loss).toFixed(dec)}.`;
             }
 
-            // Natural Indian English announcement with reminder support
             const prefix = isReminder ? 'Reminder: ' : 'Alert! ';
             const statusWord = isReminder ? 'remains active' : 'confirmed';
             const speechText = `${prefix}${actionText} signal ${statusWord} for ${assetName}. Confluence Grade: ${gradeText}.${priceDetails}`;
 
             showVoiceToast(actionText, assetName, gradeText, isReminder);
-            speakFemaleVoice(speechText);
+
+            // Match dedicated studio MP3 audio if available
+            let staticAudio = null;
+            if (actionText === 'BUY' && isGold) staticAudio = '/audio/signal_buy_gold.mp3';
+            else if (actionText === 'SELL' && isGold) staticAudio = '/audio/signal_sell_gold.mp3';
+            else if (actionText === 'BUY' && !isGold) staticAudio = '/audio/signal_buy_btc.mp3';
+            else if (actionText === 'SELL' && !isGold) staticAudio = '/audio/signal_sell_btc.mp3';
+
+            if (staticAudio && !isReminder) {
+                playRealAudio(
+                    staticAudio,
+                    null,
+                    () => speakOrFetchTTS(speechText)
+                );
+            } else {
+                speakOrFetchTTS(speechText);
+            }
         }
 
         function toggleVoiceAlerts() {
@@ -4935,16 +5017,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             updateVoiceAlertsUI();
 
             if (voiceAlertsEnabled) {
-                speakFemaleVoice("Indian English voice alerts activated. Monitoring Gold and Bitcoin.");
+                playRealAudio(
+                    '/audio/voice_alerts_active.mp3',
+                    null,
+                    () => speakFemaleVoice("Indian English voice alerts activated. Monitoring Gold and Bitcoin.")
+                );
             } else {
-                // Immediate full silence: cancel speech and clear queue
+                if (currentPlayingAudio) {
+                    try { currentPlayingAudio.pause(); } catch(e) {}
+                    currentPlayingAudio = null;
+                }
                 speechQueue = [];
                 isSpeakingNow = false;
                 window._activeSpeechUtterance = null;
                 if ('speechSynthesis' in window) {
-                    try {
-                        window.speechSynthesis.cancel();
-                    } catch (e) {}
+                    try { window.speechSynthesis.cancel(); } catch(e) {}
                 }
                 const toast = document.getElementById('voiceAlertToast');
                 if (toast) toast.classList.remove('show');
@@ -4962,9 +5049,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const asset = isGold ? 'Gold' : 'Bitcoin';
             const sampleGrade = 'Grade A Plus, Elite Institutional';
 
-            const testText = `Alert! BUY signal confirmed for ${asset}. Confluence Grade: ${sampleGrade}. Entry price 4045. Stop loss 4038.`;
             showVoiceToast('BUY', asset, sampleGrade);
-            speakFemaleVoice(testText);
+
+            playRealAudio(
+                '/audio/test_voice.mp3',
+                null,
+                () => {
+                    const testText = `Alert! BUY signal confirmed for ${asset}. Confluence Grade: ${sampleGrade}. Entry price 4045. Stop loss 4038.`;
+                    speakFemaleVoice(testText);
+                }
+            );
         }
 
         function updateVoiceAlertsUI() {
@@ -5038,6 +5132,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const greeting = getTimeOfDayGreeting();
             const welcomeText = `Hello, ${greeting} Sir! Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal.`;
 
+            let mp3File = '/audio/welcome_morning.mp3';
+            if (greeting === 'Good Afternoon') mp3File = '/audio/welcome_afternoon.mp3';
+            else if (greeting === 'Good Evening') mp3File = '/audio/welcome_evening.mp3';
+            else if (greeting === 'Good Night') mp3File = '/audio/welcome_night.mp3';
+
             const greetingEl = document.getElementById('welcomeGreetingText');
             const speechLabel = document.getElementById('welcomeSpeechLabel');
             const btnText = document.getElementById('welcomeBtnText');
@@ -5054,20 +5153,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (btnText) btnText.textContent = "🔊 Speaking Greeting... (Please wait)";
             if (enterBtn) enterBtn.classList.remove('pulse-ready');
 
-            speakFemaleVoice(welcomeText, (err) => {
-                isWelcomeSpeaking = false;
-                if (!err) {
+            // Play the studio MP3 directly
+            playRealAudio(
+                mp3File,
+                () => {
+                    isWelcomeSpeaking = false;
                     if (speechLabel) speechLabel.textContent = "Welcome complete! Opening terminal...";
                     if (btnText) btnText.textContent = "Opening Terminal...";
                     welcomeDismissTimer = setTimeout(dismissCurtainScreen, 650);
-                } else {
-                    if (!isCurtainDismissed) {
-                        if (speechLabel) speechLabel.textContent = "Tap below to hear voice & enter";
-                        if (btnText) btnText.textContent = "🔊 Tap to Play Voice & Enter Terminal";
-                        if (enterBtn) enterBtn.classList.add('pulse-ready');
-                    }
+                },
+                (err) => {
+                    console.warn("MP3 failed, trying SpeechSynthesis fallback:", err);
+                    speakFemaleVoice(welcomeText, () => {
+                        isWelcomeSpeaking = false;
+                        if (speechLabel) speechLabel.textContent = "Welcome complete! Opening terminal...";
+                        if (btnText) btnText.textContent = "Opening Terminal...";
+                        welcomeDismissTimer = setTimeout(dismissCurtainScreen, 650);
+                    });
                 }
-            });
+            );
         }
 
         function triggerVoiceFromCurtainClick(e) {
@@ -5081,6 +5185,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             if (!isWelcomeSpeaking) {
                 playWelcomeCurtainVoice();
+            }
+        }
             }
         }
 
@@ -5926,6 +6032,68 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control", "public, max-age=86400")
                 self.end_headers()
                 self.wfile.write(data)
+                return
+
+        # Audio Static Assets: Indian Female Voice Studio MP3s
+        if path.startswith("/audio/") and path.endswith(".mp3"):
+            rel_file = path.strip("/")
+            data = None
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            for candidate in (
+                rel_file,
+                os.path.join(base_dir, rel_file),
+                os.path.join(base_dir, "public", rel_file),
+                os.path.join("public", rel_file),
+            ):
+                if os.path.exists(candidate):
+                    try:
+                        with open(candidate, "rb") as f:
+                            data = f.read()
+                            break
+                    except Exception:
+                        pass
+            if data is not None:
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Cache-Control", "public, max-age=604800")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+
+        # Cloud TTS Proxy Endpoint (High-Definition Indian English Female Voice MP3)
+        if path == "/api/tts":
+            q_text = params.get("text", ["Hello"])[0][:250]
+            audio_bytes = None
+            if q_text in TTS_AUDIO_CACHE:
+                audio_bytes = TTS_AUDIO_CACHE[q_text]
+            else:
+                try:
+                    enc_text = urllib.parse.quote(q_text)
+                    g_url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl=en-IN&client=tw-ob&q={enc_text}"
+                    req = urllib.request.Request(g_url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=4) as resp:
+                        audio_bytes = resp.read()
+                        if len(TTS_AUDIO_CACHE) < 150:
+                            TTS_AUDIO_CACHE[q_text] = audio_bytes
+                except Exception:
+                    audio_bytes = None
+
+            if audio_bytes:
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(audio_bytes)
+                return
+            else:
+                self.send_response(500)
+                self.end_headers()
                 return
 
         # Google Search Console Verification File (Exact Token Only - Prevents Wildcard False-Positive Hack Flag)
