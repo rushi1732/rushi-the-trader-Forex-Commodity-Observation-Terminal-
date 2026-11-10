@@ -911,25 +911,47 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             position: fixed;
             bottom: 24px;
             right: 24px;
-            background: rgba(15, 23, 42, 0.95);
-            border: 1px solid rgba(236, 72, 153, 0.6);
+            background: rgba(15, 23, 42, 0.96);
+            border: 1.5px solid rgba(236, 72, 153, 0.6);
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 15px rgba(236, 72, 153, 0.25);
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 12px 18px;
             color: #ffffff;
             display: flex;
             align-items: center;
             gap: 14px;
-            z-index: 99999;
+            z-index: 9999999;
             transform: translateY(100px);
             opacity: 0;
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            pointer-events: none;
-            backdrop-filter: blur(8px);
+            pointer-events: auto;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            max-width: 440px;
         }
         .voice-toast.show {
             transform: translateY(0);
             opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .voice-toast {
+                top: 14px;
+                bottom: auto;
+                left: 10px;
+                right: 10px;
+                width: calc(100% - 20px);
+                max-width: 420px;
+                margin: 0 auto;
+                transform: translateY(-120%);
+                padding: 12px 14px;
+                border-radius: 12px;
+                box-shadow: 0 12px 35px rgba(0, 0, 0, 0.9), 0 0 25px rgba(56, 189, 248, 0.4);
+            }
+            .voice-toast.show {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
         .legend-toggle {
@@ -1959,7 +1981,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <audio id="persistentVoiceAudio" preload="auto" playsinline style="display:none;"></audio>
 
     <!-- Full-Screen Welcome Curtain Screen -->
-    <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="triggerVoiceFromCurtainClick(event)" ontouchstart="triggerVoiceFromCurtainClick(event)">
+    <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="triggerVoiceFromCurtainClick(event)">
         <div class="welcome-fullpage-card">
             <button onclick="event.stopPropagation(); dismissCurtainScreen();" style="position:absolute; top:16px; right:18px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:6px;" title="Skip and open terminal">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1987,7 +2009,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>
             </div>
             <div>
-                <button id="welcomeEnterBtn" class="welcome-enter-btn" onclick="triggerVoiceFromCurtainClick(event)" ontouchstart="triggerVoiceFromCurtainClick(event)">
+                <button id="welcomeEnterBtn" class="welcome-enter-btn" onclick="triggerVoiceFromCurtainClick(event)">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                     <span id="welcomeBtnText">Click Anywhere to Play Voice & Enter</span>
                 </button>
@@ -4876,7 +4898,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             return str;
         }
 
-        function showVoiceToast(action, asset, grade, isReminder = false) {
+        function showVoiceToast(action, asset, grade, isReminder = false, price = null, sl = null) {
             let toast = document.getElementById('voiceAlertToast');
             if (!toast) {
                 toast = document.createElement('div');
@@ -4885,25 +4907,42 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 document.body.appendChild(toast);
             }
             const isBuy = action === 'BUY';
-            const actionColor = isBuy ? 'var(--accent-green)' : 'var(--accent-rose)';
-            const titlePrefix = isReminder ? 'REMINDER' : 'NEW SIGNAL';
+            const actionColor = isBuy ? '#22c55e' : '#f43f5e';
+            const actionBg = isBuy ? 'rgba(34, 197, 94, 0.2)' : 'rgba(244, 63, 94, 0.2)';
+            const actionBorder = isBuy ? 'rgba(34, 197, 94, 0.6)' : 'rgba(244, 63, 94, 0.6)';
+            const titlePrefix = isReminder ? 'ACTIVE SIGNAL' : 'NEW SIGNAL';
+
+            let priceText = '';
+            if (price) {
+                priceText = ` | Entry: <strong style="color:#ffffff;">${price}</strong>`;
+            }
+            if (sl) {
+                priceText += ` | SL: <span style="color:#f87171;">${sl}</span>`;
+            }
+
             toast.innerHTML = `
-                <div style="width:36px; height:36px; border-radius:50%; background:rgba(236,72,153,0.2); display:flex; align-items:center; justify-content:center; color:#f472b6; flex-shrink:0;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                <div style="width:38px; height:38px; border-radius:10px; background:${actionBg}; border:1.5px solid ${actionBorder}; display:flex; align-items:center; justify-content:center; color:${actionColor}; flex-shrink:0; font-weight:800; font-size:12px; letter-spacing:0.04em;">
+                    ${action}
                 </div>
-                <div>
-                    <div style="font-size:12px; font-weight:700; color:${actionColor}; display:flex; align-items:center; gap:6px;">
-                        <span>INDIAN FEMALE VOICE (${titlePrefix}): ${action} ${asset.toUpperCase()}</span>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-size:13px; font-weight:800; color:${actionColor}; display:flex; align-items:center; gap:6px; letter-spacing:0.02em;">
+                        <span>${titlePrefix}: ${action} ${asset}</span>
                     </div>
-                    <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">
-                        Confluence Grade: <strong style="color:var(--text-primary);">${grade}</strong>
+                    <div style="font-size:11px; color:#cbd5e1; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        Grade: <strong style="color:#38bdf8;">${grade}</strong>${priceText}
                     </div>
                 </div>
+                <button onclick="document.getElementById('voiceAlertToast').classList.remove('show');" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:6px; margin-left:4px; display:flex; align-items:center;" title="Dismiss alert">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
             `;
+            toast.style.borderColor = actionBorder;
             toast.classList.add('show');
-            setTimeout(() => {
+
+            if (window._voiceToastTimer) clearTimeout(window._voiceToastTimer);
+            window._voiceToastTimer = setTimeout(() => {
                 toast.classList.remove('show');
-            }, 6000);
+            }, 8000);
         }
 
         /* -------------------------------------------------------------
@@ -5327,16 +5366,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             const onFinished = () => {
                 isWelcomeSpeaking = false;
+                if (window._curtainSafetyTimer) {
+                    clearTimeout(window._curtainSafetyTimer);
+                    window._curtainSafetyTimer = null;
+                }
                 if (speechLabel) speechLabel.textContent = "Welcome complete! Opening terminal...";
                 if (btnText) btnText.textContent = "Opening Terminal...";
                 if (welcomeDismissTimer) clearTimeout(welcomeDismissTimer);
-                welcomeDismissTimer = setTimeout(dismissCurtainScreen, 650);
+                welcomeDismissTimer = setTimeout(dismissCurtainScreen, 800);
             };
 
             const onBlocked = () => {
                 isWelcomeSpeaking = false;
-                if (speechLabel) speechLabel.textContent = "Click or tap below to play voice greeting";
-                if (btnText) btnText.textContent = "Click / Tap to Play Voice & Enter Terminal";
+                if (window._curtainSafetyTimer) {
+                    clearTimeout(window._curtainSafetyTimer);
+                    window._curtainSafetyTimer = null;
+                }
+                if (speechLabel) speechLabel.textContent = "Tap below to play Indian voice greeting";
+                if (btnText) btnText.textContent = "🔊 Tap to Play Voice & Enter Terminal";
                 if (enterBtn) enterBtn.classList.add('pulse-ready');
             };
 
@@ -5345,14 +5392,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (btnText) btnText.textContent = "Speaking Greeting... (Please wait)";
             if (enterBtn) enterBtn.classList.remove('pulse-ready');
 
-            // Hard safety fallback watchdog: Auto-reveal dashboard if sound hangs or takes > 8s
-            if (window._curtainSafetyTimer) clearTimeout(window._curtainSafetyTimer);
-            window._curtainSafetyTimer = setTimeout(() => {
-                if (!isCurtainDismissed) {
-                    console.warn("Welcome curtain speech timeout. Auto-revealing terminal.");
-                    onFinished();
-                }
-            }, 8000);
+            // Safety fallback watchdog: ONLY armed when user gestures, with generous 12s so it NEVER cuts speech short!
+            if (isUserGesture) {
+                if (window._curtainSafetyTimer) clearTimeout(window._curtainSafetyTimer);
+                window._curtainSafetyTimer = setTimeout(() => {
+                    if (!isCurtainDismissed && isWelcomeSpeaking) {
+                        console.warn("Welcome curtain speech timeout. Auto-revealing terminal.");
+                        onFinished();
+                    }
+                }, 12000);
+            }
 
             playRealAudio(
                 mp3File,
@@ -5378,13 +5427,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (isCurtainDismissed) return;
             unlockMobileAudio();
 
-            // If already speaking and user clicks again, immediately skip to terminal!
-            if (isWelcomeSpeaking && currentPlayingAudio && !currentPlayingAudio.paused) {
-                dismissCurtainScreen();
+            // If already speaking, DO NOT INTERRUPT OR DISMISS EARLY!
+            // Speech must finish completely before the curtain automatically slides up!
+            if (isWelcomeSpeaking) {
+                console.log("Welcome speech in progress. Waiting for audio to finish naturally.");
                 return;
             }
 
-            isWelcomeSpeaking = false;
             playWelcomeCurtainVoice(true);
         }
 
@@ -5523,9 +5572,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const shouldRepeatReminder = (now - lastSpoken >= 60000);
 
                 if (isNewSignal || shouldRepeatReminder) {
+                    const isGold = sym.includes('XAU') || sym.includes('GOLD');
+                    const assetName = isGold ? 'Gold (XAU/USD)' : 'Bitcoin (BTC/USD)';
+                    const gradeStr = formatGradeForVoice(sig.grade || (data.confluence_signal ? data.confluence_signal.grade : 'Grade B'));
+
+                    // Always display visual alert message banner on mobile and desktop
+                    showVoiceToast(sig.action, assetName, gradeStr, !isNewSignal, sig.entry_reference, sig.stop_loss);
+
                     if (isNewSignal) {
                         // Desktop push notification
-                        sendNotification(`New Paper Signal: ${sig.action} ${sym}`, `Grade: ${sig.grade || 'Valid'} | Entry: ${sig.entry_reference} | Stop: ${sig.stop_loss}`);
+                        sendNotification(`New Paper Signal: ${sig.action} ${sym}`, `Grade: ${gradeStr} | Entry: ${sig.entry_reference} | Stop: ${sig.stop_loss}`);
                     }
 
                     // Strict single-voice announcement
@@ -5937,6 +5993,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             const shouldRepeatScan = (now - lastSpoken >= 60000);
 
                             if (isNewScanSignal || shouldRepeatScan) {
+                                const isGold = sym.includes('XAU') || sym.includes('GOLD');
+                                const assetName = isGold ? 'Gold (XAU/USD)' : 'Bitcoin (BTC/USD)';
+                                const gradeStr = formatGradeForVoice(r.grade);
+
+                                // Always display visual alert message banner on mobile and desktop
+                                showVoiceToast(r.action, assetName, gradeStr, !isNewScanSignal, r.price, r.stop_loss || (r.execution_plan ? r.execution_plan.stop_loss : null));
+
                                 if (isNewScanSignal) {
                                     sendNotification(`Scanner Signal: ${r.action} ${sym}`, `Grade: ${r.grade} | Price: ${r.price}`);
                                 }
