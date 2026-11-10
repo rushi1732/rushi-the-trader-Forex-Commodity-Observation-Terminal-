@@ -631,11 +631,195 @@ def simulate_skill_paper_run(skill_id: str, user_input: str = "") -> Dict[str, A
         }
 
 
+MOBILE_BLOCKED_HTML = """<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RUSHI THE TRADER - Desktop Only Terminal</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            height: 100%;
+            background-color: #020617;
+            color: #f8fafc;
+            font-family: 'Inter', 'Noto Sans Devanagari', -apple-system, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+        .block-card {
+            background: linear-gradient(180deg, #0f172a 0%, #090d16 100%);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 20px;
+            padding: 32px 22px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+        }
+        .avatar-wrap {
+            width: 82px;
+            height: 82px;
+            margin: 0 auto 16px;
+            border-radius: 50%;
+            padding: 3px;
+            background: linear-gradient(135deg, #38bdf8, #f59e0b);
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.35);
+        }
+        .avatar-img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            display: block;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #f87171;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            border-radius: 9999px;
+            margin-bottom: 12px;
+        }
+        .title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+        .brand-sub {
+            font-size: 11px;
+            font-weight: 600;
+            color: #38bdf8;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 16px;
+        }
+        .marathi-msg {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #f1f5f9;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .eng-msg {
+            font-size: 12px;
+            line-height: 1.5;
+            color: #94a3b8;
+            margin-bottom: 18px;
+        }
+        .device-badge {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-align: left;
+        }
+        .device-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: rgba(56, 189, 248, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #38bdf8;
+            flex-shrink: 0;
+        }
+        .device-text-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .device-text-desc {
+            font-size: 10px;
+            color: #64748b;
+        }
+        .url-box {
+            margin-top: 14px;
+            padding: 8px 12px;
+            background: #020617;
+            border: 1px dashed #334155;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 10px;
+            color: #38bdf8;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="block-card">
+        <div class="avatar-wrap">
+            <img src="/rushi_profile.jpg" alt="RUSHI THE TRADER" class="avatar-img" onerror="this.style.display='none';">
+        </div>
+        <div class="badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            Mobile Access Restricted
+        </div>
+        <h1 class="title">Desktop / Laptop Only</h1>
+        <div class="brand-sub">RUSHI THE TRADER Observation Terminal</div>
+
+        <p class="marathi-msg">
+            हा टर्मिनल फक्त कॉम्प्युटर किंवा लॅपटॉप (Desktop) साठी डिझाइन केला आहे.
+        </p>
+
+        <p class="eng-msg">
+            मोबाईल स्क्रीनवर हाय-फ्रिक्वेन्सी ट्रेडिंग चार्ट्स आणि सिग्नल्स सपोर्टेड नाहीत. कृपया आपल्या PC किंवा लॅपटॉपवर ही वेबसाईट उघडा.
+        </p>
+
+        <div class="device-badge">
+            <div class="device-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div>
+                <div class="device-text-title">Please Open on PC / Laptop</div>
+                <div class="device-text-desc">Requires minimum 1024px screen width</div>
+            </div>
+        </div>
+
+        <div class="url-box">
+            https://rushithetraderdashboard.vercel.app/
+        </div>
+    </div>
+</body>
+</html>"""
+
+
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        // STRICT MOBILE BLOCKER: Terminal is strictly Desktop / Laptop only
+        (function() {
+            var ua = navigator.userAgent || '';
+            var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua)
+                || (window.innerWidth < 1024)
+                || (screen.width < 1024);
+            if (isMobile) {
+                window.__MOBILE_BLOCKED__ = true;
+            }
+        })();
+    </script>
     <meta name="google-site-verification" content="googleb3e3c0a986c6ae10">
     <meta name="google-site-verification" content="googleb3e3c0a986c6ae10.html">
     <title>RUSHI THE TRADER - Forex & Commodity Observation Terminal</title>
@@ -1934,50 +2118,83 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             box-shadow: 0 6px 25px rgba(2, 132, 199, 0.5);
         }
 
-        @keyframes mobileBtnPulse {
-            0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7); }
-            70% { box-shadow: 0 0 0 14px rgba(56, 189, 248, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+        /* Strict Mobile Blocker - Desktop Only Enforcement */
+        #mobileBlockedScreen {
+            display: none;
         }
 
-        .welcome-enter-btn.pulse-ready {
-            animation: mobileBtnPulse 1.8s infinite;
-            border-color: #38bdf8;
-            background: linear-gradient(135deg, #0284c7, #ec4899);
+        @media (max-width: 1023px) {
+            html, body {
+                height: 100% !important;
+                overflow: hidden !important;
+                background-color: #020617 !important;
+            }
+            .app-container, .welcome-fullpage-overlay, #liveSignalBanner, #voiceToastAlert, audio {
+                display: none !important;
+            }
+            #mobileBlockedScreen {
+                display: flex !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                z-index: 2147483647 !important;
+                background: linear-gradient(180deg, #090d16 0%, #020617 100%) !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 24px !important;
+                text-align: center !important;
+                box-sizing: border-box !important;
+            }
         }
 
-        @media (max-width: 640px) {
-            .welcome-fullpage-overlay {
-                padding: 16px;
-            }
-            .welcome-fullpage-card {
-                padding: 30px 18px;
-                border-radius: 16px;
-            }
-            .welcome-logo-circle {
-                width: 76px;
-                height: 76px;
-                margin-bottom: 12px;
-            }
-            .welcome-greeting-title {
-                font-size: 22px;
-                line-height: 1.3;
-            }
-            .welcome-terminal-name {
-                font-size: 13px;
-                margin-bottom: 16px;
-            }
-            .welcome-enter-btn {
-                width: 100%;
-                padding: 14px 18px;
-                font-size: 14px;
-                justify-content: center;
+        @media (min-width: 1024px) {
+            #mobileBlockedScreen {
+                display: none !important;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Dedicated Mobile Pre-Unlocked Signal Audio Players (Zero Autoplay Restriction) -->
+    <!-- Dedicated Screen for Mobile Devices (Mobile Access Completely Disabled) -->
+    <div id="mobileBlockedScreen">
+        <div style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 20px; padding: 32px 22px; max-width: 380px; width: 100%; text-align: center; box-shadow: 0 25px 60px rgba(0,0,0,0.8);">
+            <div style="width: 80px; height: 80px; margin: 0 auto 16px; border-radius: 50%; padding: 3px; background: linear-gradient(135deg, #38bdf8, #f59e0b);">
+                <img src="/rushi_profile.jpg" alt="RUSHI THE TRADER" style="width:100%; height:100%; border-radius:50%; object-fit:cover; display:block;" onerror="this.style.display='none';">
+            </div>
+            <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; border-radius: 9999px; margin-bottom: 12px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                Mobile Access Restricted
+            </div>
+            <h1 style="font-size: 20px; font-weight: 800; color: #ffffff; margin-bottom: 4px;">Desktop / Laptop Only</h1>
+            <div style="font-size: 11px; font-weight: 600; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px;">RUSHI THE TRADER Observation Terminal</div>
+            
+            <p style="font-size: 14px; line-height: 1.5; color: #f1f5f9; font-weight: 600; margin-bottom: 10px;">
+                हा टर्मिनल फक्त कॉम्प्युटर किंवा लॅपटॉप (Desktop) साठी डिझाइन केला आहे.
+            </p>
+            <p style="font-size: 12px; line-height: 1.5; color: #94a3b8; margin-bottom: 18px;">
+                मोबाईल स्क्रीनवर हाय-फ्रिक्वेन्सी ट्रेडिंग चार्ट्स आणि सिग्नल्स सपोर्टेड नाहीत. कृपया आपल्या PC किंवा लॅपटॉपवर ही वेबसाईट उघडा.
+            </p>
+            
+            <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; text-align: left;">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(56, 189, 248, 0.15); display: flex; align-items: center; justify-content: center; color: #38bdf8; flex-shrink: 0;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </div>
+                <div>
+                    <div style="font-size: 12px; font-weight: 700; color: #ffffff;">Please Open on PC / Laptop</div>
+                    <div style="font-size: 10px; color: #64748b;">Requires minimum 1024px screen width</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 14px; padding: 8px 12px; background: #020617; border: 1px dashed #334155; border-radius: 8px; font-family: monospace; font-size: 10px; color: #38bdf8; word-break: break-all;">
+                https://rushithetraderdashboard.vercel.app/
+            </div>
+        </div>
+    </div>
+
+    <!-- Dedicated Audio Players -->
     <audio id="persistentVoiceAudio" preload="auto" playsinline style="display:none;"></audio>
     <audio id="audioSignalBuyGold" src="/audio/signal_buy_gold.mp3" preload="auto" playsinline style="display:none;"></audio>
     <audio id="audioSignalSellGold" src="/audio/signal_sell_gold.mp3" preload="auto" playsinline style="display:none;"></audio>
@@ -4559,26 +4776,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         let isPersistentAudioUnlocked = false;
 
-        function unlockMobileAudio() {
+        function unlockAudio() {
             try {
-                // 1. Resume Web Audio Context & maintain continuous mobile keep-alive
                 const ctx = getAudioContext();
                 if (ctx && ctx.state !== 'running') {
                     ctx.resume().catch(() => {});
                 }
-                if (ctx && !window._mobileAudioKeepAlive) {
-                    try {
-                        const buffer = ctx.createBuffer(1, 22050, 22050);
-                        const src = ctx.createBufferSource();
-                        src.buffer = buffer;
-                        src.loop = true;
-                        src.connect(ctx.destination);
-                        src.start(0);
-                        window._mobileAudioKeepAlive = src;
-                    } catch(e) {}
-                }
 
-                // 2. Prime and permanently unlock all dedicated signal audio elements on mobile
+                // Prime dedicated audio elements
                 const signalAudioIds = [
                     'audioSignalBuyGold',
                     'audioSignalSellGold',
@@ -4604,7 +4809,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     }
                 });
 
-                // 3. Resume and prime SpeechSynthesis
                 if ('speechSynthesis' in window) {
                     try {
                         window.speechSynthesis.resume();
@@ -4616,26 +4820,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const pill = document.getElementById('audioUnlockPill');
                 if (pill) pill.style.display = 'none';
             } catch (e) {
-                console.warn("Mobile audio unlock notice:", e);
+                console.warn("Audio unlock notice:", e);
             }
         }
 
-        function unlockAudioDirectly() {
-            unlockMobileAudio();
+        function unlockMobileAudio() {
+            unlockAudio();
         }
 
-        // Global touch / click listeners to unlock audio immediately on first user interaction
+        function unlockAudioDirectly() {
+            unlockAudio();
+        }
+
+        // Global click / key listeners to unlock audio immediately on user interaction
         if (typeof window !== 'undefined') {
-            ['touchstart', 'touchend', 'pointerdown', 'click'].forEach(evt => {
+            ['click', 'keydown'].forEach(evt => {
                 window.addEventListener(evt, () => {
                     if (!isAudioUnlocked) {
-                        unlockMobileAudio();
+                        unlockAudio();
                     }
-                }, { passive: true, once: false });
+                }, { once: true });
             });
         }
 
-        // Keep mobile AudioContext awake while observing charts
+        // Keep AudioContext awake while observing charts
         if (typeof window !== 'undefined') {
             setInterval(() => {
                 if (voiceAlertsEnabled && audioCtx && audioCtx.state === 'suspended') {
@@ -5513,28 +5721,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             const greeting = getTimeOfDayGreeting();
             const greetingEl = document.getElementById('welcomeGreetingText');
-            const speechLabel = document.getElementById('welcomeSpeechLabel');
-            const btnText = document.getElementById('welcomeBtnText');
             const enterBtn = document.getElementById('welcomeEnterBtn');
 
             if (greetingEl) {
                 greetingEl.innerHTML = `Hello, <span class="greeting-highlight">${greeting} Sir!</span>`;
             }
 
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window) || (window.innerWidth <= 768);
-
-            if (isMobile && !forceReplay && !isAudioUnlocked) {
-                // Mobile Autoplay Policy: Mobile browsers require a direct tap/touch to start audio
-                if (speechLabel) speechLabel.textContent = "Tap below to play Indian voice greeting";
-                if (btnText) btnText.textContent = "Tap to Play Voice & Enter Terminal";
-                if (enterBtn) enterBtn.classList.add('pulse-ready');
-            } else {
-                if (enterBtn) enterBtn.classList.remove('pulse-ready');
-                try {
-                    playWelcomeCurtainVoice(false);
-                } catch (e) {
-                    console.warn("Welcome voice initial playback error:", e);
-                }
+            if (enterBtn) enterBtn.classList.remove('pulse-ready');
+            try {
+                playWelcomeCurtainVoice(false);
+            } catch (e) {
+                console.warn("Welcome voice initial playback error:", e);
             }
         }
 
@@ -6173,6 +6370,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         // Initialize on load
         window.addEventListener('DOMContentLoaded', () => {
+            // Strict Mobile Blocker: Stop all background polling and remove terminal UI on mobile
+            if (window.__MOBILE_BLOCKED__ || window.innerWidth < 1024 || screen.width < 1024) {
+                console.log("Mobile device detected. Terminal completely halted.");
+                const app = document.querySelector('.app-container');
+                if (app) app.remove();
+                const curtain = document.getElementById('welcomeFullPageOverlay');
+                if (curtain) curtain.remove();
+                return;
+            }
+
             // Trigger Opening Welcome Animation & Indian Female Voice Greeting immediately
             try {
                 triggerWelcomeExperience();
@@ -6326,6 +6533,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
         # 1. Main Dashboard UI
         if path in ("/", "/index.html", "/api", "/api/", "/api/index.py", "/api/index"):
+            user_agent = self.headers.get("User-Agent", "").lower()
+            if any(m in user_agent for m in ("mobile", "android", "iphone", "ipad", "ipod", "blackberry", "iemobile", "opera mini")):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("X-Paper-Trading-Only", "true")
+                self.end_headers()
+                self.wfile.write(MOBILE_BLOCKED_HTML.encode("utf-8"))
+                return
+
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("X-Paper-Trading-Only", "true")
