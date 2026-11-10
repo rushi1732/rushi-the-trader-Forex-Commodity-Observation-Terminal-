@@ -1996,13 +1996,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </style>
 </head>
 <body>
-    </div>
-            
-            <div style="margin-top: 14px; padding: 8px 12px; background: #020617; border: 1px dashed #334155; border-radius: 8px; font-family: monospace; font-size: 10px; color: #38bdf8; word-break: break-all;">
-                https://rushithetraderdashboard.vercel.app/
-            </div>
-        </div>
-    </div>
+    <!-- Permanent Silent Audio Keep-Alive for Mobile Media Session -->
+    <audio id="silentKeepAliveAudio" loop playsinline style="display:none;"></audio>
 
     <!-- Dedicated Audio Players -->
     <audio id="persistentVoiceAudio" preload="auto" playsinline style="display:none;"></audio>
@@ -4597,7 +4592,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     ctx.resume().catch(() => {});
                 }
 
-                // Audio keep-alive buffer source for background session persistence
+                // 1. Permanent Silent Audio Loop: Mobile browsers never sleep an active media session!
+                const keepAliveEl = document.getElementById('silentKeepAliveAudio');
+                if (keepAliveEl && keepAliveEl.paused) {
+                    keepAliveEl.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+                    keepAliveEl.volume = 0.001;
+                    keepAliveEl.play().catch(() => {});
+                }
+
+                // 2. WebAudio keep-alive node
                 if (ctx && !window._audioKeepAliveNode) {
                     try {
                         const buffer = ctx.createBuffer(1, 22050, 22050);
@@ -4610,12 +4613,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     } catch(e) {}
                 }
 
-                // Prime dedicated signal audio elements (NEVER pause the welcome audio!)
+                // 3. Pre-load all dedicated audio elements
                 const signalAudioIds = [
                     'audioSignalBuyGold',
                     'audioSignalSellGold',
                     'audioSignalBuyBtc',
                     'audioSignalSellBtc',
+                    'audioWelcomeMorning',
+                    'audioWelcomeAfternoon',
+                    'audioWelcomeEvening',
+                    'audioWelcomeNight',
                     'audioTestVoice',
                     'audioAlertsActive',
                     'persistentVoiceAudio'
@@ -4626,21 +4633,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if (el) {
                         try {
                             el.volume = 1.0;
-                            const p = el.play();
-                            if (p !== undefined) {
-                                p.then(() => {
-                                    el.pause();
-                                    el.currentTime = 0;
-                                }).catch(() => {});
-                            }
+                            el.load();
                         } catch(e) {}
                     }
                 });
 
                 if ('speechSynthesis' in window) {
-                    try {
-                        window.speechSynthesis.resume();
-                    } catch(e) {}
+                    try { window.speechSynthesis.resume(); } catch(e) {}
                 }
 
                 isAudioUnlocked = true;
@@ -5180,8 +5179,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
 
-            // Wake up and unlock mobile audio
-            unlockMobileAudio();
 
             // Mobile haptic vibration feedback
             try {
@@ -5442,6 +5439,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     document.documentElement.style.overflow = 'auto';
                 }, 700);
             }
+
+            // Immediately check for any active BUY/SELL signal once curtain opens!
+            setTimeout(() => {
+                if (currentObservation && currentObservation.auto_signal) {
+                    checkNotifications(currentObservation);
+                }
+            }, 800);
         }
 
         function playWelcomeCurtainVoice(isUserGesture = false) {
@@ -5695,6 +5699,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function checkNotifications(data) {
             if (!data || !data.auto_signal) return;
+            // Guard: Never consume or announce signal while welcome curtain is active!
+            if (!isCurtainDismissed) {
+                console.log("[Signal Guard] Curtain still active. Signal will announce after welcome.");
+                return;
+            }
             const sig = data.auto_signal;
             const sym = normalizeSym(sig.symbol || (document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD'));
             const now = Date.now();
