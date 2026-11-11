@@ -178,7 +178,7 @@ def detect_divergence(
                         "is_continuation": True,
                         "description": (
                             f"Hidden Bullish Divergence (Price HL {curr_l['price']:.2f} > {prev_l['price']:.2f} "
-                            f"vs RSI LL {curr_l['rsi']:.1f} < {prev_l['rsi']:.1f}) — Trend Continuation"
+                            f"vs RSI LL {curr_l['rsi']:.1f} < {prev_l['rsi']:.1f})  -  Trend Continuation"
                         ),
                         "grade_boost": 25,
                         "details": {
@@ -212,7 +212,7 @@ def detect_divergence(
                         "is_continuation": True,
                         "description": (
                             f"Hidden Bearish Divergence (Price LH {curr_h['price']:.2f} < {prev_h['price']:.2f} "
-                            f"vs RSI HH {curr_h['rsi']:.1f} > {prev_h['rsi']:.1f}) — Trend Continuation"
+                            f"vs RSI HH {curr_h['rsi']:.1f} > {prev_h['rsi']:.1f})  -  Trend Continuation"
                         ),
                         "grade_boost": 25,
                         "details": {
@@ -245,7 +245,7 @@ def detect_divergence(
                         "is_continuation": False,
                         "description": (
                             f"Regular Bullish Divergence (Price LL {curr_l['price']:.2f} < {prev_l['price']:.2f} "
-                            f"vs RSI HL {curr_l['rsi']:.1f} > {prev_l['rsi']:.1f}) — Potential Reversal"
+                            f"vs RSI HL {curr_l['rsi']:.1f} > {prev_l['rsi']:.1f})  -  Potential Reversal"
                         ),
                         "grade_boost": 15,
                         "details": {
@@ -278,7 +278,7 @@ def detect_divergence(
                         "is_continuation": False,
                         "description": (
                             f"Regular Bearish Divergence (Price HH {curr_h['price']:.2f} > {prev_h['price']:.2f} "
-                            f"vs RSI LH {curr_h['rsi']:.1f} < {prev_h['rsi']:.1f}) — Potential Reversal"
+                            f"vs RSI LH {curr_h['rsi']:.1f} < {prev_h['rsi']:.1f})  -  Potential Reversal"
                         ),
                         "grade_boost": 15,
                         "details": {

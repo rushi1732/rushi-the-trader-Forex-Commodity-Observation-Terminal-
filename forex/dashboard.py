@@ -340,7 +340,7 @@ SKILLS_REGISTRY: List[Dict[str, Any]] = [
         "outputs": [
             {"name": "NO EXECUTION", "desc": "Real-money order routing and executions are blocked"}
         ],
-        "status": "Disabled — no execution",
+        "status": "Disabled  -  no execution",
         "badge_class": "badge-rose",
         "is_executable": False,
         "sample_input": "DISABLED"
@@ -417,13 +417,13 @@ def simulate_skill_paper_run(skill_id: str, user_input: str = "") -> Dict[str, A
         return {
             "skill_id": "trader-broker",
             "name": "Order Execution & Broker Gateway",
-            "status": "Disabled — no execution",
+            "status": "Disabled  -  no execution",
             "allowed": False,
-            "error": "Disabled — no execution: Live broker connections, order routing, and real-money execution are permanently prohibited in Paper Observation Mode.",
+            "error": "Disabled  -  no execution: Live broker connections, order routing, and real-money execution are permanently prohibited in Paper Observation Mode.",
             "output": (
                 "================================================================================\n"
                 "[SECURITY GUARD] trader-broker IS DISABLED\n"
-                "Status: Disabled — no execution\n"
+                "Status: Disabled  -  no execution\n"
                 "Reason: Order execution, broker credentials, and real-money trading are prohibited.\n"
                 "Safety Assurance: Zero broker accounts connected; live execution is blocked.\n"
                 "================================================================================"
@@ -538,7 +538,7 @@ def simulate_skill_paper_run(skill_id: str, user_input: str = "") -> Dict[str, A
                 "Check 4: Within allowed entry window (09:45-15:30)-> PASS (10:15 ET)\n"
                 "Check 5: No duplicate open order for symbol     -> PASS\n"
                 "Check 6: Cash buffer >= 10% retained            -> PASS ($2,086.56 cash remains)\n"
-                "VERDICT: PASS — All risk guardrails satisfied."
+                "VERDICT: PASS  -  All risk guardrails satisfied."
             ),
         }
     elif skill_id == "trader-budget":
@@ -2087,7 +2087,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <div class="safety-ribbon">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIVITY — REAL CAPITAL IS NEVER AT RISK</span>
+        <span>SIMULATED PAPER OBSERVATION ONLY  -  ZERO BROKER CONNECTIVITY  -  REAL CAPITAL IS NEVER AT RISK</span>
     </div>
 
     <div class="container">
@@ -2774,7 +2774,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             Paper Observation Journal (Simulated Positions)
                         </span>
                         <div style="display:flex; align-items:center; gap:10px;">
-                            <span class="badge badge-amber">SIMULATED ONLY — NO REAL MONEY</span>
+                            <span class="badge badge-amber">SIMULATED ONLY  -  NO REAL MONEY</span>
                             <button id="btnExportCsv" class="btn" style="padding:4px 10px; font-size:11px;" onclick="exportJournalCSV()">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                                 Export CSV
@@ -2833,9 +2833,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <!-- Card 8: Disclaimers & Safety Guardrails -->
             <div class="col-12">
                 <div class="disclaimer-box">
-                    <strong>LEGAL & SAFETY NOTICE — PAPER OBSERVATION ONLY:</strong><br>
+                    <strong>LEGAL & SAFETY NOTICE  -  PAPER OBSERVATION ONLY:</strong><br>
                     1. This software runs strictly in educational observation / paper mode. It contains zero brokerage connector modules, holds no API trading credentials, and possesses no live order routing capabilities.<br>
-                    2. <strong>Futures Benchmark:</strong> Gold (XAU/USD) continuous benchmark based on COMEX Gold Futures (GC=F) & Twelve Data Direct Feed — not OTC spot/interbank aggregate feeds.<br>
+                    2. <strong>Futures Benchmark:</strong> Gold (XAU/USD) continuous benchmark based on COMEX Gold Futures (GC=F) & Twelve Data Direct Feed  -  not OTC spot/interbank aggregate feeds.<br>
                     3. <strong>Indicative Pricing:</strong> All quotes are indicative and bank/exchange approximations for paper analysis. Spreads, execution latency, and slippage in real market conditions differ significantly.
                 </div>
             </div>
@@ -3680,7 +3680,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 if (action === 'BUY') {
                     box.className = 'decision-box buy-active';
-                    actionEl.innerHTML = `<span class="pulse-dot green"></span> BUY SIGNAL CONFIRMED (बाय सिग्नल सक्रिय) — ${score}% [${grade}]`;
+                    actionEl.innerHTML = `<span class="pulse-dot green"></span> BUY SIGNAL CONFIRMED (बाय सिग्नल सक्रिय)  -  ${score}% [${grade}]`;
                     actionEl.style.color = '#34d399';
                     summaryEl.innerHTML = `
                         <strong>का BUY करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बुलिश असून किंमत Discount Zone मध्ये आहे. लिक्विडिटी हंट किंवा ऑर्डर ब्लॉक टेस्ट नंतर 5m कँडलने स्पष्ट कन्फर्मेशन दिले आहे.<br>
@@ -3688,7 +3688,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     `;
                 } else if (action === 'SELL') {
                     box.className = 'decision-box sell-active';
-                    actionEl.innerHTML = `<span class="pulse-dot red"></span> SELL SIGNAL CONFIRMED (सेल सिग्नल सक्रिय) — ${score}% [${grade}]`;
+                    actionEl.innerHTML = `<span class="pulse-dot red"></span> SELL SIGNAL CONFIRMED (सेल सिग्नल सक्रिय)  -  ${score}% [${grade}]`;
                     actionEl.style.color = '#fb7185';
                     summaryEl.innerHTML = `
                         <strong>का SELL करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बेअरिश असून किंमत Premium Zone मध्ये आहे. Buy-Side Liquidity (BSL) स्वीप किंवा Supply Order Block रिजेक्शन नंतर मजबूत सेल-ऑफ दिसत आहे.<br>
@@ -3696,7 +3696,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     `;
                 } else {
                     box.className = 'decision-box wait-active';
-                    actionEl.innerHTML = `<span class="pulse-dot amber"></span> NO SIGNAL (प्रतीक्षा करा - किंमत अद्याप एन्ट्री झोनमध्ये नाही) — Confluence: ${score}% [${grade}]`;
+                    actionEl.innerHTML = `<span class="pulse-dot amber"></span> NO SIGNAL (प्रतीक्षा करा - किंमत अद्याप एन्ट्री झोनमध्ये नाही)  -  Confluence: ${score}% [${grade}]`;
                     actionEl.style.color = '#fbbf24';
                     summaryEl.innerHTML = `
                         <strong>सध्या काय स्थिती आहे? (Current Status & Strategy Rationale):</strong> चालू भाव <strong>${curPrice ? curPrice.toFixed(decimals) : '--'}</strong> आहे. किंमत अद्याप स्ट्रॅटेजीनुसार व्हॅलिड एन्ट्री झोनमध्ये (Demand/Supply Order Block, FVG, OTE किंवा Breakout Level) पोहोचलेली नाही.<br>
@@ -4720,36 +4720,35 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     } catch(e) {}
                 }
 
-                // 2. Pre-unlock / warm up all dedicated HTML5 signal audio elements on mobile
-                // NOTE: DO NOT include welcome audios here to avoid muting or cutting welcome speech!
+                // 2. Pre-unlock / warm up HTML5 audio elements on mobile cleanly (without setting 0.001 volume or causing media notifications)
+                const pAudio = document.getElementById('persistentVoiceAudio');
+                if (pAudio && !isPersistentAudioUnlocked) {
+                    try {
+                        pAudio.volume = 1.0;
+                        const p = pAudio.play();
+                        if (p !== undefined) {
+                            p.then(() => {
+                                pAudio.pause();
+                                pAudio.currentTime = 0;
+                                isPersistentAudioUnlocked = true;
+                            }).catch(() => {});
+                        }
+                    } catch(e) {}
+                }
                 const signalAudioIds = [
                     'audioSignalBuyGold',
                     'audioSignalSellGold',
                     'audioSignalBuyBtc',
                     'audioSignalSellBtc',
                     'audioTestVoice',
-                    'audioAlertsActive',
-                    'persistentVoiceAudio'
+                    'audioAlertsActive'
                 ];
                 signalAudioIds.forEach(id => {
-                    if (id === skipAudioId) return;
                     const el = document.getElementById(id);
                     if (el) {
                         try {
-                            el.volume = 0.001;
-                            const p = el.play();
-                            if (p !== undefined) {
-                                p.then(() => {
-                                    el.pause();
-                                    el.currentTime = 0;
-                                    el.volume = 1.0;
-                                }).catch(() => {
-                                    el.volume = 1.0;
-                                });
-                            }
-                        } catch(e) {
                             el.volume = 1.0;
-                        }
+                        } catch(e) {}
                     }
                 });
 
@@ -5165,7 +5164,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     }
                     const src = ctx.createBufferSource();
                     src.buffer = buf;
-                    src.connect(ctx.destination);
+                    const gain = ctx.createGain();
+                    gain.gain.value = 1.0;
+                    src.connect(gain);
+                    gain.connect(ctx.destination);
                     src.onended = () => {
                         activeWebAudioSource = null;
                         if (onEnded) onEnded();
@@ -5394,7 +5396,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (onFinished) onFinished();
             };
 
-            // Attempt 1: Try pre-unlocked dedicated HTML5 Audio element
+            // Priority 1: Instant WebAudio buffer playback from RAM (Zero latency, full volume, no Android notification widget)
+            if (url && tryPlayViaWebAudio(url, done)) {
+                return;
+            }
+
+            // Priority 2: Fallback to dedicated HTML5 Audio element
             if (el) {
                 try {
                     el.currentTime = 0;
@@ -5405,11 +5412,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         p.then(() => {
                             // HTML5 Audio playback started successfully
                         }).catch(err => {
-                            console.warn("[Voice Engine] Dedicated element play notice, using WebAudio buffer:", err);
-                            // Attempt 2: Instant WebAudio buffer playback from RAM
-                            if (!tryPlayViaWebAudio(url, done)) {
-                                playRealAudio(url, done, done);
-                            }
+                            console.warn("[Voice Engine] Dedicated element play notice, using fallback:", err);
+                            if (url) playRealAudio(url, done, done);
+                            else done();
                         });
                         return;
                     }
@@ -5418,11 +5423,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             }
 
-            // Attempt 2: Instant WebAudio buffer playback from RAM
+            // Priority 3: Final fallback to playRealAudio
             if (url) {
-                if (!tryPlayViaWebAudio(url, done)) {
-                    playRealAudio(url, done, done);
-                }
+                playRealAudio(url, done, done);
             } else {
                 done();
             }
@@ -5476,21 +5479,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             const el = isGold ? document.getElementById('audioSignalBuyGold') : document.getElementById('audioSignalBuyBtc');
             const mp3Url = isGold ? '/audio/signal_buy_gold.mp3' : '/audio/signal_buy_btc.mp3';
-
-            // Immediate user-gesture warmup of target element
-            if (el) {
-                try {
-                    el.volume = 0.001;
-                    const p = el.play();
-                    if (p !== undefined) {
-                        p.then(() => {
-                            el.pause();
-                            el.currentTime = 0;
-                            el.volume = 1.0;
-                        }).catch(() => { el.volume = 1.0; });
-                    }
-                } catch(e) { el.volume = 1.0; }
-            }
 
             try { playChime(); } catch(e) {}
 
@@ -6175,7 +6163,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <div class="skill-input-row">
                                 <input id="input-${skill.id}" class="skill-input" value="${skill.sample_input || ''}" ${!skill.is_executable ? 'disabled' : ''}>
                                 <button class="skill-btn" ${!skill.is_executable ? 'disabled' : ''} onclick="runSkill('${skill.id}')">
-                                    ${!skill.is_executable ? 'Disabled — No Execution' : 'Simulate Paper'}
+                                    ${!skill.is_executable ? 'Disabled  -  No Execution' : 'Simulate Paper'}
                                 </button>
                             </div>
                             <pre id="console-${skill.id}" class="skill-console"></pre>
@@ -6877,10 +6865,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     "is_gold": "XAU" in canon,
                     "calibrated_offset": GOLD_CALIBRATION["offset"] if "XAU" in canon else 0.0,
                     "benchmark_notice": (
-                        "Twelve Data Direct Retail Spot (XAU/USD) — Authentic Broker Spot Benchmark"
+                        "Twelve Data Direct Retail Spot (XAU/USD)  -  Authentic Broker Spot Benchmark"
                         if is_twelve_data
                         else (
-                            "COMEX Gold Futures benchmark (GC=F) — not OTC spot XAU/USD"
+                            "COMEX Gold Futures benchmark (GC=F)  -  not OTC spot XAU/USD"
                             if "XAU" in canon
                             else "Yahoo Finance FX (query2 indicative aggregate)"
                         )
@@ -7064,10 +7052,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 "system_time_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
                 "broker_connected": False,
                 "broker_disconnected": True,
-                "broker_notice": "DISABLED — No broker connections permitted",
+                "broker_notice": "DISABLED  -  No broker connections permitted",
                 "benchmark_verified": True,
                 "benchmark_notice": (
-                    "Twelve Data Real-Time Spot Gold (XAU/USD) & COMEX Gold Futures benchmark (GC=F) — not OTC spot/interbank aggregate feeds"
+                    "Twelve Data Real-Time Spot Gold (XAU/USD) & COMEX Gold Futures benchmark (GC=F)  -  not OTC spot/interbank aggregate feeds"
                     if "XAU" in canon
                     else (
                         "Twelve Data Real-Time Crypto (BTC/USD)"
@@ -7187,7 +7175,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 sim_fill = execution_price(sym, side, entry, slippage_pips=0.5)
                 sizing["simulated_fill"] = sim_fill
                 sizing["paper_mode"] = True
-                sizing["warning"] = "SIMULATED — NOT A REAL TRADE"
+                sizing["warning"] = "SIMULATED  -  NOT A REAL TRADE"
 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")

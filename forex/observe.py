@@ -184,7 +184,7 @@ class SignalStateManager:
                 "reason": status_reason or "Spot Forex / Futures market is closed.",
                 "candle_close_confirmed": False,
                 "paper_mode": True,
-                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY  -  ZERO BROKER CONNECTIONS",
             }
 
         # 2. Stale data enforcement (Req 8 & 10)
@@ -216,7 +216,7 @@ class SignalStateManager:
                 "reason": status_reason or "Market data feed is stale.",
                 "candle_close_confirmed": False,
                 "paper_mode": True,
-                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY  -  ZERO BROKER CONNECTIONS",
             }
 
         # 3. Insufficient candles enforcement (< 15)
@@ -248,7 +248,7 @@ class SignalStateManager:
                 "reason": status_reason or "Insufficient timeframe candles (< 15 bars).",
                 "candle_close_confirmed": False,
                 "paper_mode": True,
-                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY  -  ZERO BROKER CONNECTIONS",
             }
 
         # 4. Check Existing Active Confirmed Signal (Req 3, 4, 6, 7 - Persistence & Invalidation)
@@ -331,7 +331,7 @@ class SignalStateManager:
                     "reason": f"Previous {side} signal invalidated ({inv_text}). Waiting for new setup.",
                     "candle_close_confirmed": False,
                     "paper_mode": True,
-                    "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+                    "disclaimer": "SIMULATED PAPER OBSERVATION ONLY  -  ZERO BROKER CONNECTIONS",
                 }
 
             # Still Valid: Maintain active confirmed signal persistently!
@@ -496,7 +496,7 @@ class SignalStateManager:
                 "reason": candidate_reason,
                 "candle_close_confirmed": True,
                 "paper_mode": True,
-                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY  -  ZERO BROKER CONNECTIONS",
             }
             if not is_offline_test:
                 with self._lock:
@@ -545,7 +545,7 @@ class SignalStateManager:
             "reason": final_rsn,
             "candle_close_confirmed": False,
             "paper_mode": True,
-            "disclaimer": "SIMULATED PAPER OBSERVATION ONLY — ZERO BROKER CONNECTIONS",
+            "disclaimer": "SIMULATED PAPER OBSERVATION ONLY  -  ZERO BROKER CONNECTIONS",
         }
 
 
@@ -632,7 +632,7 @@ def observe_pair(
 
     if live_tick or (is_td_configured and offline_data is None and offline_file is None):
         source_label = "Twelve Data Real-Time (Retail Spot Feed)"
-        disclaimer_text = "Twelve Data Real-Time Spot Feed — Retail Spot Forex & Commodities"
+        disclaimer_text = "Twelve Data Real-Time Spot Feed  -  Retail Spot Forex & Commodities"
     else:
         source_label = (
             "Yahoo Finance (GC=F: COMEX Gold Futures indicative benchmark)"

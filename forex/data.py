@@ -363,7 +363,7 @@ def parse_twelve_data_chart(data: Dict[str, Any], symbol: str, interval: str = "
         "candles_count": len(candles),
         "latest_price": latest_close,
         "price_type": "SPOT_RETAIL_MID",
-        "disclaimer": "Twelve Data API Spot Feed — Real-time Spot Forex/Gold Rates",
+        "disclaimer": "Twelve Data API Spot Feed  -  Real-time Spot Forex/Gold Rates",
         "candles": candles,
     }
 

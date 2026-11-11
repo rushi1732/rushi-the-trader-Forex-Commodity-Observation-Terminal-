@@ -176,7 +176,7 @@ class TestForexDashboard(unittest.TestCase):
         self.assertEqual(sim["lot_size"], 0.10)
         self.assertEqual(sim["units"], 10)  # 10 oz
         self.assertAlmostEqual(sim["max_loss_usd"], 50.0, places=1)
-        self.assertEqual(sim["warning"], "SIMULATED — NOT A REAL TRADE")
+        self.assertEqual(sim["warning"], "SIMULATED  -  NOT A REAL TRADE")
 
     def test_api_paper_journal_crud(self):
         """Verify journal listing and adding new simulated entries."""
@@ -237,12 +237,12 @@ class TestForexDashboard(unittest.TestCase):
             self.assertTrue(len(s["outputs"]) > 0)
 
     def test_broker_skill_strictly_disabled(self):
-        """Verify trader-broker is strictly labeled 'Disabled — no execution' and rejects run requests."""
+        """Verify trader-broker is strictly labeled 'Disabled  -  no execution' and rejects run requests."""
         url_skills = f"http://127.0.0.1:{self.port}/api/skills"
         with urllib.request.urlopen(url_skills, timeout=5) as resp:
             skills = json.loads(resp.read().decode("utf-8"))
         broker_skill = next(s for s in skills if s["id"] == "trader-broker")
-        self.assertEqual(broker_skill["status"], "Disabled — no execution")
+        self.assertEqual(broker_skill["status"], "Disabled  -  no execution")
         self.assertFalse(broker_skill["is_executable"])
 
         # Attempt to trigger trader-broker
@@ -257,8 +257,8 @@ class TestForexDashboard(unittest.TestCase):
             self.assertEqual(resp.status, 200)
             res = json.loads(resp.read().decode("utf-8"))
             self.assertFalse(res["allowed"])
-            self.assertEqual(res["status"], "Disabled — no execution")
-            self.assertIn("Disabled — no execution", res["error"])
+            self.assertEqual(res["status"], "Disabled  -  no execution")
+            self.assertIn("Disabled  -  no execution", res["error"])
             self.assertIn("trader-broker IS DISABLED", res["output"])
 
     def test_api_skills_run_paper_simulation(self):

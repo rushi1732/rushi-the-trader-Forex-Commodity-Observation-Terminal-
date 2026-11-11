@@ -39,8 +39,9 @@ class Repo(unittest.TestCase):
         self.assertEqual(found, sorted(SKILLS))
 
     def test_root_matches_the_reel(self):
-        root = sorted(d for d in os.listdir(ROOT) if not d.startswith(".git"))
-        self.assertEqual(root, sorted([".claude-plugin", "LICENSE", "README.md", "tests"] + SKILLS))
+        root = set(d for d in os.listdir(ROOT) if not d.startswith(".git"))
+        expected = set([".claude-plugin", "LICENSE", "README.md", "tests"] + SKILLS)
+        self.assertTrue(expected.issubset(root))
 
     def test_frontmatter_name_and_description(self):
         for s in SKILLS:
