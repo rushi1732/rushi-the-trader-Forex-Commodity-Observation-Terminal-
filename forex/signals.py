@@ -27,6 +27,7 @@ from .smc import analyze_smc
 from .ict import analyze_ict
 from .liquidity import analyze_liquidity
 from .divergence import detect_divergence
+from .multitimeframe import analyze_multi_timeframe
 from .data import fetch_chart, MAJOR_PAIRS
 from .backtest import calculate_ema
 
@@ -238,6 +239,20 @@ def evaluate_confluence_signal(
         elif div_bias == "SELL":
             bearish_score += div_boost
             bearish_factors.append(f"[RSI DIVERGENCE] {div_desc}")
+
+    # Factor H: Multi-Timeframe (MTF) Alignment across 4H, 1H, 15M, and 5M
+    mtf_candles = {interval: candles} if candles else None
+    mtf_data = analyze_multi_timeframe(symbol=canon, candles_by_tf=mtf_candles)
+    if mtf_data.get("alignment_score", 0) >= 70:
+        mtf_bias = mtf_data.get("overall_bias")
+        mtf_bonus = mtf_data.get("bonus_score", 0)
+        mtf_verdict = mtf_data.get("verdict", "")
+        if mtf_bias == "BULLISH":
+            bullish_score += mtf_bonus
+            bullish_factors.append(f"[MTF ALIGNMENT] {mtf_verdict}")
+        elif mtf_bias == "BEARISH":
+            bearish_score += mtf_bonus
+            bearish_factors.append(f"[MTF ALIGNMENT] {mtf_verdict}")
 
     # 2.5 Entry Zone Verification
     # Identify valid institutional entry zones from SMC, ICT, Fibonacci, and Liquidity
@@ -467,6 +482,7 @@ def evaluate_confluence_signal(
             "liquidity": liq_data,
             "ict": ict_data,
             "divergence": div_data,
+            "multitimeframe": mtf_data,
         },
         "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
         "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
