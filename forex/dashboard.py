@@ -2421,7 +2421,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </div>
                     </div>
 
-                    <!-- 6-Pillar Institutional Strategy Verification Checklist -->
+                    <!-- 7-Pillar Institutional Strategy Verification Checklist -->
                     <div class="checklist-grid">
                         <!-- Pillar 1: SMC Market Structure -->
                         <div class="check-card">
@@ -2506,6 +2506,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 Invalidation SL beyond sweep/OB | Max $50 risk cap
                             </div>
                         </div>
+
+                        <!-- Pillar 7: RSI Hidden Divergence (Trend Continuation) -->
+                        <div class="check-card">
+                            <div class="check-card-header">
+                                <span class="check-card-title">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                                    7. RSI Hidden Divergence
+                                </span>
+                                <span id="chkDivStatus" class="badge badge-purple">MONITORING</span>
+                            </div>
+                            <div id="chkDivDetail" class="check-card-detail">
+                                Trend Continuation (Price HL / RSI LL or LH / HH)
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Key Strategy Decision Levels -->
@@ -2556,6 +2570,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
                                 <strong style="color:var(--text-primary);">४. लिक्विडिटी आणि स्टॉपलॉस हंट (Turtle Soup):</strong>
                                 <p style="font-size:11px; margin-top:4px;">ऑपरेटर रीटेल ट्रेडर्सचे स्टॉपलॉस उडवण्यासाठी Equal Highs (BSL) किंवा Equal Lows (SSL) च्या पलीकडे फक्त सुई (Wick) नेतात आणि लगेच उलटी कँडल क्लोज करतात. हा फेक ब्रेकआउट (Stop Hunt) ओळखून रिव्हर्सल ट्रेड केला जातो.</p>
+                            </div>
+                            <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
+                                <strong style="color:var(--text-primary);">५. आरएसआय हिडन डायव्हर्जन्स (Trend Continuation):</strong>
+                                <p style="font-size:11px; margin-top:4px;">अपट्रेंडमध्ये किंमत <strong>Higher Low (HL)</strong> बनवते पण RSI <strong>Lower Low (LL)</strong> बनवतो, तेव्हा तो <strong>Hidden Bullish Divergence</strong> असतो (ट्रेंड चालू राहण्याचा मजबूत संकेत). डाऊनट्रेंडमध्ये किंमत <strong>Lower High (LH)</strong> आणि RSI <strong>Higher High (HH)</strong> बनवतो तेव्हा <strong>Hidden Bearish Divergence</strong> होतो.</p>
                             </div>
                         </div>
                     </details>
@@ -3798,6 +3816,47 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
             if (chkRiskDetail) {
                 chkRiskDetail.textContent = 'Guaranteed 1:2+ R:R | Strictly $50.00 Max Risk Cap';
+            }
+
+            // Pillar 7: RSI Hidden & Regular Divergence (Trend Continuation)
+            const chkDivStatus = document.getElementById('chkDivStatus');
+            const chkDivDetail = document.getElementById('chkDivDetail');
+            const div = data.divergence || (confSig.components && confSig.components.divergence) || {};
+            if (chkDivStatus) {
+                if (div.detected) {
+                    if (div.type === 'HIDDEN_BULLISH') {
+                        chkDivStatus.className = 'badge badge-green';
+                        chkDivStatus.textContent = 'HIDDEN BULLISH (CONT)';
+                    } else if (div.type === 'HIDDEN_BEARISH') {
+                        chkDivStatus.className = 'badge badge-rose';
+                        chkDivStatus.textContent = 'HIDDEN BEARISH (CONT)';
+                    } else if (div.type === 'REGULAR_BULLISH') {
+                        chkDivStatus.className = 'badge badge-cyan';
+                        chkDivStatus.textContent = 'REGULAR BULLISH (REV)';
+                    } else if (div.type === 'REGULAR_BEARISH') {
+                        chkDivStatus.className = 'badge badge-amber';
+                        chkDivStatus.textContent = 'REGULAR BEARISH (REV)';
+                    } else {
+                        chkDivStatus.className = 'badge badge-purple';
+                        chkDivStatus.textContent = div.bias || 'ACTIVE';
+                    }
+                } else {
+                    chkDivStatus.className = 'badge badge-blue';
+                    chkDivStatus.textContent = 'MONITORING';
+                }
+            }
+            if (chkDivDetail) {
+                if (div.detected && div.details) {
+                    const dt = div.details;
+                    const pPrev = dt.price_prev !== undefined ? dt.price_prev.toFixed(decimals) : '--';
+                    const pCurr = dt.price_curr !== undefined ? dt.price_curr.toFixed(decimals) : '--';
+                    const rPrev = dt.rsi_prev !== undefined ? dt.rsi_prev.toFixed(1) : '--';
+                    const rCurr = dt.rsi_curr !== undefined ? dt.rsi_curr.toFixed(1) : '--';
+                    const bAgo = dt.bars_ago !== undefined ? ` [${dt.bars_ago}b ago]` : '';
+                    chkDivDetail.textContent = `${div.type.replace('_', ' ')}: P(${pPrev}→${pCurr}) vs RSI(${rPrev}→${rCurr})${bAgo}`;
+                } else {
+                    chkDivDetail.textContent = 'Scanning swings for Hidden HL/LL or LH/HH Trend Continuation';
+                }
             }
 
             // Update Decision Level Metrics
@@ -6840,6 +6899,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     "fibonacci": obs.get("fibonacci"),
                     "liquidity": obs.get("liquidity"),
                     "ict": obs.get("ict"),
+                    "divergence": obs.get("divergence"),
                     "confluence_signal": obs.get("confluence_signal"),
                     "timestamp": obs.get("timestamp_et", ""),
                     "freshness": obs.get("data_freshness", "N/A"),
@@ -6894,6 +6954,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     "fibonacci": obs.get("fibonacci"),
                     "liquidity": obs.get("liquidity"),
                     "ict": obs.get("ict"),
+                    "divergence": obs.get("divergence"),
                     "auto_signal": obs.get("auto_signal"),
                     "paper_simulation": obs.get("paper_simulation"),
                     "timestamp": obs.get("timestamp_et", ""),

@@ -19,6 +19,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from .pairs import to_pips, get_pair_info
 from .data import fetch_chart, MAJOR_PAIRS, INDICATIVE_DISCLAIMER
 from .sessions import utc_to_et, get_active_sessions
+from .divergence import detect_divergence
 
 
 def calculate_sma(closes: List[float], period: int = 20) -> List[Optional[float]]:
@@ -247,6 +248,13 @@ def analyze_pair(
     if trend != "NEUTRAL":
         signals.append(f"20-period {trend.title()} Trend")
 
+    # 5. RSI Divergence (Hidden Continuation & Regular Exhaustion)
+    div_data = detect_divergence(candles, rsis)
+    if div_data.get("detected"):
+        signals.insert(0, f"RSI Divergence: {div_data['description']}")
+        if direction == "NEUTRAL":
+            direction = "BULLISH" if div_data.get("bias") == "BUY" else "BEARISH"
+
     primary_setup = signals[0] if signals else "Consolidation / Range"
 
     return {
@@ -262,6 +270,7 @@ def analyze_pair(
         "primary_setup": primary_setup,
         "signals": signals,
         "asian_setup": orb_setup,
+        "divergence": div_data,
         "disclaimer": INDICATIVE_DISCLAIMER,
     }
 

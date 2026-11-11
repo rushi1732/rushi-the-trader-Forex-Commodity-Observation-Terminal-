@@ -26,6 +26,7 @@ from .fibonacci import analyze_fibonacci
 from .smc import analyze_smc
 from .ict import analyze_ict
 from .liquidity import analyze_liquidity
+from .divergence import detect_divergence
 from .data import fetch_chart, MAJOR_PAIRS
 from .backtest import calculate_ema
 
@@ -224,6 +225,20 @@ def evaluate_confluence_signal(
             bearish_score += 20
             bearish_factors.append(f"[JUDAS SWING] {judas['description']}")
 
+    # Factor G: RSI Hidden & Regular Divergence (Trend Continuation & Exhaustion)
+    div_data = detect_divergence(candles)
+    if div_data.get("detected"):
+        div_bias = div_data.get("bias", "NEUTRAL")
+        div_desc = div_data.get("description", "")
+        div_boost = div_data.get("grade_boost", 0)
+
+        if div_bias == "BUY":
+            bullish_score += div_boost
+            bullish_factors.append(f"[RSI DIVERGENCE] {div_desc}")
+        elif div_bias == "SELL":
+            bearish_score += div_boost
+            bearish_factors.append(f"[RSI DIVERGENCE] {div_desc}")
+
     # 2.5 Entry Zone Verification
     # Identify valid institutional entry zones from SMC, ICT, Fibonacci, and Liquidity
     bullish_entry_zones = []
@@ -268,6 +283,13 @@ def evaluate_confluence_signal(
     recent_bsl = [s for s in recent_sweeps if s.get("sentiment") == "BEARISH" and s.get("candle_index", 0) >= len(candles) - 2]
     if recent_bsl and to_pips(canon, abs(current_price - recent_bsl[-1]["level_price"])) <= 5.0:
         bearish_entry_zones.append(f"Turtle Soup BSL Sweep Zone at {recent_bsl[-1]['level_price']}")
+
+    # E. RSI Hidden Divergence Continuation Zone (Uptrend Pullback or Downtrend Bounce)
+    if div_data.get("is_continuation"):
+        if div_data.get("type") == "HIDDEN_BULLISH" and (zone == "DISCOUNT" or in_ote or inside_ob or nearest_demand):
+            bullish_entry_zones.append(f"RSI Hidden Bullish Continuation Zone at {current_price:.{decimals}f}")
+        elif div_data.get("type") == "HIDDEN_BEARISH" and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
+            bearish_entry_zones.append(f"RSI Hidden Bearish Continuation Zone at {current_price:.{decimals}f}")
 
     # Veto check: Never BUY into a falling knife with bearish momentum & red candle close
     last_candle = candles[-1] if candles else {}
@@ -444,6 +466,7 @@ def evaluate_confluence_signal(
             "fibonacci": fib_data,
             "liquidity": liq_data,
             "ict": ict_data,
+            "divergence": div_data,
         },
         "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
         "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
