@@ -390,6 +390,154 @@ class TestSignalStability(unittest.TestCase):
         if obs.get("auto_signal") and obs["auto_signal"].get("entry_reference"):
             self.assertEqual(obs["auto_signal"]["entry_reference"], 4055.20)
 
+    def test_hard_trend_filter_prohibits_counter_trend_buy_in_selloff(self):
+        """Simulate Gold selloff from 4056 to 4045: evaluate_confluence_signal MUST NOT trigger BUY."""
+        from forex.signals import evaluate_confluence_signal
+        # Create cascading downward candles (4056 -> 4045)
+        falling_candles = []
+        base_ts = 1700000000
+        for i in range(25):
+            price = 4056.0 - (i * 0.45)
+            falling_candles.append({
+                "timestamp": base_ts + i * 300,
+                "open": price + 0.20,
+                "high": price + 0.30,
+                "low": price - 0.20,
+                "close": price,
+                "volume": 500,
+            })
+        sig = evaluate_confluence_signal("XAU/USD", falling_candles, interval="5m")
+        # In a cascade selloff, BUY is strictly prohibited
+        self.assertNotEqual(sig["action"], "BUY")
+        self.assertIn(sig["action"], ("SELL", "NEUTRAL"))
+
+    def test_technical_bias_vetoes_opposite_candidate_action(self):
+        """Card 2 Technical Bias: BEARISH strictly vetoes any BUY candidate in Card 3."""
+        conf_buy = {
+            "action": "BUY",
+            "confluence_score": 75,
+            "grade": "Grade A",
+            "is_in_entry_zone": True,
+            "execution_plan": {
+                "entry_price": 4048.0,
+                "stop_loss": 4044.0,
+                "take_profit_1": 4056.0,
+                "take_profit_2": 4062.0,
+            },
+        }
+        scan_bearish = {"direction": "BEARISH", "status": "OK"}
+        sig = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=4048.0,
+            candles=self.candles,
+            scan_info=scan_bearish,
+            confluence_signal=conf_buy,
+        )
+        self.assertEqual(sig["action"], "NO SIGNAL")
+        self.assertEqual(sig["status_label"], "WAITING FOR ENTRY ZONE")
+
+    def test_circuit_breaker_prevents_consecutive_stop_outs(self):
+        """After hitting Stop Loss, circuit breaker blocks consecutive entries in same direction for 3 bars."""
+        conf_buy = {
+            "action": "BUY",
+            "confluence_score": 75,
+            "grade": "Grade A",
+            "is_in_entry_zone": True,
+            "execution_plan": {
+                "entry_price": 4050.0,
+                "stop_loss": 4046.0,
+                "take_profit_1": 4058.0,
+                "take_profit_2": 4064.0,
+            },
+        }
+        # 1. Establish BUY
+        self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=4050.0,
+            candles=self.candles,
+            confluence_signal=conf_buy,
+        )
+        # 2. Price hits Stop Loss (4045.0 < 4046.0)
+        sig_sl = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=4045.0,
+            candles=self.candles,
+        )
+        self.assertEqual(sig_sl["action"], "NO SIGNAL")
+        self.assertIn("Stop Loss hit", sig_sl["reason"])
+
+        # 3. Next immediate candle: attempt to BUY again must be BLOCKED by circuit breaker
+        sig_retry = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=4046.0,
+            candles=self.candles,
+            confluence_signal=conf_buy,
+        )
+        self.assertEqual(sig_retry["action"], "NO SIGNAL")
+        self.assertEqual(sig_retry["status_label"], "WAITING FOR ENTRY ZONE")
+
+    def test_active_signal_invalidated_when_market_trend_turns_bearish(self):
+        """Active BUY signal is immediately invalidated when live technical bias turns BEARISH."""
+        conf_buy = {
+            "action": "BUY",
+            "confluence_score": 75,
+            "grade": "Grade A",
+            "is_in_entry_zone": True,
+            "execution_plan": {
+                "entry_price": 4050.0,
+                "stop_loss": 4040.0,
+                "take_profit_1": 4060.0,
+                "take_profit_2": 4070.0,
+            },
+        }
+        # 1. Establish BUY
+        self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=4050.0,
+            candles=self.candles,
+            confluence_signal=conf_buy,
+        )
+        # 2. Market turns BEARISH (price at 4048, not hit SL yet)
+        scan_bearish = {"direction": "BEARISH", "status": "OK"}
+        sig_inv = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=4048.0,
+            candles=self.candles,
+            scan_info=scan_bearish,
+        )
+        self.assertEqual(sig_inv["action"], "NO SIGNAL")
+        self.assertIn("Technical bias turned BEARISH", sig_inv["reason"])
+
 
 if __name__ == "__main__":
     unittest.main()

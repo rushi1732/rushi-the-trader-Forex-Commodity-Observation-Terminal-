@@ -296,7 +296,23 @@ class SignalStateManager:
                 elif side == "SELL" and (choch_dir == "BULLISH" or bos_dir == "BULLISH"):
                     is_struct_break = True
 
-            if is_sl_hit or is_tp2_hit or is_struct_break or is_price_insane:
+            # Check macro trend reversal against active signal
+            scan_dir = (scan_info or {}).get("direction", "NEUTRAL") if scan_info else "NEUTRAL"
+            is_trend_reversed = False
+            if side == "BUY" and scan_dir == "BEARISH":
+                is_trend_reversed = True
+            elif side == "SELL" and scan_dir == "BULLISH":
+                is_trend_reversed = True
+
+            # Check signal age (90 minutes max duration for intraday 5m setup without hitting target)
+            signal_ts = active.get("confirmed_candle_ts") or active.get("created_timestamp")
+            is_time_expired = False
+            if signal_ts and candles:
+                curr_ts = candles[-1].get("timestamp", 0)
+                if curr_ts > 0 and (curr_ts - signal_ts) >= 5400:  # 90 minutes
+                    is_time_expired = True
+
+            if is_sl_hit or is_tp2_hit or is_struct_break or is_price_insane or is_trend_reversed or is_time_expired:
                 # Signal is INVALIDATED! (Req 4: never switch directly from BUY to SELL. First invalidate, transition to waiting)
                 with self._lock:
                     self._active_signals.pop(canon, None)
@@ -304,8 +320,17 @@ class SignalStateManager:
                         "invalidated_side": side,
                         "invalidated_at": now_utc.timestamp(),
                         "candle_ts": candles[-1].get("timestamp", 0) if candles else 0,
+                        "reason": "SL_HIT" if is_sl_hit else "INVALIDATED",
                     }
-                inv_text = "Cross-asset anomaly invalidated" if is_price_insane else (f"Stop Loss hit at {sl}" if is_sl_hit else (f"Take Profit 2 target completed at {tp2}" if is_tp2_hit else "Market structure invalidated"))
+                inv_text = "Cross-asset anomaly invalidated" if is_price_insane else (
+                    f"Stop Loss hit at {sl}" if is_sl_hit else (
+                        f"Take Profit 2 target completed at {tp2}" if is_tp2_hit else (
+                            f"Technical bias turned {scan_dir}" if is_trend_reversed else (
+                                "Intraday session expired (90m timeout)" if is_time_expired else "Market structure invalidated"
+                            )
+                        )
+                    )
+                )
                 return {
                     "action": "NO SIGNAL",
                     "status_label": "WAITING FOR ENTRY ZONE",
@@ -417,17 +442,38 @@ class SignalStateManager:
             candidate_factors = ["Candle closed beyond breakout boundary in valid entry zone"]
             candidate_reason = f"Confirmed {b_side} signal: completed candle closed beyond setup boundary. 2R target planned."
 
-        # Cooldown check: prevent instant reversal on the same candle after invalidation (Req 4)
+        # Cooldown check:
+        # 1. Prevent instant reversal on the same candle after invalidation (Req 4)
+        # 2. Enforce 3-bar (15m) Circuit Breaker after Stop Loss hit to prevent consecutive losses in falling markets
         if candidate_action and not is_offline_test:
             with self._lock:
                 cooldown = self._cooldown.get(canon)
             if cooldown:
                 last_inv_side = cooldown.get("invalidated_side")
                 last_candle_cd = cooldown.get("candle_ts", 0)
+                cd_reason = cooldown.get("reason")
                 if last_inv_side and last_inv_side != candidate_action:
                     if confirmed_candle_ts <= last_candle_cd:
                         # Cannot reverse immediately on the same candle bar
                         candidate_action = None
+                elif cd_reason == "SL_HIT" and last_inv_side == candidate_action:
+                    bars_passed = 0
+                    if candles:
+                        for c in reversed(candles):
+                            if c.get("timestamp", 0) <= last_candle_cd:
+                                break
+                            bars_passed += 1
+                    if bars_passed < 3:
+                        candidate_action = None
+
+        # Strict Technical Bias Alignment Gate (Card 2 vs Card 3 Consistency)
+        # Never generate BUY when 20-period Technical Bias is BEARISH
+        # Never generate SELL when 20-period Technical Bias is BULLISH
+        scan_dir = (scan_info or {}).get("direction", "NEUTRAL") if scan_info else "NEUTRAL"
+        if candidate_action == "BUY" and scan_dir == "BEARISH":
+            candidate_action = None
+        elif candidate_action == "SELL" and scan_dir == "BULLISH":
+            candidate_action = None
 
         if candidate_action in ("BUY", "SELL") and candle_is_closed:
             canon = normalize_symbol(canon)
@@ -488,6 +534,7 @@ class SignalStateManager:
                 "grade": candidate_grade,
                 "confluence_factors": candidate_factors,
                 "confirmed_candle_ts": confirmed_candle_ts,
+                "created_timestamp": now_utc.timestamp(),
                 "confirmed_at_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
                 "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
                 "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
@@ -510,7 +557,8 @@ class SignalStateManager:
         if confluence_signal:
             b_sc = confluence_signal.get("bullish_score", 0)
             s_sc = confluence_signal.get("bearish_score", 0)
-            if b_sc >= 30 or s_sc >= 30:
+            c_sc = confluence_signal.get("confluence_score", 0)
+            if b_sc >= 30 or s_sc >= 30 or c_sc >= 30 or confluence_signal.get("action") in ("BUY", "SELL"):
                 has_potential_setup = True
                 wait_reason = "Institutional setup detected. Waiting for 5m candle close inside valid Entry Zone."
 

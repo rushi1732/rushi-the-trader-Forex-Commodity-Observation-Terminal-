@@ -76,12 +76,14 @@ def evaluate_confluence_signal(
     bullish_factors = []
     bearish_factors = []
 
-    # Factor 0: Short-term Trend & Exponential Moving Average (EMA) Momentum
+    # Factor 0: Trend & Exponential Moving Average (EMA) Momentum (9, 21, 50)
     closes = [c["close"] for c in candles]
     ema9_series = calculate_ema(closes, 9)
     ema21_series = calculate_ema(closes, 21)
+    ema50_series = calculate_ema(closes, 50) if len(closes) >= 50 else []
     ema9 = ema9_series[-1] if ema9_series and ema9_series[-1] is not None else None
     ema21 = ema21_series[-1] if ema21_series and ema21_series[-1] is not None else None
+    ema50 = ema50_series[-1] if ema50_series and ema50_series[-1] is not None else None
 
     is_bearish_momentum = False
     is_bullish_momentum = False
@@ -94,6 +96,17 @@ def evaluate_confluence_signal(
             is_bullish_momentum = True
             bullish_score += 20
             bullish_factors.append(f"Bullish Trend & Momentum: Price ({current_price:.2f}) > EMA-9 ({ema9:.2f}) > EMA-21 ({ema21:.2f})")
+
+    # EMA-50 Macro Trend Gate
+    if ema50:
+        if current_price < ema50:
+            is_bearish_momentum = True
+            bearish_score += 10
+            bearish_factors.append(f"Below 50 EMA ({ema50:.2f}) - Bearish Bias")
+        elif current_price > ema50:
+            is_bullish_momentum = True
+            bullish_score += 10
+            bullish_factors.append(f"Above 50 EMA ({ema50:.2f}) - Bullish Bias")
 
     # Factor A: Market Structure (BOS / CHoCH)
     structure = smc_data.get("structure", {})
@@ -184,7 +197,8 @@ def evaluate_confluence_signal(
         latest_sw = sweeps.get("latest_sweep", {})
         sw_idx = latest_sw.get("candle_index", 0)
         c_last = candles[-1]
-        if sw_idx >= len(candles) - 3 and (c_last["close"] >= c_last["open"] or c_last["close"] > latest_sw.get("level_price", 0)):
+        # In a real institutional SSL sweep, price must wick below and close firmly back ABOVE the level
+        if sw_idx >= len(candles) - 3 and c_last["close"] > latest_sw.get("level_price", 0):
             bullish_score += 25
             desc = latest_sw.get("description", "Sell-Side Liquidity Swept (Stop Hunt)")
             bullish_factors.append(f"[LIQUIDITY HUNT] {desc}")
@@ -193,7 +207,8 @@ def evaluate_confluence_signal(
         latest_sw = sweeps.get("latest_sweep", {})
         sw_idx = latest_sw.get("candle_index", 0)
         c_last = candles[-1]
-        if sw_idx >= len(candles) - 3 and (c_last["close"] <= c_last["open"] or c_last["close"] < latest_sw.get("level_price", 0)):
+        # In a real institutional BSL sweep, price must wick above and close firmly back BELOW the level
+        if sw_idx >= len(candles) - 3 and c_last["close"] < latest_sw.get("level_price", 0):
             bearish_score += 25
             desc = latest_sw.get("description", "Buy-Side Liquidity Swept (Stop Hunt)")
             bearish_factors.append(f"[LIQUIDITY HUNT] {desc}")
@@ -291,16 +306,20 @@ def evaluate_confluence_signal(
         elif div_data.get("type") == "HIDDEN_BEARISH" and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
             bearish_entry_zones.append(f"RSI Hidden Bearish Continuation Zone at {current_price:.{decimals}f}")
 
-    # Veto check: Never BUY into a falling knife with bearish momentum & red candle close
-    last_candle = candles[-1] if candles else {}
-    is_last_candle_bearish = (last_candle.get("close", 0) < last_candle.get("open", 0))
-    if is_bearish_momentum and is_last_candle_bearish and not (latest_choch and latest_choch.get("direction") == "BULLISH"):
+    # Hard Trend Filter & Veto check:
+    # 1. Never BUY into a downtrend (Price < EMAs or Bearish Market Structure) unless a confirmed Bullish CHoCH occurs
+    has_bullish_choch = bool(latest_choch and latest_choch.get("direction") == "BULLISH")
+    if (is_bearish_momentum or trend == "BEARISH") and not has_bullish_choch:
         bullish_entry_zones = []
+        bullish_score = min(bullish_score, 30)
+        bullish_factors.append("[TREND VETO] Counter-trend BUY prohibited: Bearish momentum/structure active without Bullish CHoCH")
 
-    # Never SELL into a vertical pump with bullish momentum & green candle close
-    is_last_candle_bullish = (last_candle.get("close", 0) > last_candle.get("open", 0))
-    if is_bullish_momentum and is_last_candle_bullish and not (latest_choch and latest_choch.get("direction") == "BEARISH"):
+    # 2. Never SELL into an uptrend (Price > EMAs or Bullish Market Structure) unless a confirmed Bearish CHoCH occurs
+    has_bearish_choch = bool(latest_choch and latest_choch.get("direction") == "BEARISH")
+    if (is_bullish_momentum or trend == "BULLISH") and not has_bearish_choch:
         bearish_entry_zones = []
+        bearish_score = min(bearish_score, 30)
+        bearish_factors.append("[TREND VETO] Counter-trend SELL prohibited: Bullish momentum/structure active without Bearish CHoCH")
 
     in_bullish_entry_zone = len(bullish_entry_zones) > 0
     in_bearish_entry_zone = len(bearish_entry_zones) > 0
