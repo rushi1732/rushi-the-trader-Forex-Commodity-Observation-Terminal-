@@ -791,7 +791,6 @@ def observe_pair(
             "liquidity": confluence_sig.get("components", {}).get("liquidity"),
             "ict": confluence_sig.get("components", {}).get("ict"),
             "divergence": confluence_sig.get("components", {}).get("divergence"),
-            "multitimeframe": confluence_sig.get("components", {}).get("multitimeframe"),
         }
         market_label = "COMEX Gold Futures (GC=F)" if is_gold else "Spot Forex"
         reason_msg = f"{market_label} market is closed ({open_reason}). Observation only."
@@ -823,7 +822,6 @@ def observe_pair(
             "liquidity": confluence_sig.get("components", {}).get("liquidity"),
             "ict": confluence_sig.get("components", {}).get("ict"),
             "divergence": confluence_sig.get("components", {}).get("divergence"),
-            "multitimeframe": confluence_sig.get("components", {}).get("multitimeframe"),
         }
 
     if not is_fresh:
@@ -859,7 +857,6 @@ def observe_pair(
             "liquidity": confluence_sig.get("components", {}).get("liquidity"),
             "ict": confluence_sig.get("components", {}).get("ict"),
             "divergence": confluence_sig.get("components", {}).get("divergence"),
-            "multitimeframe": confluence_sig.get("components", {}).get("multitimeframe"),
         }
 
     if len(candles) < 15:
@@ -1102,7 +1099,6 @@ def observe_pair(
         "liquidity": confluence_sig.get("components", {}).get("liquidity"),
         "ict": confluence_sig.get("components", {}).get("ict"),
         "divergence": confluence_sig.get("components", {}).get("divergence"),
-        "multitimeframe": confluence_sig.get("components", {}).get("multitimeframe"),
         "paper_simulation": paper_simulation,
         "auto_signal": auto_sig,
         "paper_mode": True,

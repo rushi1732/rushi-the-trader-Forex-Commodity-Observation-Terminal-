@@ -1788,82 +1788,6 @@
                         </div>
                     </div>
 
-                    <!-- Multi-Timeframe Institutional Confluence Matrix (4H, 1H, 15M, 5M) -->
-                    <div class="mtf-container" style="margin-bottom: 16px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; flex-wrap:wrap; gap:8px;">
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent-blue);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                <span style="font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-primary);">
-                                    Multi-Timeframe Confluence (4H, 1H, 15M, 5M)
-                                </span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <span id="mtfAlignedRatio" class="badge badge-purple" style="font-size:11px;">ALIGNMENT: --</span>
-                                <span id="mtfOverallVerdict" class="badge badge-blue" style="font-size:11px;">ANALYZING</span>
-                            </div>
-                        </div>
-
-                        <!-- 4-Card MTF Grid -->
-                        <div class="mtf-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
-                            <!-- 4H Higher Timeframe Card -->
-                            <div class="mtf-card" style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:6px; padding:10px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                    <span style="font-weight:700; font-size:11px; color:var(--text-secondary);">4H (Macro Trend)</span>
-                                    <span id="mtf4hBadge" class="badge badge-blue">--</span>
-                                </div>
-                                <div style="font-size:11px; color:var(--text-primary); display:flex; justify-content:space-between;">
-                                    <span>RSI(14): <strong id="mtf4hRsi">--</strong></span>
-                                    <span id="mtf4hStructure" style="color:var(--text-muted); font-size:10px;">--</span>
-                                </div>
-                                <div id="mtf4hDiv" style="font-size:10px; color:var(--accent-purple); margin-top:4px;">No Divergence</div>
-                            </div>
-
-                            <!-- 1H Intermediate Card -->
-                            <div class="mtf-card" style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:6px; padding:10px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                    <span style="font-weight:700; font-size:11px; color:var(--text-secondary);">1H (Intermediate)</span>
-                                    <span id="mtf1hBadge" class="badge badge-blue">--</span>
-                                </div>
-                                <div style="font-size:11px; color:var(--text-primary); display:flex; justify-content:space-between;">
-                                    <span>RSI(14): <strong id="mtf1hRsi">--</strong></span>
-                                    <span id="mtf1hStructure" style="color:var(--text-muted); font-size:10px;">--</span>
-                                </div>
-                                <div id="mtf1hDiv" style="font-size:10px; color:var(--accent-purple); margin-top:4px;">No Divergence</div>
-                            </div>
-
-                            <!-- 15M Structural Card -->
-                            <div class="mtf-card" style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:6px; padding:10px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                    <span style="font-weight:700; font-size:11px; color:var(--text-secondary);">15M (Structural)</span>
-                                    <span id="mtf15mBadge" class="badge badge-blue">--</span>
-                                </div>
-                                <div style="font-size:11px; color:var(--text-primary); display:flex; justify-content:space-between;">
-                                    <span>RSI(14): <strong id="mtf15mRsi">--</strong></span>
-                                    <span id="mtf15mStructure" style="color:var(--text-muted); font-size:10px;">--</span>
-                                </div>
-                                <div id="mtf15mDiv" style="font-size:10px; color:var(--accent-purple); margin-top:4px;">No Divergence</div>
-                            </div>
-
-                            <!-- 5M Trigger Card -->
-                            <div class="mtf-card" style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:6px; padding:10px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                    <span style="font-weight:700; font-size:11px; color:var(--text-secondary);">5M (Entry Trigger)</span>
-                                    <span id="mtf5mBadge" class="badge badge-blue">--</span>
-                                </div>
-                                <div style="font-size:11px; color:var(--text-primary); display:flex; justify-content:space-between;">
-                                    <span>RSI(14): <strong id="mtf5mRsi">--</strong></span>
-                                    <span id="mtf5mStructure" style="color:var(--text-muted); font-size:10px;">--</span>
-                                </div>
-                                <div id="mtf5mDiv" style="font-size:10px; color:var(--accent-purple); margin-top:4px;">Scanning Swings</div>
-                            </div>
-                        </div>
-
-                        <!-- MTF Marathi Summary Footer -->
-                        <div id="mtfSummaryMarathi" style="margin-top:10px; font-size:11px; color:var(--text-secondary); line-height:1.4;">
-                            ४ तास, १ तास, १५ मिनिटे आणि ५ मिनिटे या सर्व टाईमफ्रेममधील ट्रेंड व डायव्हर्जन्स तपासले जात आहेत...
-                        </div>
-                    </div>
-
                     <!-- 7-Pillar Institutional Strategy Verification Checklist -->
                     <div class="checklist-grid">
                         <!-- Pillar 1: SMC Market Structure -->
@@ -2017,10 +1941,6 @@
                             <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
                                 <strong style="color:var(--text-primary);">५. आरएसआय हिडन डायव्हर्जन्स (Trend Continuation):</strong>
                                 <p style="font-size:11px; margin-top:4px;">अपट्रेंडमध्ये किंमत <strong>Higher Low (HL)</strong> बनवते पण RSI <strong>Lower Low (LL)</strong> बनवतो, तेव्हा तो <strong>Hidden Bullish Divergence</strong> असतो (ट्रेंड चालू राहण्याचा मजबूत संकेत). डाऊनट्रेंडमध्ये किंमत <strong>Lower High (LH)</strong> आणि RSI <strong>Higher High (HH)</strong> बनवतो तेव्हा <strong>Hidden Bearish Divergence</strong> होतो.</p>
-                            </div>
-                            <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
-                                <strong style="color:var(--text-primary);">६. मल्टि-टाईमफ्रेम अलाईनमेंट (4H, 1H, 15M, 5M MTF):</strong>
-                                <p style="font-size:11px; margin-top:4px;"><strong>४ तास (4H) आणि १ तास (1H)</strong> वरून मोठा संस्थात्मक प्रवाह ठरतो, <strong>१५ मिनिटांवर (15M)</strong> स्ट्रक्चर कन्फर्म होते, आणि <strong>५ मिनिटांवर (5M)</strong> हिडन डायव्हर्जन्ससह परफेक्ट एन्ट्री व स्टॉपलॉस लावला जातो. सर्व टाईमफ्रेम जुळल्यासच ट्रेडला सर्वोच्च <strong>Grade A+</strong> मिळतो.</p>
                             </div>
                         </div>
                     </details>
@@ -3152,61 +3072,6 @@
                         • <strong>नियम:</strong> जोपर्यंत लाइव्ह मार्केट प्राईस अचूक एन्ट्री झोनमध्ये पोहोचत नाही, तोपर्यंत सिस्टम strictly 'NO SIGNAL' स्थितीत राहील.
                     `;
                 }
-            }
-
-            // Multi-Timeframe (MTF) Confluence Engine Update (4H, 1H, 15M, 5M)
-            const mtf = data.multitimeframe || (confSig.components && confSig.components.multitimeframe) || {};
-            const tfs = mtf.timeframes || {};
-
-            const updateTfCard = (prefix, tfKey) => {
-                const tfObj = tfs[tfKey] || {};
-                const badge = document.getElementById(prefix + 'Badge');
-                const rsiEl = document.getElementById(prefix + 'Rsi');
-                const structEl = document.getElementById(prefix + 'Structure');
-                const divEl = document.getElementById(prefix + 'Div');
-
-                if (badge) {
-                    const tr = tfObj.trend || 'NEUTRAL';
-                    badge.className = tr === 'BULLISH' ? 'badge badge-green' : (tr === 'BEARISH' ? 'badge badge-rose' : 'badge badge-amber');
-                    badge.textContent = tr;
-                }
-                if (rsiEl) {
-                    rsiEl.textContent = tfObj.rsi !== undefined && tfObj.rsi !== null ? tfObj.rsi.toFixed(1) : '--';
-                }
-                if (structEl) {
-                    structEl.textContent = tfObj.structure || tfObj.zone || '--';
-                }
-                if (divEl) {
-                    const d = tfObj.divergence || {};
-                    if (d.detected) {
-                        divEl.style.color = d.bias === 'BUY' ? 'var(--accent-green)' : 'var(--accent-rose)';
-                        divEl.textContent = d.type ? d.type.replace('_', ' ') : 'Divergence';
-                    } else {
-                        divEl.style.color = 'var(--text-muted)';
-                        divEl.textContent = tfKey === '5m' ? 'No Divergence' : 'Aligned';
-                    }
-                }
-            };
-
-            updateTfCard('mtf4h', '4h');
-            updateTfCard('mtf1h', '1h');
-            updateTfCard('mtf15m', '15m');
-            updateTfCard('mtf5m', '5m');
-
-            const mtfRatio = document.getElementById('mtfAlignedRatio');
-            const mtfVerdict = document.getElementById('mtfOverallVerdict');
-            const mtfSumm = document.getElementById('mtfSummaryMarathi');
-
-            if (mtfRatio) {
-                mtfRatio.textContent = `ALIGNMENT: ${mtf.aligned_count || '--'} (${mtf.alignment_score || 0}%)`;
-                mtfRatio.className = (mtf.alignment_score >= 80) ? 'badge badge-green' : ((mtf.alignment_score >= 65) ? 'badge badge-gold' : 'badge badge-purple');
-            }
-            if (mtfVerdict) {
-                mtfVerdict.textContent = mtf.overall_bias || 'NEUTRAL';
-                mtfVerdict.className = mtf.overall_bias === 'BULLISH' ? 'badge badge-green' : (mtf.overall_bias === 'BEARISH' ? 'badge badge-rose' : 'badge badge-blue');
-            }
-            if (mtfSumm && mtf.summary_marathi) {
-                mtfSumm.textContent = mtf.summary_marathi;
             }
 
             // Pillar 1: SMC Market Structure
