@@ -258,8 +258,59 @@ class SignalStateManager:
         if active and active.get("action") in ("BUY", "SELL"):
             side = active["action"]
             sl = active.get("stop_loss")
+            tp1 = active.get("take_profit")
             tp2 = active.get("take_profit_2") or active.get("take_profit")
             entry_ref = active.get("entry_reference")
+            initial_sl = active.get("initial_stop_loss") or sl
+            if "initial_stop_loss" not in active:
+                active["initial_stop_loss"] = sl
+
+            decimals = 2 if ("XAU" in canon or "BTC" in canon) else (2 if "JPY" in canon else 4)
+            pip_size = 0.10 if "XAU" in canon else (1.0 if "BTC" in canon else (0.01 if "JPY" in canon else 0.0001))
+
+            # Dynamic Breakeven & Trailing Stop Protection (Risk-Free Trade Logic)
+            if entry_ref and initial_sl and current_price > 0.0:
+                risk_dist = abs(entry_ref - initial_sl)
+                if risk_dist > 0.0:
+                    if side == "BUY":
+                        profit_dist = current_price - entry_ref
+                        # 1. Breakeven Protection at 1R profit: lock in +1 pip buffer
+                        if profit_dist >= risk_dist * 1.0:
+                            be_level = round(entry_ref + (pip_size * 1.0), decimals)
+                            if sl is None or sl < be_level:
+                                sl = be_level
+                                active["stop_loss"] = be_level
+                                active["is_breakeven_protected"] = True
+                                active["status_label"] = "BUY (BREAKEVEN PROTECTED / 1R REACHED)"
+
+                        # 2. Lock 1R profit once TP1 (2R) is touched
+                        if tp1 and current_price >= tp1:
+                            t1_level = round(entry_ref + (risk_dist * 1.0), decimals)
+                            if sl is None or sl < t1_level:
+                                sl = t1_level
+                                active["stop_loss"] = t1_level
+                                active["tp1_hit"] = True
+                                active["status_label"] = "BUY (TP1 REACHED - TRAILED TO +1R)"
+
+                    elif side == "SELL":
+                        profit_dist = entry_ref - current_price
+                        # 1. Breakeven Protection at 1R profit: lock in -1 pip buffer
+                        if profit_dist >= risk_dist * 1.0:
+                            be_level = round(entry_ref - (pip_size * 1.0), decimals)
+                            if sl is None or sl > be_level:
+                                sl = be_level
+                                active["stop_loss"] = be_level
+                                active["is_breakeven_protected"] = True
+                                active["status_label"] = "SELL (BREAKEVEN PROTECTED / 1R REACHED)"
+
+                        # 2. Lock 1R profit once TP1 (2R) is touched
+                        if tp1 and current_price <= tp1:
+                            t1_level = round(entry_ref - (risk_dist * 1.0), decimals)
+                            if sl is None or sl > t1_level:
+                                sl = t1_level
+                                active["stop_loss"] = t1_level
+                                active["tp1_hit"] = True
+                                active["status_label"] = "SELL (TP1 REACHED - TRAILED TO +1R)"
 
             is_sl_hit = False
             is_tp2_hit = False
@@ -322,8 +373,9 @@ class SignalStateManager:
                         "candle_ts": candles[-1].get("timestamp", 0) if candles else 0,
                         "reason": "SL_HIT" if is_sl_hit else "INVALIDATED",
                     }
+                is_be_hit = bool(active.get("is_breakeven_protected") or active.get("tp1_hit"))
                 inv_text = "Cross-asset anomaly invalidated" if is_price_insane else (
-                    f"Stop Loss hit at {sl}" if is_sl_hit else (
+                    (f"Trailing Stop / Breakeven hit at {sl} (Capital protected)" if is_be_hit else f"Stop Loss hit at {sl}") if is_sl_hit else (
                         f"Take Profit 2 target completed at {tp2}" if is_tp2_hit else (
                             f"Technical bias turned {scan_dir}" if is_trend_reversed else (
                                 "Intraday session expired (90m timeout)" if is_time_expired else "Market structure invalidated"
@@ -480,14 +532,24 @@ class SignalStateManager:
             decimals = 2 if ("XAU" in canon or "BTC" in canon) else (2 if "JPY" in canon else 4)
             pip_size = 0.10 if "XAU" in canon else (1.0 if "BTC" in canon else (0.01 if "JPY" in canon else 0.0001))
 
+            # Set Asset-Specific Minimum Safe Risk Distance
+            if "XAU" in canon:
+                min_safe_dist = 4.00
+            elif "BTC" in canon:
+                min_safe_dist = 300.0
+            elif "JPY" in canon:
+                min_safe_dist = 0.20
+            else:
+                min_safe_dist = 0.0015
+
             # Guarantee Stop Loss strictly adheres to side
             if candidate_sl is None or candidate_sl == 0.0:
                 if candidate_action == "BUY":
-                    candidate_sl = round(candidate_entry - (pip_size * 25), decimals)
+                    candidate_sl = round(candidate_entry - min_safe_dist, decimals)
                 else:
-                    candidate_sl = round(candidate_entry + (pip_size * 25), decimals)
+                    candidate_sl = round(candidate_entry + min_safe_dist, decimals)
 
-            risk_dist = max(pip_size * 5, abs(candidate_entry - candidate_sl))
+            risk_dist = max(min_safe_dist, abs(candidate_entry - candidate_sl))
             if candidate_risk_pips is None:
                 candidate_risk_pips = round(risk_dist / pip_size, 1)
 
@@ -523,6 +585,9 @@ class SignalStateManager:
                 "symbol": canon,
                 "entry_reference": candidate_entry,
                 "stop_loss": candidate_sl,
+                "initial_stop_loss": candidate_sl,
+                "is_breakeven_protected": False,
+                "tp1_hit": False,
                 "take_profit": candidate_tp1,
                 "take_profit_2": candidate_tp2,
                 "reward_risk": candidate_rr,

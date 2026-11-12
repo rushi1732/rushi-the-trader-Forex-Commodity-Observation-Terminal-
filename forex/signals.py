@@ -321,6 +321,23 @@ def evaluate_confluence_signal(
         bearish_score = min(bearish_score, 30)
         bearish_factors.append("[TREND VETO] Counter-trend SELL prohibited: Bullish momentum/structure active without Bearish CHoCH")
 
+    # Candlestick Rejection & Quality Verification:
+    # Do not enter against active high-momentum thrust candles
+    last_candle = candles[-1] if candles else {}
+    c_open = last_candle.get("open", 0.0)
+    c_close = last_candle.get("close", 0.0)
+    c_high = last_candle.get("high", 0.0)
+    c_low = last_candle.get("low", 0.0)
+    c_range = max(0.0001, c_high - c_low)
+
+    # For BUY: If candle is a heavy red candle (> 75% body) with no bottom wick, wait for rejection
+    if c_close < c_open and (c_open - c_close) > (c_range * 0.75):
+        bullish_entry_zones = []
+
+    # For SELL: If candle is a heavy green candle (> 75% body) with no top wick, wait for rejection
+    if c_close > c_open and (c_close - c_open) > (c_range * 0.75):
+        bearish_entry_zones = []
+
     in_bullish_entry_zone = len(bullish_entry_zones) > 0
     in_bearish_entry_zone = len(bearish_entry_zones) > 0
 
@@ -372,24 +389,50 @@ def evaluate_confluence_signal(
     rr_tp1 = 0.0
     rr_tp2 = 0.0
 
-    # ATR / Volatility buffer
-    recent_ranges = [c["high"] - c["low"] for c in candles[-14:]]
-    avg_bar_range = sum(recent_ranges) / len(recent_ranges) if recent_ranges else (pip_size * 10)
-    sl_buffer = avg_bar_range * 0.5
+    # ATR / Volatility buffer: 14-period true range
+    recent_ranges = [max(c["high"] - c["low"], abs(c["high"] - c.get("close", c["high"]))) for c in candles[-14:]]
+    avg_bar_range = sum(recent_ranges) / len(recent_ranges) if recent_ranges else (pip_size * 15)
+
+    # Institutional Volatility Buffer (1.25x ATR-14)
+    sl_buffer = avg_bar_range * 1.25
+
+    # Asset-Specific Minimum Safe Risk Distance (Prevents premature noise suffocation)
+    # XAU/USD (Gold): at least $4.00 (40 pips)
+    # BTC/USD: at least $300 (300 pips)
+    # JPY pairs: at least 20 pips
+    # Forex pairs: at least 15 pips
+    if "XAU" in canon:
+        min_risk_pips = 40.0
+        min_risk_dist = 4.00
+    elif "BTC" in canon:
+        min_risk_pips = 300.0
+        min_risk_dist = 300.0
+    elif "JPY" in canon:
+        min_risk_pips = 20.0
+        min_risk_dist = from_pips(canon, 20.0)
+    else:
+        min_risk_pips = 15.0
+        min_risk_dist = from_pips(canon, 15.0)
+
+    # Structural Lookback: 18 candles for true swing anchor (not just 5!)
+    structural_lookback = min(len(candles), 18)
+    structural_low = min([c["low"] for c in candles[-structural_lookback:]])
+    structural_high = max([c["high"] for c in candles[-structural_lookback:]])
 
     if signal_side == "BUY":
-        # Stop Loss strictly below entry and below recent swing low or Order block bottom
-        structural_low = min([c["low"] for c in candles[-5:]])
-        if nearest_demand and nearest_demand["bottom"] < current_price:
-            invalidation = min(structural_low, nearest_demand["bottom"]) - sl_buffer
-        else:
-            invalidation = structural_low - sl_buffer
+        # Anchor Stop Loss strictly below structural low and Order Block base
+        demand_anchor = nearest_demand["bottom"] if (nearest_demand and nearest_demand["bottom"] < current_price) else structural_low
+        invalidation = min(structural_low, demand_anchor) - sl_buffer
+
+        # Enforce minimum safe volatility distance so normal wicks do not stop out the trade
+        if (current_price - invalidation) < min_risk_dist:
+            invalidation = current_price - min_risk_dist
 
         stop_loss = round(invalidation, decimals)
         if stop_loss >= current_price:
-            stop_loss = round(current_price - max(pip_size * 5, sl_buffer), decimals)
+            stop_loss = round(current_price - min_risk_dist, decimals)
 
-        risk_dist = max(pip_size * 5, current_price - stop_loss)
+        risk_dist = max(min_risk_dist, current_price - stop_loss)
         risk_pips = round(to_pips(canon, risk_dist), 1)
 
         # TP1 = 1:2 R:R from actual entry reference
@@ -411,18 +454,19 @@ def evaluate_confluence_signal(
         rr_tp2 = round(tp2_dist / risk_dist, 2)
 
     elif signal_side == "SELL":
-        # Stop Loss strictly above entry and above recent swing high or Order block top
-        structural_high = max([c["high"] for c in candles[-5:]])
-        if nearest_supply and nearest_supply["top"] > current_price:
-            invalidation = max(structural_high, nearest_supply["top"]) + sl_buffer
-        else:
-            invalidation = structural_high + sl_buffer
+        # Anchor Stop Loss strictly above structural high and Supply Block top
+        supply_anchor = nearest_supply["top"] if (nearest_supply and nearest_supply["top"] > current_price) else structural_high
+        invalidation = max(structural_high, supply_anchor) + sl_buffer
+
+        # Enforce minimum safe volatility distance so normal wicks do not stop out the trade
+        if (invalidation - current_price) < min_risk_dist:
+            invalidation = current_price + min_risk_dist
 
         stop_loss = round(invalidation, decimals)
         if stop_loss <= current_price:
-            stop_loss = round(current_price + max(pip_size * 5, sl_buffer), decimals)
+            stop_loss = round(current_price + min_risk_dist, decimals)
 
-        risk_dist = max(pip_size * 5, stop_loss - current_price)
+        risk_dist = max(min_risk_dist, stop_loss - current_price)
         risk_pips = round(to_pips(canon, risk_dist), 1)
 
         # TP1 = 1:2 R:R from actual entry reference

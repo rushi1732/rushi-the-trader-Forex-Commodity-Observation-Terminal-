@@ -538,6 +538,87 @@ class TestSignalStability(unittest.TestCase):
         self.assertEqual(sig_inv["action"], "NO SIGNAL")
         self.assertIn("Technical bias turned BEARISH", sig_inv["reason"])
 
+    def test_dynamic_breakeven_trailing_protection(self):
+        """When price advances 1R into profit, stop loss trails to Breakeven (+1 pip buffer)."""
+        conf_buy = {
+            "action": "BUY",
+            "confluence_score": 75,
+            "grade": "Grade A",
+            "is_in_entry_zone": True,
+            "execution_plan": {
+                "entry_price": 4050.0,
+                "stop_loss": 4045.0,  # Risk = 5.0
+                "take_profit_1": 4060.0,  # 2R = 10.0
+                "take_profit_2": 4067.5,
+            },
+        }
+        # 1. Establish BUY at 4050.0
+        sig1 = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=4050.0,
+            candles=self.candles,
+            confluence_signal=conf_buy,
+        )
+        self.assertEqual(sig1["action"], "BUY")
+        self.assertEqual(sig1["stop_loss"], 4045.0)
+
+        # 2. Price advances to 4055.20 (+5.20 >= 1R of 5.0)
+        sig2 = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=4055.20,
+            candles=self.candles,
+        )
+        # SL MUST be trailed to Breakeven >= 4050.0!
+        self.assertEqual(sig2["action"], "BUY")
+        self.assertGreaterEqual(sig2["stop_loss"], 4050.0)
+        self.assertIn("BREAKEVEN", sig2["status_label"])
+
+        # 3. If price subsequently retraces back below Breakeven (e.g. 4049.50)
+        sig3 = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=4049.50,
+            candles=self.candles,
+        )
+        # Trade exits at Breakeven, capital protected!
+        self.assertEqual(sig3["action"], "NO SIGNAL")
+        self.assertIn("Breakeven", sig3["reason"])
+
+    def test_gold_minimum_safe_stop_loss_distance(self):
+        """XAU/USD execution plan enforces minimum $4.00 (40 pips) risk distance to avoid noise suffocation."""
+        from forex.signals import evaluate_confluence_signal
+        # Create candles where tight swings exist
+        tight_candles = []
+        base_ts = 1700000000
+        for i in range(25):
+            tight_candles.append({
+                "timestamp": base_ts + i * 300,
+                "open": 4050.0 + i * 0.05,
+                "high": 4050.2 + i * 0.05,
+                "low": 4049.8 + i * 0.05,
+                "close": 4050.1 + i * 0.05,
+                "volume": 500,
+            })
+        sig = evaluate_confluence_signal("XAU/USD", tight_candles, interval="5m")
+        plan = sig.get("execution_plan", {})
+        if plan.get("entry_price") and plan.get("stop_loss"):
+            risk_dist = abs(plan["entry_price"] - plan["stop_loss"])
+            self.assertGreaterEqual(risk_dist, 4.00)
+
 
 if __name__ == "__main__":
     unittest.main()

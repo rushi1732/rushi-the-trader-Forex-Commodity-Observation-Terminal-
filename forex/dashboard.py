@@ -3640,7 +3640,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     autoBadge.className = action === 'BUY' ? 'badge badge-green' : 'badge badge-rose';
                 }
                 if (autoAction) {
-                    autoAction.textContent = action + ' CONFIRMED';
+                    autoAction.textContent = autoSig.status_label || (action + ' CONFIRMED');
                 }
                 if (autoReason) {
                     autoReason.textContent = autoSig.reason || (action + ' Signal confirmed in entry zone.');
