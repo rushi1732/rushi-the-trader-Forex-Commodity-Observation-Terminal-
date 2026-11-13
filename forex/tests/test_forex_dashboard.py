@@ -599,6 +599,8 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("chkRiskStatus", html)
         self.assertIn("matrixLevelHigh", html)
         self.assertIn("matrixLevelLow", html)
+        self.assertIn("matrix9StrategiesPanel", html)
+        self.assertIn("matrixStrategiesGrid", html)
         self.assertIn("updateStrategyMatrix", html)
 
     def test_twelve_data_api_config_get_and_post(self):

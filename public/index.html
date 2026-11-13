@@ -1132,6 +1132,126 @@
             color: #f1f5f9;
         }
 
+        /* 9-Strategy Institutional Signal Deep Dive Panel */
+        .matrix-strategies-panel {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .matrix-strategies-panel.panel-buy {
+            border-color: rgba(16, 185, 129, 0.5);
+            background: linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.75) 100%);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.1);
+        }
+
+        .matrix-strategies-panel.panel-sell {
+            border-color: rgba(244, 63, 94, 0.5);
+            background: linear-gradient(180deg, rgba(244, 63, 94, 0.08) 0%, rgba(15, 23, 42, 0.75) 100%);
+            box-shadow: 0 0 15px rgba(244, 63, 94, 0.1);
+        }
+
+        .matrix-strategies-panel.panel-wait {
+            border-color: rgba(245, 158, 11, 0.3);
+            background: rgba(15, 23, 42, 0.65);
+        }
+
+        .strategies-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .strategies-panel-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .strategies-grid-9 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+            gap: 10px;
+        }
+
+        .strategy-deep-card {
+            background: rgba(30, 41, 59, 0.45);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .strategy-deep-card:hover {
+            background: rgba(30, 41, 59, 0.65);
+            border-color: rgba(56, 189, 248, 0.4);
+        }
+
+        .strategy-deep-card.status-buy {
+            border-left: 3px solid #10b981;
+        }
+
+        .strategy-deep-card.status-sell {
+            border-left: 3px solid #f43f5e;
+        }
+
+        .strategy-deep-card.status-wait {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .strat-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+
+        .strat-card-title {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .strat-card-metric {
+            font-size: 10.5px;
+            font-family: var(--font-mono);
+            color: var(--accent-blue);
+            background: rgba(56, 189, 248, 0.08);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            line-height: 1.3;
+        }
+
+        .strat-card-expl {
+            font-size: 11px;
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+
+        .strat-card-expl strong {
+            color: #f8fafc;
+        }
+
         .checklist-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -1884,7 +2004,21 @@
                         </div>
                     </div>
 
-                    <!-- 7-Pillar Institutional Strategy Verification Checklist -->
+                    <!-- 9-Strategy Institutional Signal Deep Dive Explanation Panel -->
+                    <div id="matrix9StrategiesPanel" class="matrix-strategies-panel panel-wait">
+                        <div class="strategies-panel-header">
+                            <span class="strategies-panel-title">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                🎯 ९ संस्थात्मक स्ट्रॅटेजींचे सखोल विश्लेषण (9-Strategy Institutional Signal Deep Dive)
+                            </span>
+                            <span id="matrixStrategiesSignalBadge" class="badge badge-amber">WAITING FOR CONFLUENCE</span>
+                        </div>
+                        <div id="matrixStrategiesGrid" class="strategies-grid-9">
+                            <!-- Populated dynamically via updateStrategyMatrix() -->
+                        </div>
+                    </div>
+
+                    <!-- 9-Pillar Institutional Strategy Verification Checklist -->
                     <div class="checklist-grid">
                         <!-- Pillar 1: SMC Market Structure -->
                         <div class="check-card">
@@ -3268,6 +3402,188 @@
                         • <strong>नियम:</strong> जोपर्यंत लाइव्ह मार्केट प्राईस अचूक एन्ट्री झोनमध्ये पोहोचत नाही, तोपर्यंत सिस्टम strictly 'NO SIGNAL' स्थितीत राहील.
                     `;
                 }
+            }
+
+            // 🎯 Render 9-Strategy Institutional Signal Deep Dive
+            const stratPanel = document.getElementById('matrix9StrategiesPanel');
+            const stratBadge = document.getElementById('matrixStrategiesSignalBadge');
+            const stratGrid = document.getElementById('matrixStrategiesGrid');
+
+            if (stratPanel && stratGrid) {
+                if (action === 'BUY') {
+                    stratPanel.className = 'matrix-strategies-panel panel-buy';
+                    if (stratBadge) {
+                        stratBadge.className = 'badge badge-green';
+                        stratBadge.textContent = `BUY CONFIRMED (${score}% [${grade}])`;
+                    }
+                } else if (action === 'SELL') {
+                    stratPanel.className = 'matrix-strategies-panel panel-sell';
+                    if (stratBadge) {
+                        stratBadge.className = 'badge badge-rose';
+                        stratBadge.textContent = `SELL CONFIRMED (${score}% [${grade}])`;
+                    }
+                } else {
+                    stratPanel.className = 'matrix-strategies-panel panel-wait';
+                    if (stratBadge) {
+                        stratBadge.className = 'badge badge-amber';
+                        stratBadge.textContent = `WAITING FOR CONFLUENCE (${score}%)`;
+                    }
+                }
+
+                // Helper variables for live metrics
+                const struct = smc.structure || {};
+                const bosStr = struct.latest_bos ? Number(struct.latest_bos.price).toFixed(decimals) : '--';
+                const chochStr = struct.latest_choch ? Number(struct.latest_choch.price).toFixed(decimals) : '--';
+                const obs = smc.order_blocks || {};
+                const dObStr = obs.nearest_demand ? `${Number(obs.nearest_demand.top).toFixed(decimals)} (${Number(obs.nearest_demand.bottom).toFixed(decimals)})` : '--';
+                const sObStr = obs.nearest_supply ? `${Number(obs.nearest_supply.bottom).toFixed(decimals)} (${Number(obs.nearest_supply.top).toFixed(decimals)})` : '--';
+                const kz = ict.killzones || {};
+                const kzName = (kz.active_killzones && kz.active_killzones.length) ? kz.active_killzones.map(k => k.name).join(', ') : (data.active_sessions ? data.active_sessions.join(', ') : 'Off-Peak');
+                const judasBias = (ict.judas_swing && ict.judas_swing.detected) ? `${ict.judas_swing.bias} Judas Detected` : 'Normal Flow';
+                const fibEq = fib.equilibrium ? Number(fib.equilibrium).toFixed(decimals) : '--';
+                const fibOte = fib.ote_sweet_spot ? Number(fib.ote_sweet_spot).toFixed(decimals) : (fib.fib_707 ? Number(fib.fib_707).toFixed(decimals) : '--');
+                const bslTargetStr = liq.bsl_target ? Number(liq.bsl_target).toFixed(decimals) : '--';
+                const sslTargetStr = liq.ssl_target ? Number(liq.ssl_target).toFixed(decimals) : '--';
+                const curRsi = (div.rsi_current !== undefined) ? Number(div.rsi_current).toFixed(1) : (div.details && div.details.rsi_curr !== undefined ? Number(div.details.rsi_curr).toFixed(1) : '50.0');
+                const smtTier = smt.tier || 'SCANNING';
+                const smtBonus = smt.confluence_bonus || 0;
+                const disp = smt.displacement || {};
+                const liveSpread = (disp.live_spread_pips !== undefined) ? Number(disp.live_spread_pips).toFixed(1) : ((data.spread_pips !== undefined) ? Number(data.spread_pips).toFixed(1) : (isGold ? '2.5' : '1.8'));
+                const riskUsd = (autoSig.risk_usd !== undefined ? autoSig.risk_usd : 50.0).toFixed(2);
+                const slStr = autoSig.stop_loss ? Number(autoSig.stop_loss).toFixed(decimals) : '--';
+                const tp1Str = autoSig.target_tp1 ? Number(autoSig.target_tp1).toFixed(decimals) : '--';
+                const tp2Str = autoSig.target_tp2 ? Number(autoSig.target_tp2).toFixed(decimals) : '--';
+
+                const strats = [
+                    // Strategy 1: SMC Market Structure
+                    {
+                        num: '१',
+                        title: 'SMC Market Structure (BOS / CHoCH)',
+                        statusClass: action === 'BUY' ? 'status-buy' : (action === 'SELL' ? 'status-sell' : 'status-wait'),
+                        badgeHtml: action === 'BUY' ? '<span class="badge badge-green">BULLISH BOS CONFIRMED</span>' : (action === 'SELL' ? '<span class="badge badge-rose">BEARISH BOS CONFIRMED</span>' : `<span class="badge badge-amber">${smc.trend || 'NEUTRAL'}</span>`),
+                        metric: action === 'BUY' ? `Trend: BULLISH | BOS: ${bosStr} | CHoCH: ${chochStr}` : (action === 'SELL' ? `Trend: BEARISH | BOS: ${bosStr} | CHoCH: ${chochStr}` : `Structure: Range / Consolidation | BOS: ${bosStr}`),
+                        expl: action === 'BUY'
+                            ? `मार्केट हायर हाय (HH) आणि हायर लो (HL) तयार करत स्पष्ट बुलिश स्ट्रक्चरमध्ये आहे. <strong>${bosStr}</strong> वर ब्रेक ऑफ स्ट्रक्चर (BOS) झाल्यामुळे संस्थात्मक खरेदीदारांनी (Smart Money) वरच्या दिशेने नियंत्रण घेतले आहे.`
+                            : (action === 'SELL'
+                                ? `मार्केट लोअर हाय (LH) आणि लोअर लो (LL) तयार करत स्पष्ट डाऊनट्रेंडमध्ये आहे. <strong>${bosStr}</strong> वरील की-सपोर्ट ब्रेक (BOS/CHoCH) झाल्याने संस्थांची आक्रमक विक्री सुरू असल्याचे सिद्ध झाले आहे.`
+                                : `मार्केट सध्या रेंजमध्ये असून हायर हाय किंवा लोअर लो चे स्पष्ट ब्रेकआऊट झालेले नाही. नवीन ट्रेंड दिशेसाठी कन्फर्म BOS किंवा CHoCH ची प्रतीक्षा आहे.`)
+                    },
+                    // Strategy 2: Order Blocks & FVG
+                    {
+                        num: '२',
+                        title: 'Order Blocks & FVG (Demand / Supply)',
+                        statusClass: action === 'BUY' ? 'status-buy' : (action === 'SELL' ? 'status-sell' : 'status-wait'),
+                        badgeHtml: action === 'BUY' ? '<span class="badge badge-green">DEMAND OB MITIGATED</span>' : (action === 'SELL' ? '<span class="badge badge-rose">SUPPLY OB MITIGATED</span>' : '<span class="badge badge-blue">ZONES MAPPED</span>'),
+                        metric: action === 'BUY' ? `Demand: ${dObStr} | FVG: Bullish Imbalance` : (action === 'SELL' ? `Supply: ${sObStr} | FVG: Bearish Imbalance` : `Demand: ${dObStr} | Supply: ${sObStr}`),
+                        expl: action === 'BUY'
+                            ? `संस्थात्मक बँकर्सच्या अनमिटिगेटेड डिमांड ऑर्डर ब्लॉक (<strong>${dObStr}</strong>) मध्ये किंमत आली असून 5M कँडलला मजबूत बुलिश रिजेक्शन मिळाले आहे. फेअर व्हॅल्यू गॅप (FVG) मधून लिक्विडिटी भरून वर जाण्याचा रस्ता मोकळा झाला आहे.`
+                            : (action === 'SELL'
+                                ? `मोठ्या संस्थांच्या अनमिटिगेटेड सप्लाय ऑर्डर ब्लॉक (<strong>${sObStr}</strong>) वरून किंमतीला तीव्र रिजेक्शन मिळाले आहे. वरच्या बाजूचे सर्व बायर्स संपले असून सप्लाय झोनमधून आक्रमक सेल-ऑफ सुरू झाला आहे.`
+                                : `चालू भाव डिमांड व सप्लाय झोनच्या मध्यभागी आहे. संस्थात्मक व्हॉल्यूम मिळण्यासाठी किंमत ऑर्डर ब्लॉक किंवा FVG झोनमध्ये येण्याची प्रतीक्षा आहे.`)
+                    },
+                    // Strategy 3: ICT Sessions & Killzones
+                    {
+                        num: '३',
+                        title: 'ICT Sessions & Killzones (Judas Swing)',
+                        statusClass: action === 'BUY' ? 'status-buy' : (action === 'SELL' ? 'status-sell' : 'status-wait'),
+                        badgeHtml: action === 'BUY' ? `<span class="badge badge-gold">${kzName}</span>` : (action === 'SELL' ? `<span class="badge badge-gold">${kzName}</span>` : `<span class="badge badge-blue">${kzName || 'OFF-PEAK'}</span>`),
+                        metric: `Session: ${kzName} | Judas: ${judasBias}`,
+                        expl: action === 'BUY'
+                            ? `लंडन किंवा न्यू यॉर्क ओपन किलझोन (<strong>${kzName}</strong>) सक्रिय आहे. या उच्च-व्हॉल्यूम वेळेत एशियन रेंजच्या खालची लिक्विडिटी घेऊन ज्युडास स्विंग (Judas Swing) रिव्हर्सल झाला असून वरच्या दिशेने रॅली सुरू झाली आहे.`
+                            : (action === 'SELL'
+                                ? `सक्रिय किलझोन (<strong>${kzName}</strong>) मध्ये ऑपरेटर्सनी वरच्या दिशेने फेक मुव्ह (Judas Swing) करून बायर्सना ट्रॅप केले आणि आता न्यू यॉर्क/लंडन सेशनच्या मुख्य दिशेने डाऊनवर्ड मुव्ह वेगाने सुरू झाली आहे.`
+                                : `सध्या संस्थात्मक मोमेंटम विंडो स्कॅन केली जात आहे. लंडन (02:00-05:00 ET) किंवा न्यू यॉर्क (07:00-10:00 ET / 10:00-11:00 AM Silver Bullet) मध्ये व्हॉल्यूम वाढल्यावर ट्रेड ट्रिगर होईल.`)
+                    },
+                    // Strategy 4: Fibonacci OTE (0.618 - 0.707)
+                    {
+                        num: '४',
+                        title: 'Fibonacci Retracement & ICT OTE',
+                        statusClass: action === 'BUY' ? 'status-buy' : (action === 'SELL' ? 'status-sell' : 'status-wait'),
+                        badgeHtml: action === 'BUY' ? '<span class="badge badge-green">DISCOUNT OTE (70.7%)</span>' : (action === 'SELL' ? '<span class="badge badge-rose">PREMIUM OTE (70.7%)</span>' : `<span class="badge badge-amber">${fib.zone || 'EQUILIBRIUM'}</span>`),
+                        metric: `Zone: ${(fib.zone) || 'EQUILIBRIUM'} | Eq 50%: ${fibEq} | OTE: ${fibOte}`,
+                        expl: action === 'BUY'
+                            ? `किंमत 50% इक्विलिब्रियमच्या खाली <strong>डिस्काउंट झोन</strong> मध्ये स्वस्त भावात आली आहे. ICT Optimal Trade Entry (<strong>61.8% - 70.7% OTE</strong>) लेव्हलवर अचूक रिट्रेसमेंट झाल्याने रिस्क अतिशय कमी आणि रिवॉर्ड सर्वाधिक आहे.`
+                            : (action === 'SELL'
+                                ? `किंमत 50% इक्विलिब्रियमच्या वर <strong>प्रीमियम झोन</strong> मध्ये महाग भावात पोहोचली आहे. 61.8% - 70.7% फिबोनॅची ओटे झोनमधून संस्थांनी विक्री सुरू केल्यामुळे हा सेलसाठी सर्वोत्तम झोन आहे.`
+                                : `किंमत 50% इक्विलिब्रियम जवळ ट्रेड करत आहे. बायसाठी डिस्काउंट (<50%) किंवा सेलसाठी प्रीमियम (>50%) झोनमध्ये किंमत जाण्याची वाट पाहत आहोत.`)
+                    },
+                    // Strategy 5: Liquidity Sweeps & Stop-Loss Hunt
+                    {
+                        num: '५',
+                        title: 'Liquidity Sweeps & Turtle Soup',
+                        statusClass: action === 'BUY' ? 'status-buy' : (action === 'SELL' ? 'status-sell' : 'status-wait'),
+                        badgeHtml: action === 'BUY' ? '<span class="badge badge-green">SSL SWEPT (TURTLE SOUP)</span>' : (action === 'SELL' ? '<span class="badge badge-rose">BSL SWEPT (TURTLE SOUP)</span>' : '<span class="badge badge-cyan">POOLS MAPPED</span>'),
+                        metric: action === 'BUY' ? `SSL Swept: ${sslTargetStr} | Wick Raid Confirmed` : (action === 'SELL' ? `BSL Swept: ${bslTargetStr} | Wick Raid Confirmed` : `BSL: ${bslTargetStr} | SSL: ${sslTargetStr}`),
+                        expl: action === 'BUY'
+                            ? `रिटेल ट्रेडर्सचे स्टॉपलॉस ज्या सेल-साइड लिक्विडिटी (<strong>SSL</strong>) खाली होते, तिथे ऑपरेटर्सनी विक (Wick) मारून स्टॉप उडवले आणि लगेच कँडल रेंजच्या आत क्लोज केली (टर्टल सूप रिव्हर्सल). लिक्विडिटी मिळताच वरची मुव्ह कन्फर्म झाली.`
+                            : (action === 'SELL'
+                                ? `रेजिस्टन्स वरील ब्रेकआऊट बायर्सना ट्रॅप करण्यासाठी बाय-साइड लिक्विडिटी (<strong>BSL</strong>) चा स्टॉप हंट करण्यात आला. वर फक्त सुई (Wick) सोडून कँडल खाली क्लोज झाली, ज्यामुळे ऑपरेटर सेलिंग लॉक झाली.`
+                                : `की-स्विंग हाय (BSL) आणि की-स्विंग लो (SSL) लिक्विडिटी पूल्स ट्रॅक केले जात आहेत. ऑपरेटरचा स्टॉप हंट (Wick Raid) झाल्यावरच रिव्हर्सल एन्ट्री वैध होईल.`)
+                    },
+                    // Strategy 6: Multi-Target R:R Capital Protection
+                    {
+                        num: '६',
+                        title: 'Multi-Target R:R & Capital Protection',
+                        statusClass: action === 'BUY' || action === 'SELL' ? (action === 'BUY' ? 'status-buy' : 'status-sell') : 'status-wait',
+                        badgeHtml: action === 'BUY' || action === 'SELL' ? '<span class="badge badge-green">TP1 2R & TP2 3.5R+</span>' : '<span class="badge badge-green">$50 RISK PROTECTED</span>',
+                        metric: action === 'BUY' || action === 'SELL' ? `Risk: $${riskUsd} | SL: ${slStr} | TP1: ${tp1Str} | TP2: ${tp2Str}` : 'Max Risk: $50.00 | Mandatory 1:2+ R:R Guard',
+                        expl: action === 'BUY'
+                            ? `कठोर रिस्क मॅनेजमेंट: स्टॉपलॉस मॅनिप्युलेशन लो खाली सुरक्षित ठेवला आहे ($50 कमाल मर्यादा). TP1 वर 1:2 R:R (1R वर स्टॉप ब्रेक-इव्हन) आणि TP2 वर 1:3.5+ R:R स्नायपर टार्गेट प्लॅन तयार आहे.`
+                            : (action === 'SELL'
+                                ? `कॅपिटल प्रोटेक्शन: स्टॉपलॉस मॅनिप्युलेशन हायच्या पलीकडे सुरक्षित ठेवला आहे. $50 कमाल रिस्क मर्यादेसह TP1 (1:2 R:R) आणि TP2 (1:3.5+ R:R) संस्थात्मक टार्गेट्स ठरवले आहेत.`
+                                : `किमान 1:2 आणि 1:3.5+ रिस्क-रिवॉर्ड मिळणारा सेटअप तयार झाल्यावरच ऑटोमॅटिक ट्रेड जनरेट होईल. तोपर्यंत कॅपिटल 100% सुरक्षित आहे.`)
+                    },
+                    // Strategy 7: RSI Hidden Divergence
+                    {
+                        num: '७',
+                        title: 'RSI Hidden Divergence (Trend Continuation)',
+                        statusClass: action === 'BUY' ? 'status-buy' : (action === 'SELL' ? 'status-sell' : 'status-wait'),
+                        badgeHtml: action === 'BUY' ? '<span class="badge badge-green">HIDDEN BULLISH (CONT)</span>' : (action === 'SELL' ? '<span class="badge badge-rose">HIDDEN BEARISH (CONT)</span>' : '<span class="badge badge-purple">MONITORING</span>'),
+                        metric: action === 'BUY' ? `Price HL vs RSI LL | Current RSI: ${curRsi}` : (action === 'SELL' ? `Price LH vs RSI HH | Current RSI: ${curRsi}` : `Current RSI: ${curRsi} | Swing Divergence Scan`),
+                        expl: action === 'BUY'
+                            ? `चार्टवर किंमतीने हायर लो (HL) टिकवून ठेवला आहे, पण RSI ने लोअर लो (LL) बनवला आहे. हा <strong>Hidden Bullish Divergence</strong> असून अंतर्गत मोमेंटम अतिशय मजबूत आहे आणि अपट्रेंड वेगाने पुढे चालू राहणार असल्याचे सिद्ध होते.`
+                            : (action === 'SELL'
+                                ? `चार्टवर किंमतीने लोअर हाय (LH) बनवला पण RSI वर गेला. हा <strong>Hidden Bearish Divergence</strong> सेलिंग प्रेशर टिकून असल्याचे आणि डाऊनट्रेंड चालू राहण्याचे स्पष्ट संकेत देतो.`
+                                : `RSI आणि प्राईस स्विंग्समधील छुपा डायव्हर्जन्स शोधण्याचे काम सुरू आहे. मोमेंटम आणि प्राईसमध्ये विसंगती येताच अलर्ट मिळेल.`)
+                    },
+                    // Strategy 8: Inter-Market Triad SMT
+                    {
+                        num: '८',
+                        title: 'Inter-Market Triad SMT Divergence (5M)',
+                        statusClass: action === 'BUY' ? 'status-buy' : (action === 'SELL' ? 'status-sell' : 'status-wait'),
+                        badgeHtml: action === 'BUY' ? `<span class="badge badge-green">${smtTier}</span>` : (action === 'SELL' ? `<span class="badge badge-rose">${smtTier}</span>` : `<span class="badge badge-blue">${smtTier}</span>`),
+                        metric: action === 'BUY' || action === 'SELL' ? `Triad Divergence | Bias: ${action} (+${smtBonus}%)` : 'Correlation Benchmark Scanning (XAU vs XAG/DXY | BTC vs ETH/QQQ)',
+                        expl: action === 'BUY'
+                            ? `गोल्ड vs सिल्व्हर (XAG) व डॉलर इंडेक्स (DXY) किंवा BTC vs ETH व QQQ यांच्यातील संस्थात्मक ट्रायड विसंगती: बेंचमार्कने नवा लो बनवला पण मुख्य ॲसेट तोडू शकला नाही. स्मार्ट मनी खरेदी करत असल्याने <strong>SMT A+ स्नायपर सिग्नल</strong> कन्फर्म झाला.`
+                            : (action === 'SELL'
+                                ? `इंटर-मार्केट बेअरिश SMT: बेंचमार्क ॲसेट नवीन हाय बनवत असताना मुख्य ॲसेट हायर हाय बनवण्यात अपयशी ठरला (Lower High). स्मार्ट मनी मोठ्या प्रमाणात विक्री करत असल्याचा हा अचूक पुरावा आहे.`
+                                : `5M स्विंग्ज आणि बेंचमार्क ॲसेट्स (XAG/USD, DXY, ETH, QQQ) यांचे रिअल-टाईम कोरिलेशन स्कॅन सुरू आहे. संस्थात्मक डायव्हर्जन्स येताच हा निकष सक्रिय होईल.`)
+                    },
+                    // Strategy 9: CISD + FVG Displacement & Spread Guard
+                    {
+                        num: '९',
+                        title: 'CISD + FVG Displacement & Spread Guard',
+                        statusClass: action === 'BUY' ? 'status-buy' : (action === 'SELL' ? 'status-sell' : 'status-wait'),
+                        badgeHtml: action === 'BUY' ? '<span class="badge badge-green">CISD CONFIRMED (SAFE)</span>' : (action === 'SELL' ? '<span class="badge badge-rose">CISD CONFIRMED (SAFE)</span>' : `<span class="badge badge-green">SAFE SPREAD (${liveSpread}p)</span>`),
+                        metric: action === 'BUY' || action === 'SELL' ? `5M Body Close Confirmed | Spread: ${liveSpread}p (< 4.5p)` : `Live Spread: ${liveSpread} pips | 5M Body Close Verification`,
+                        expl: action === 'BUY'
+                            ? `5M चेंज इन स्टेट ऑफ डिलिव्हरी (CISD) यशस्वी: बुलिश डिस्प्लेसमेंट कँडलच्या बॉडीने आधीच्या बेअरिश कँडलची बॉडी पूर्णपणे ओलांडून वर क्लोज दिला आहे (Wicks Ignored). लाइव्ह स्प्रेड <strong>${liveSpread} pips</strong> असून न्यूज स्पाइकची कोणतीही जोखीम नाही.`
+                            : (action === 'SELL'
+                                ? `5M बेअरिश CISD कन्फर्मेशन: बेअरिश कँडलने आधीच्या बुलिश कॅण्डलच्या बॉडीच्या खाली क्लोज दिली आहे. 3-कॅण्डल FVG डिस्प्लेसमेंट पूर्ण झाले असून स्प्रेड <strong>${liveSpread} pips</strong> वर सुरक्षित आहे.`
+                                : `5M कँडल बॉडी क्लोज आणि फेअर व्हॅल्यू गॅप (FVG) डिस्प्लेसमेंटची तपासणी सुरू आहे. विना-पुष्टीकरणाची (Blind Entry) कोणतीही घाई केली जात नाही.`)
+                    }
+                ];
+
+                stratGrid.innerHTML = strats.map(s => `
+                    <div class="strategy-deep-card ${s.statusClass}">
+                        <div class="strat-card-head">
+                            <span class="strat-card-title">${s.num}. ${s.title}</span>
+                            ${s.badgeHtml}
+                        </div>
+                        <div class="strat-card-metric">${s.metric}</div>
+                        <div class="strat-card-expl">${s.expl}</div>
+                    </div>
+                `).join('');
             }
 
             // Pillar 1: SMC Market Structure

@@ -14,6 +14,7 @@
   - `forex/tests/`: Comprehensive test suite verifying all engines (132/132 unit tests passing).
 - **Verification**: 132 tests passing across all test suites in 16.5s; 11/11 repository invariant tests passing.
 - **Recent Refinements & Bug Fixes**:
+  - `forex/dashboard.py` & UI: Added 9-Strategy Institutional Signal Deep Dive Panel (`#matrix9StrategiesPanel`) inside the Institutional Strategy Decision Matrix. Whenever a BUY or SELL signal triggers (or during monitoring), all 9 institutional strategies are fully explained in Marathi + technical live metrics (SMC BOS/CHoCH, Order Block Mitigation, ICT Killzones/Judas, Fibonacci Discount/Premium OTE 70.7%, Liquidity Turtle Soup, Multi-Target 1:2 & 1:3.5+ R:R with $50 risk cap, RSI Hidden Divergence, Inter-Market Triad SMT, and CISD Displacement).
   - `forex/signals.py`: Corrected True Range ATR calculation to account for price gap risk using previous candle close across 15 bars.
   - `forex/smt.py`: Improved fractal pivot temporal alignment between primary and benchmark series using relative `bars_ago` and ±900s timestamp tolerance.
   - `forex/smt.py`: Added offline mode check in `fetch_benchmark_candles` to prevent external network socket hangs during automated dashboard test runs.
