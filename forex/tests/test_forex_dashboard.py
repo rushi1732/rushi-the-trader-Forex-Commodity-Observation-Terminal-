@@ -983,6 +983,27 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("playRealAudio", html)
         self.assertIn("/audio/welcome_morning.mp3", html)
 
+    def test_service_worker_and_mobile_notification_endpoints(self):
+        """Verify Service Worker endpoint and Mobile Notification Bar features."""
+        # 1. /sw.js service worker endpoint
+        url_sw = f"http://127.0.0.1:{self.port}/sw.js"
+        with urllib.request.urlopen(url_sw, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertIn("javascript", resp.headers.get_content_type().lower())
+            body = resp.read().decode("utf-8")
+            self.assertIn("notificationclick", body)
+            self.assertIn("registration.showNotification", body)
+
+        # 2. HTML contains mobile notification bar hooks
+        url_home = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url_home, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        self.assertIn("initServiceWorker", html)
+        self.assertIn("testMobileNotification", html)
+        self.assertIn("btnTestNotif", html)
+        self.assertIn("showNotification", html)
+        self.assertIn("/sw.js", html)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2264,7 +2264,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <!-- Full-Screen Welcome Curtain Screen -->
     <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="triggerVoiceFromCurtainClick(event)">
         <div class="welcome-fullpage-card">
-            <button onclick="event.stopPropagation(); dismissCurtainScreen();" style="position:absolute; top:16px; right:18px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:6px;" title="Skip and open terminal">
+            <button onclick="event.stopPropagation(); unlockAudio(); dismissCurtainScreen();" style="position:absolute; top:16px; right:18px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:6px;" title="Skip and open terminal">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
             <div class="welcome-logo-circle">
@@ -2339,9 +2339,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     Test Indian Voice
                 </button>
 
-                <button id="btnNotif" class="btn" onclick="toggleNotifications()" title="Toggle Browser Desktop Alerts for BUY/SELL Signals" style="border-color:rgba(100,116,139,0.5); color:var(--text-muted); display:inline-flex; align-items:center; gap:6px;">
+                <button id="btnNotif" class="btn" onclick="toggleNotifications()" title="Toggle Mobile Notification Bar & Desktop Alerts for BUY/SELL Signals" style="border-color:rgba(100,116,139,0.5); color:var(--text-muted); display:inline-flex; align-items:center; gap:6px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                     <span id="notifStatusLabel">Alerts: OFF</span>
+                </button>
+
+                <button id="btnTestNotif" class="btn" onclick="testMobileNotification()" title="Test Mobile Notification Bar & Voice Alert" style="border-color:rgba(168,85,247,0.5); color:#c084fc; display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                    Test Mobile Alert
                 </button>
 
                 <button class="btn" onclick="openRiskModal()">
@@ -5378,14 +5383,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             unlockAudio();
         }
 
-        // Global click / touch / key listeners to unlock audio immediately on user interaction
+        // Global touch / click / pointer listeners to keep audio context awake and responsive on mobile
         if (typeof window !== 'undefined') {
-            ['click', 'touchstart', 'pointerdown', 'keydown'].forEach(evt => {
+            ['click', 'touchstart', 'touchend', 'pointerdown'].forEach(evt => {
                 window.addEventListener(evt, () => {
+                    if (audioCtx && audioCtx.state === 'suspended') {
+                        audioCtx.resume().catch(() => {});
+                    }
                     if (!isAudioUnlocked) {
                         unlockAudio();
                     }
-                }, { once: true, passive: true });
+                }, { passive: true });
             });
         }
 
@@ -5977,12 +5985,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }, 10000);
 
             // Wait 350ms for chime, then play studio MP3 via pre-unlocked dedicated element or instant WebAudio
+            const voiceNarration = `${actionText} ${assetName}, ${gradeText}`;
             setTimeout(() => {
-                playStudioSignalVoice(targetEl, staticAudio, onVoiceFinished);
+                playStudioSignalVoice(targetEl, staticAudio, onVoiceFinished, voiceNarration);
             }, 350);
         }
 
-        function playStudioSignalVoice(el, url, onFinished) {
+        function playStudioSignalVoice(el, url, onFinished, fallbackText = null) {
             let finished = false;
             const done = () => {
                 if (finished) return;
@@ -6007,7 +6016,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             // HTML5 Audio playback started successfully
                         }).catch(err => {
                             console.warn("[Voice Engine] Dedicated element play notice, using fallback:", err);
-                            if (url) playRealAudio(url, done, done);
+                            if (url) playRealAudio(url, done, () => {
+                                if (fallbackText && 'speechSynthesis' in window) speakFemaleVoice(fallbackText, done);
+                                else done();
+                            });
+                            else if (fallbackText && 'speechSynthesis' in window) speakFemaleVoice(fallbackText, done);
                             else done();
                         });
                         return;
@@ -6017,9 +6030,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             }
 
-            // Priority 3: Final fallback to playRealAudio
+            // Priority 3: Final fallback to playRealAudio with speech synthesis backup
             if (url) {
-                playRealAudio(url, done, done);
+                playRealAudio(url, done, () => {
+                    if (fallbackText && 'speechSynthesis' in window) speakFemaleVoice(fallbackText, done);
+                    else done();
+                });
+            } else if (fallbackText && 'speechSynthesis' in window) {
+                speakFemaleVoice(fallbackText, done);
             } else {
                 done();
             }
@@ -6132,6 +6150,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let welcomeDismissTimer = null;
 
         function dismissCurtainScreen() {
+            unlockAudio();
             if (isCurtainDismissed) return;
             isCurtainDismissed = true;
             if (welcomeDismissTimer) {
@@ -6339,6 +6358,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         /* -------------------------------------------------------------
            Browser Notifications & Risk Controls
            ------------------------------------------------------------- */
+        /* -------------------------------------------------------------
+           Mobile System Notification Bar (Service Worker PWA) & Alerts
+           ------------------------------------------------------------- */
+        let swRegistration = null;
+
+        function initServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .then(reg => {
+                        swRegistration = reg;
+                        console.log('[PWA] Service Worker registered for Mobile System Notifications:', reg.scope);
+                    })
+                    .catch(err => {
+                        console.warn('[PWA] Service Worker registration note:', err);
+                    });
+            }
+        }
+        if (typeof window !== 'undefined') {
+            initServiceWorker();
+        }
+
         function updateNotificationsUI() {
             const btn = document.getElementById('btnNotif');
             const lbl = document.getElementById('notifStatusLabel');
@@ -6359,9 +6399,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function toggleNotifications() {
-            getAudioContext(); // Unlock audio context on user gesture
+            unlockAudio();
+            getAudioContext();
             if (!("Notification" in window)) {
-                alert("This browser does not support desktop notifications.");
+                alert("This mobile browser does not support notifications. Please use Google Chrome on Android.");
                 return;
             }
 
@@ -6373,19 +6414,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
 
-            // If deactivated, toggle to ACTIVATED
-            if (Notification.permission === "granted") {
+            const activate = () => {
                 notificationsEnabled = true;
                 localStorage.setItem('notificationsEnabled', 'true');
                 updateNotificationsUI();
-                sendNotification("Forex Paper Terminal", "Desktop alerts activated for paper trade signals.");
+                try { playChime(); } catch(e) {}
+                sendNotification("Forex Paper Terminal", "Mobile Notification Bar and Desktop alerts activated.", "status-alert");
+            };
+
+            if (Notification.permission === "granted") {
+                activate();
             } else if (Notification.permission !== "denied") {
                 Notification.requestPermission().then(permission => {
                     if (permission === "granted") {
-                        notificationsEnabled = true;
-                        localStorage.setItem('notificationsEnabled', 'true');
-                        updateNotificationsUI();
-                        sendNotification("Forex Paper Terminal", "Desktop alerts activated for paper trade signals.");
+                        activate();
                     } else {
                         notificationsEnabled = false;
                         localStorage.setItem('notificationsEnabled', 'false');
@@ -6394,19 +6436,109 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     }
                 });
             } else {
-                alert("Desktop notifications are blocked by browser settings. Please allow notifications for this site in your browser URL bar.");
+                alert("Notifications are blocked by browser settings. Please allow notifications for this site in your browser URL bar.");
                 notificationsEnabled = false;
                 localStorage.setItem('notificationsEnabled', 'false');
                 updateNotificationsUI();
             }
         }
 
-        function sendNotification(title, body) {
-            if (notificationsEnabled && Notification.permission === "granted") {
-                new Notification(title, {
-                    body: body,
-                    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2338bdf8'><circle cx='12' cy='12' r='10'/></svg>"
+        function testMobileNotification() {
+            unlockAudio();
+            getAudioContext();
+
+            if (!("Notification" in window)) {
+                alert("This mobile browser does not support web notifications. Please open in Google Chrome on Android.");
+                return;
+            }
+
+            const executeTest = () => {
+                notificationsEnabled = true;
+                localStorage.setItem('notificationsEnabled', 'true');
+                updateNotificationsUI();
+
+                // Haptic vibration feedback on mobile phone
+                try {
+                    if ('vibrate' in navigator) navigator.vibrate([300, 100, 300, 100, 300]);
+                } catch(e) {}
+
+                // Play loud institutional double bell chime
+                try { playChime(); } catch(e) {}
+
+                // Send real notification directly to Android Notification Bar
+                sendNotification(
+                    "🔔 RUSHI THE TRADER: Mobile Alerts ACTIVE!",
+                    "Live BUY & SELL institutional signals will appear directly here in your mobile notification bar!",
+                    "test-mobile-alert"
+                );
+
+                // Voice audio announcement
+                const msg = "Mobile notification bar and Indian voice alerts are now active.";
+                if ('speechSynthesis' in window) {
+                    speakFemaleVoice(msg, null);
+                }
+            };
+
+            if (Notification.permission === "granted") {
+                executeTest();
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        executeTest();
+                    } else {
+                        alert("Notification permission was denied. Tap the lock/tune icon near the URL in Chrome to allow notifications.");
+                    }
                 });
+            } else {
+                alert("Notifications are blocked in your browser settings. Please tap the lock/tune icon in the browser address bar, go to Permissions, and tap Allow for Notifications.");
+            }
+        }
+
+        function sendNotification(title, body, tag = 'signal-alert') {
+            try {
+                if (!notificationsEnabled) return;
+                if (typeof Notification === 'undefined') return;
+                if (Notification.permission !== 'granted') return;
+
+                const notifOptions = {
+                    body: body,
+                    icon: '/favicon.ico',
+                    badge: '/favicon.ico',
+                    vibrate: [300, 100, 300, 100, 300],
+                    tag: tag || ('signal-' + Date.now()),
+                    renotify: true,
+                    requireInteraction: true,
+                    silent: false,
+                    data: {
+                        url: window.location.href,
+                        time: Date.now()
+                    }
+                };
+
+                // Priority 1: ServiceWorker showNotification (Direct to Android System Notification Bar)
+                if ('serviceWorker' in navigator) {
+                    const getSw = swRegistration ? Promise.resolve(swRegistration) : navigator.serviceWorker.ready;
+                    getSw.then(reg => {
+                        if (reg && reg.showNotification) {
+                            return reg.showNotification(title, notifOptions);
+                        }
+                        throw new Error('No showNotification on reg');
+                    }).catch(() => {
+                        try {
+                            new Notification(title, notifOptions);
+                        } catch(e) {}
+                    });
+                    return;
+                }
+
+                // Priority 2: Standard Desktop Notification constructor
+                try {
+                    new Notification(title, notifOptions);
+                } catch(e) {
+                    console.warn('[Notification] Constructor exception:', e);
+                }
+            } catch(e) {
+                console.warn('[Notification] sendNotification catch:', e);
             }
         }
 
@@ -6435,19 +6567,31 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     showVoiceToast(sig.action, assetName, gradeStr, !isNewSignal, sig.entry_reference, sig.stop_loss);
 
                     if (isNewSignal) {
-                        // Desktop push notification
-                        sendNotification(`New Paper Signal: ${sig.action} ${sym}`, `Grade: ${gradeStr} | Entry: ${sig.entry_reference} | Stop: ${sig.stop_loss}`);
+                        // Desktop and Mobile Notification Bar push notification
+                        try {
+                            sendNotification(
+                                `New Paper Signal: ${sig.action} ${sym}`,
+                                `Grade: ${gradeStr} | Entry: ${sig.entry_reference} | Stop: ${sig.stop_loss}`,
+                                `signal-${sym}-${sig.action}`
+                            );
+                        } catch(e) {
+                            console.warn('[Signal Notification Error]', e);
+                        }
                     }
 
-                    // Strict single-voice announcement
-                    announceSignalVoice({
-                        symbol: sym,
-                        action: sig.action,
-                        grade: sig.grade || (data.confluence_signal ? data.confluence_signal.grade : 'Grade B'),
-                        entry_reference: sig.entry_reference,
-                        stop_loss: sig.stop_loss,
-                        take_profit: sig.take_profit
-                    }, !isNewSignal);
+                    // Strict single-voice announcement with independent try/catch
+                    try {
+                        announceSignalVoice({
+                            symbol: sym,
+                            action: sig.action,
+                            grade: sig.grade || (data.confluence_signal ? data.confluence_signal.grade : 'Grade B'),
+                            entry_reference: sig.entry_reference,
+                            stop_loss: sig.stop_loss,
+                            take_profit: sig.take_profit
+                        }, !isNewSignal);
+                    } catch(e) {
+                        console.warn('[Signal Voice Error]', e);
+                    }
                 }
             } else {
                 // Signal has expired or returned to waiting/neutral
@@ -7051,6 +7195,60 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
+SW_JS_CONTENT = """// RUSHI THE TRADER - Service Worker for Mobile Notification Bar Alerts & Background Signals
+const SW_VERSION = 'v1.1.0';
+
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(self.clients.claim());
+});
+
+// Handle notification click from Mobile Notification Bar (opens or focuses terminal)
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const targetUrl = (event.notification.data && event.notification.data.url) ? event.notification.data.url : '/';
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            for (let i = 0; i < clientList.length; i++) {
+                const client = clientList[i];
+                if ('focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(targetUrl);
+            }
+        })
+    );
+});
+
+// Handle background push notifications if Web Push API is used
+self.addEventListener('push', (event) => {
+    if (!event.data) return;
+    try {
+        const payload = event.data.json();
+        event.waitUntil(
+            self.registration.showNotification(payload.title || 'Signal Alert', {
+                body: payload.body || 'New institutional trading signal',
+                icon: payload.icon || '/favicon.ico',
+                badge: payload.badge || '/favicon.ico',
+                vibrate: payload.vibrate || [300, 100, 300, 100, 300],
+                tag: payload.tag || 'trade-signal',
+                renotify: true,
+                requireInteraction: true,
+                data: payload.data || {}
+            })
+        );
+    } catch (e) {
+        console.warn('[SW] push event parse notice:', e);
+    }
+});
+"""
+
 
 class DashboardServer(ServerClass):
     """Server that suppresses client disconnect/refresh tracebacks."""
@@ -7104,6 +7302,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.send_header("X-Paper-Trading-Only", "true")
             self.end_headers()
             self.wfile.write(HTML_TEMPLATE.encode("utf-8"))
+            return
+
+        # Service Worker for Mobile Notification Bar & PWA Alerts
+        if path in ("/sw.js", "/serviceworker.js"):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Service-Worker-Allowed", "/")
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.end_headers()
+            self.wfile.write(SW_JS_CONTENT.encode("utf-8"))
             return
 
         # Favicon and Brand Images
