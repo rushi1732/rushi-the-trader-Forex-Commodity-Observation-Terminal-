@@ -434,8 +434,20 @@ def evaluate_confluence_signal(
     rr_tp1 = 0.0
     rr_tp2 = 0.0
 
-    # ATR / Volatility buffer: 14-period true range
-    recent_ranges = [max(c["high"] - c["low"], abs(c["high"] - c.get("close", c["high"]))) for c in candles[-14:]]
+    # ATR / Volatility buffer: 14-period true range (incorporates price gaps)
+    sub_candles = candles[-15:]
+    if len(sub_candles) >= 2:
+        recent_ranges = []
+        for i in range(1, len(sub_candles)):
+            c_curr = sub_candles[i]
+            c_prev = sub_candles[i - 1]
+            h = c_curr["high"]
+            l = c_curr["low"]
+            pc = c_prev["close"]
+            tr = max(h - l, abs(h - pc), abs(l - pc))
+            recent_ranges.append(tr)
+    else:
+        recent_ranges = [max(c["high"] - c["low"], 0.0001) for c in candles]
     avg_bar_range = sum(recent_ranges) / len(recent_ranges) if recent_ranges else (pip_size * 15)
 
     # Institutional Volatility Buffer (1.25x ATR-14)

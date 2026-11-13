@@ -104,6 +104,11 @@ def fetch_benchmark_candles(
             return raw["candles"], True, "Offline Test Feed"
         if isinstance(raw, list):
             return raw, True, "Offline Test Feed"
+        if isinstance(raw, dict) and "chart" in raw:
+            from .data import parse_yahoo_chart
+            parsed = parse_yahoo_chart(raw, canon)
+            return parsed.get("candles", []), True, "Offline Test Feed"
+        return [], False, "Offline Mode (Benchmark not provided)"
 
     # 2. Check in-memory cache
     cached = _BENCHMARK_CACHE.get(cache_key)
@@ -304,6 +309,7 @@ def find_fractal_pivots_5m(
             swing_highs.append({
                 "local_index": i,
                 "global_index": offset + i,
+                "bars_ago": len(candles) - 1 - (offset + i),
                 "price": h,
                 "timestamp": ts,
             })
@@ -318,6 +324,7 @@ def find_fractal_pivots_5m(
             swing_lows.append({
                 "local_index": i,
                 "global_index": offset + i,
+                "bars_ago": len(candles) - 1 - (offset + i),
                 "price": l,
                 "timestamp": ts,
             })
@@ -383,11 +390,17 @@ def detect_smt_divergence(
         p_sh1, p_sh2 = p_highs[-2], p_highs[-1]
         b1_sh1, b1_sh2 = b1_highs[-2], b1_highs[-1]
 
-        # Temporal pivot alignment check (within ±3 candles)
-        idx_diff_1 = abs(p_sh1["local_index"] - b1_sh1["local_index"])
-        idx_diff_2 = abs(p_sh2["local_index"] - b1_sh2["local_index"])
+        # Temporal pivot alignment check (within +/-3 candles or +/-900s)
+        bars_diff_1 = abs(p_sh1.get("bars_ago", p_sh1["local_index"]) - b1_sh1.get("bars_ago", b1_sh1["local_index"]))
+        bars_diff_2 = abs(p_sh2.get("bars_ago", p_sh2["local_index"]) - b1_sh2.get("bars_ago", b1_sh2["local_index"]))
+        aligned_1 = bars_diff_1 <= 3
+        aligned_2 = bars_diff_2 <= 3
+        if not aligned_1 and p_sh1.get("timestamp") and b1_sh1.get("timestamp"):
+            aligned_1 = abs(p_sh1["timestamp"] - b1_sh1["timestamp"]) <= 900
+        if not aligned_2 and p_sh2.get("timestamp") and b1_sh2.get("timestamp"):
+            aligned_2 = abs(p_sh2["timestamp"] - b1_sh2["timestamp"]) <= 900
 
-        if idx_diff_1 <= 3 and idx_diff_2 <= 3:
+        if aligned_1 and aligned_2:
             # Check Primary Lower High (SH2 < SH1)
             p_lh = p_sh2["price"] < p_sh1["price"]
             p_hh = p_sh2["price"] > p_sh1["price"]
@@ -474,11 +487,17 @@ def detect_smt_divergence(
         p_sl1, p_sl2 = p_lows[-2], p_lows[-1]
         b1_sl1, b1_sl2 = b1_lows[-2], b1_lows[-1]
 
-        # Temporal alignment check (within ±3 candles)
-        idx_diff_1 = abs(p_sl1["local_index"] - b1_sl1["local_index"])
-        idx_diff_2 = abs(p_sl2["local_index"] - b1_sl2["local_index"])
+        # Temporal alignment check (within +/-3 candles or +/-900s)
+        bars_diff_1 = abs(p_sl1.get("bars_ago", p_sl1["local_index"]) - b1_sl1.get("bars_ago", b1_sl1["local_index"]))
+        bars_diff_2 = abs(p_sl2.get("bars_ago", p_sl2["local_index"]) - b1_sl2.get("bars_ago", b1_sl2["local_index"]))
+        aligned_1 = bars_diff_1 <= 3
+        aligned_2 = bars_diff_2 <= 3
+        if not aligned_1 and p_sl1.get("timestamp") and b1_sl1.get("timestamp"):
+            aligned_1 = abs(p_sl1["timestamp"] - b1_sl1["timestamp"]) <= 900
+        if not aligned_2 and p_sl2.get("timestamp") and b1_sl2.get("timestamp"):
+            aligned_2 = abs(p_sl2["timestamp"] - b1_sl2["timestamp"]) <= 900
 
-        if idx_diff_1 <= 3 and idx_diff_2 <= 3:
+        if aligned_1 and aligned_2:
             # Check Primary Higher Low (SL2 > SL1)
             p_hl = p_sl2["price"] > p_sl1["price"]
             p_ll = p_sl2["price"] < p_sl1["price"]

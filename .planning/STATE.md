@@ -12,4 +12,8 @@
   - `forex/observe.py`: Observation pipeline integration, dynamic 1R breakeven protection, zero live-broker paper execution safety.
   - `forex/dashboard.py`: Native HTML5 Canvas overlays, 9-Pillar Institutional Confluence Decision Matrix with Check #8 (Inter-Market Triad SMT) and Check #9 (CISD + FVG Displacement & Spread Guard), Marathi + English explanations, Indian Voice Alert for 90%+ A+ Sniper signals, Multi-Pair Live Scanner Widget with 1-click pair chart analysis.
   - `forex/tests/`: Comprehensive test suite verifying all engines (132/132 unit tests passing).
-- **Verification**: 132 tests passing across all test suites in 6.8s.
+- **Verification**: 132 tests passing across all test suites in 16.5s; 11/11 repository invariant tests passing.
+- **Recent Refinements & Bug Fixes**:
+  - `forex/signals.py`: Corrected True Range ATR calculation to account for price gap risk using previous candle close across 15 bars.
+  - `forex/smt.py`: Improved fractal pivot temporal alignment between primary and benchmark series using relative `bars_ago` and ±900s timestamp tolerance.
+  - `forex/smt.py`: Added offline mode check in `fetch_benchmark_candles` to prevent external network socket hangs during automated dashboard test runs.
