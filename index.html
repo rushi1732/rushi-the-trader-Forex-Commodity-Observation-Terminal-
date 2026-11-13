@@ -1983,6 +1983,34 @@
                                 Trend Continuation (Price HL / RSI LL or LH / HH)
                             </div>
                         </div>
+
+                        <!-- Pillar 8: Inter-Market Triad SMT (5M) -->
+                        <div class="check-card">
+                            <div class="check-card-header">
+                                <span class="check-card-title">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 12l-4-4-4 4M12 16V8"/></svg>
+                                    8. Inter-Market Triad SMT (5M)
+                                </span>
+                                <span id="chkSmtStatus" class="badge badge-blue">SCANNING</span>
+                            </div>
+                            <div id="chkSmtDetail" class="check-card-detail">
+                                Scanning XAU vs XAG + DXY or BTC vs ETH + QQQ
+                            </div>
+                        </div>
+
+                        <!-- Pillar 9: CISD + FVG Displacement & Spread Guard -->
+                        <div class="check-card">
+                            <div class="check-card-header">
+                                <span class="check-card-title">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                                    9. CISD + FVG Displacement
+                                </span>
+                                <span id="chkDispStatus" class="badge badge-green">SAFE (<4.5p)</span>
+                            </div>
+                            <div id="chkDispDetail" class="check-card-detail">
+                                5M displacement body close & spread safety check
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Key Strategy Decision Levels -->
@@ -2037,6 +2065,10 @@
                             <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
                                 <strong style="color:var(--text-primary);">५. आरएसआय हिडन डायव्हर्जन्स (Trend Continuation):</strong>
                                 <p style="font-size:11px; margin-top:4px;">अपट्रेंडमध्ये किंमत <strong>Higher Low (HL)</strong> बनवते पण RSI <strong>Lower Low (LL)</strong> बनवतो, तेव्हा तो <strong>Hidden Bullish Divergence</strong> असतो (ट्रेंड चालू राहण्याचा मजबूत संकेत). डाऊनट्रेंडमध्ये किंमत <strong>Lower High (LH)</strong> आणि RSI <strong>Higher High (HH)</strong> बनवतो तेव्हा <strong>Hidden Bearish Divergence</strong> होतो.</p>
+                            </div>
+                            <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
+                                <strong style="color:var(--text-primary);">६. इंटर-मार्केट ट्रायड SMT व CISD (Institutional SMT):</strong>
+                                <p style="font-size:11px; margin-top:4px;">गोल्ड (XAU), सिल्व्हर (XAG) आणि डॉलर इंडेक्स (DXY) यांच्यातील विसंगती <strong>SMT Divergence</strong> दर्शवते. सिल्व्हरने नवीन High बनवला पण गोल्डने बनवला नाही, तर स्मार्ट मनी विक्री करत आहे हे सिद्ध होते. <strong>5M CISD (Change in State of Delivery)</strong> व FVG डिस्प्लेसमेंटनंतर 90%+ A+ स्नायपर ट्रेड कन्फर्म होतो.</p>
                             </div>
                         </div>
                     </details>
@@ -3200,6 +3232,7 @@
             const box = document.getElementById('matrixDecisionBox');
             const actionEl = document.getElementById('matrixActionLabel');
             const summaryEl = document.getElementById('matrixDecisionSummary');
+            const smt = data.smt || (confSig.components && confSig.components.smt) || {};
 
             if (box && actionEl && summaryEl) {
                 const factorListHtml = factors.length ? ('<ul style="margin:6px 0 6px 18px; font-size:11px;">' + factors.map(f => `<li>${f}</li>`).join('') + '</ul>') : '';
@@ -3208,26 +3241,30 @@
                     box.className = 'decision-box buy-active';
                     actionEl.innerHTML = `<span class="pulse-dot green"></span> BUY SIGNAL CONFIRMED (बाय सिग्नल सक्रिय)  -  ${score}% [${grade}]`;
                     actionEl.style.color = '#34d399';
+                    const smtNote = smt.summary_mr ? `<br>• <strong>इंटर-मार्केट ट्रायड SMT:</strong> ${smt.summary_mr}` : '';
                     summaryEl.innerHTML = `
-                        <strong>का BUY करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बुलिश असून किंमत Discount Zone मध्ये आहे. लिक्विडिटी हंट किंवा ऑर्डर ब्लॉक टेस्ट नंतर 5m कँडलने स्पष्ट कन्फर्मेशन दिले आहे.<br>
+                        <strong>का BUY करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बुलिश असून किंमत Discount Zone मध्ये आहे. लिक्विडिटी हंट किंवा ऑर्डर ब्लॉक टेस्ट नंतर 5m कँडलने स्पष्ट कन्फर्मेशन दिले आहे.${smtNote}<br>
                         ${factorListHtml}
                     `;
                 } else if (action === 'SELL') {
                     box.className = 'decision-box sell-active';
                     actionEl.innerHTML = `<span class="pulse-dot red"></span> SELL SIGNAL CONFIRMED (सेल सिग्नल सक्रिय)  -  ${score}% [${grade}]`;
                     actionEl.style.color = '#fb7185';
+                    const smtNote = smt.summary_mr ? `<br>• <strong>इंटर-मार्केट ट्रायड SMT:</strong> ${smt.summary_mr}` : '';
                     summaryEl.innerHTML = `
-                        <strong>का SELL करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बेअरिश असून किंमत Premium Zone मध्ये आहे. Buy-Side Liquidity (BSL) स्वीप किंवा Supply Order Block रिजेक्शन नंतर मजबूत सेल-ऑफ दिसत आहे.<br>
+                        <strong>का SELL करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बेअरिश असून किंमत Premium Zone मध्ये आहे. Buy-Side Liquidity (BSL) स्वीप किंवा Supply Order Block रिजेक्शन नंतर मजबूत सेल-ऑफ दिसत आहे.${smtNote}<br>
                         ${factorListHtml}
                     `;
                 } else {
                     box.className = 'decision-box wait-active';
                     actionEl.innerHTML = `<span class="pulse-dot amber"></span> NO SIGNAL (प्रतीक्षा करा - किंमत अद्याप एन्ट्री झोनमध्ये नाही)  -  Confluence: ${score}% [${grade}]`;
                     actionEl.style.color = '#fbbf24';
+                    const smtNote = smt.summary_mr ? `• <strong>इंटर-मार्केट ट्रायड SMT:</strong> ${smt.summary_mr}<br>` : `• <strong>इंटर-मार्केट ट्रायड SMT:</strong> 5M स्विंग्ज व 15M की-लेव्हल्स स्कॅन सुरू आहे.<br>`;
                     summaryEl.innerHTML = `
                         <strong>सध्या काय स्थिती आहे? (Current Status & Strategy Rationale):</strong> चालू भाव <strong>${curPrice ? curPrice.toFixed(decimals) : '--'}</strong> आहे. किंमत अद्याप स्ट्रॅटेजीनुसार व्हॅलिड एन्ट्री झोनमध्ये (Demand/Supply Order Block, FVG, OTE किंवा Breakout Level) पोहोचलेली नाही.<br>
                         • <strong>SMC स्ट्रक्चर:</strong> ${smc.trend || 'Ranging'} | <strong>झोन:</strong> ${(fib.zone) || 'Equilibrium'} (50% Eq: ${(fib.equilibrium || 0).toFixed(decimals)})<br>
                         • <strong>ऑर्डर ब्लॉक / FVG:</strong> डिमांड व सप्लाय झोनची चाचणी सुरू आहे.<br>
+                        ${smtNote}
                         • <strong>नियम:</strong> जोपर्यंत लाइव्ह मार्केट प्राईस अचूक एन्ट्री झोनमध्ये पोहोचत नाही, तोपर्यंत सिस्टम strictly 'NO SIGNAL' स्थितीत राहील.
                     `;
                 }
@@ -3382,6 +3419,64 @@
                     chkDivDetail.textContent = `${div.type.replace('_', ' ')}: P(${pPrev}→${pCurr}) vs RSI(${rPrev}→${rCurr})${bAgo}`;
                 } else {
                     chkDivDetail.textContent = 'Scanning swings for Hidden HL/LL or LH/HH Trend Continuation';
+                }
+            }
+
+            // Pillar 8: Inter-Market Triad SMT (5M)
+            const chkSmtStatus = document.getElementById('chkSmtStatus');
+            const chkSmtDetail = document.getElementById('chkSmtDetail');
+            if (chkSmtStatus) {
+                const tier = smt.tier || 'SCANNING';
+                if (tier.includes('TRIAD SMT (A+)')) {
+                    chkSmtStatus.className = smt.bias === 'BUY' ? 'badge badge-green' : 'badge badge-rose';
+                    chkSmtStatus.textContent = 'TRIAD SMT (A+)';
+                } else if (tier.includes('PAIR SMT (A)')) {
+                    chkSmtStatus.className = smt.bias === 'BUY' ? 'badge badge-cyan' : 'badge badge-amber';
+                    chkSmtStatus.textContent = 'PAIR SMT (A)';
+                } else if (tier === 'INVALIDATED') {
+                    chkSmtStatus.className = 'badge';
+                    chkSmtStatus.textContent = 'INVALIDATED';
+                } else {
+                    chkSmtStatus.className = 'badge badge-blue';
+                    chkSmtStatus.textContent = 'SCANNING';
+                }
+            }
+            if (chkSmtDetail) {
+                if (smt.smt && smt.smt.description) {
+                    chkSmtDetail.textContent = smt.smt.description;
+                } else if (smt.summary_en) {
+                    chkSmtDetail.textContent = smt.summary_en;
+                } else {
+                    chkSmtDetail.textContent = 'Scanning 5M fractal pivots (XAU vs XAG/DXY | BTC vs ETH/QQQ)';
+                }
+            }
+
+            // Pillar 9: CISD + FVG Displacement & Spread Guard
+            const chkDispStatus = document.getElementById('chkDispStatus');
+            const chkDispDetail = document.getElementById('chkDispDetail');
+            const disp = smt.displacement || {};
+            if (chkDispStatus) {
+                if (disp.displacement_confirmed) {
+                    chkDispStatus.className = 'badge badge-green';
+                    chkDispStatus.textContent = 'CONFIRMED (SAFE)';
+                } else if (disp.is_spread_safe === false) {
+                    chkDispStatus.className = 'badge badge-rose';
+                    chkDispStatus.textContent = 'SPREAD LOCKED';
+                } else if (disp.status_badge) {
+                    chkDispStatus.className = 'badge badge-amber';
+                    chkDispStatus.textContent = disp.status_badge;
+                } else {
+                    const sp = data.spread_pips !== undefined ? data.spread_pips : (isGold ? 2.5 : 5.0);
+                    chkDispStatus.className = sp <= 4.5 ? 'badge badge-green' : 'badge badge-rose';
+                    chkDispStatus.textContent = sp <= 4.5 ? `SAFE (${sp.toFixed(1)}p)` : `LOCKED (${sp.toFixed(1)}p)`;
+                }
+            }
+            if (chkDispDetail) {
+                if (disp.description) {
+                    chkDispDetail.textContent = disp.description;
+                } else {
+                    const sp = data.spread_pips !== undefined ? data.spread_pips : (isGold ? 2.5 : 5.0);
+                    chkDispDetail.textContent = `Live Spread: ${sp.toFixed(1)} pips (News threshold < 4.5p) | 5M CISD Body Check`;
                 }
             }
 

@@ -22,3 +22,16 @@
 - [x] Phase 7: Comprehensive Unit Tests & Real Market Verification
   - Verification of mathematical accuracy for SMC, ICT, Fib, Liquidity, and end-to-end signal generation.
 
+## Milestone 5: Institutional-Grade Multi-Factor SMT Execution Engine (XAU/USD & BTC/USD)
+- [x] Phase 8: Inter-Market Triad Feed & Weekend-Aware Fallback (`forex/smt.py`, `forex/data.py`, `forex/pairs.py`)
+  - Twelve Data rate-limit safe 5m/15m completed candle caching, XAU triad (XAG/USD + UUP/DXY), BTC triad (ETH/USD + QQQ).
+  - Off-hours/weekend stale detection with seamless 2-Asset Pair SMT fallback.
+- [x] Phase 9: 4-Layer SMT Verification & Execution Pipeline (`forex/smt.py`, `forex/signals.py`, `forex/observe.py`)
+  - Layer 1: 15-Minute HTF context & liquidity sweep lock.
+  - Layer 2: 5M fractal pivots (SH1/SH2, SL1/SL2) with 2-candle confirmation across 25 bars.
+  - Layer 3: Mandatory CISD body displacement + 3-candle FVG gap & news spread guardrail (< 4.5 pips).
+  - Layer 4: Dynamic confluence weighting (+15% Pair SMT, +30% Triad SMT -> 90%+ A+ Sniper Confluence) & TP2 prioritization.
+- [x] Phase 10: Decision Matrix UI & Bilingual Voice Integration (`forex/dashboard.py`, `index.html`)
+  - Check #8 (Inter-Market Triad SMT) and Check #9 (CISD + FVG Displacement & Spread Guard).
+  - Marathi/English strategy rationale integration and Indian Voice Alert on 90%+ A+ Sniper signals.
+

@@ -27,6 +27,7 @@ from .smc import analyze_smc
 from .ict import analyze_ict
 from .liquidity import analyze_liquidity
 from .divergence import detect_divergence
+from .smt import analyze_institutional_triad_smt
 from .data import fetch_chart, MAJOR_PAIRS
 from .backtest import calculate_ema
 
@@ -37,6 +38,9 @@ def evaluate_confluence_signal(
     interval: str = "5m",
     now_dt: Optional[datetime] = None,
     asian_range: Optional[Dict[str, Any]] = None,
+    candles_15m: Optional[List[Dict[str, Any]]] = None,
+    live_spread_pips: float = 1.8,
+    offline_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Evaluates multi-factor institutional confluence across SMC, ICT, Fib, and Liquidity.
@@ -254,6 +258,27 @@ def evaluate_confluence_signal(
             bearish_score += div_boost
             bearish_factors.append(f"[RSI DIVERGENCE] {div_desc}")
 
+    # Factor H: Institutional-Grade Multi-Factor Triad SMT & HTF Key Levels
+    smt_data = analyze_institutional_triad_smt(
+        primary_symbol=canon,
+        primary_candles_5m=candles,
+        primary_candles_15m=candles_15m,
+        live_spread_pips=live_spread_pips,
+        offline_data=offline_data,
+        now_ts=now_utc.timestamp(),
+    )
+    if smt_data.get("tier") in ("TRIAD SMT (A+)", "PAIR SMT (A)"):
+        smt_bias = smt_data.get("bias")
+        smt_bonus = smt_data.get("confluence_bonus", 0)
+        smt_desc = smt_data.get("summary_en", "")
+
+        if smt_bias == "BUY":
+            bullish_score += smt_bonus
+            bullish_factors.append(f"[TRIAD SMT] {smt_desc}")
+        elif smt_bias == "SELL":
+            bearish_score += smt_bonus
+            bearish_factors.append(f"[TRIAD SMT] {smt_desc}")
+
     # 2.5 Entry Zone Verification
     # Identify valid institutional entry zones from SMC, ICT, Fibonacci, and Liquidity
     bullish_entry_zones = []
@@ -306,6 +331,13 @@ def evaluate_confluence_signal(
         elif div_data.get("type") == "HIDDEN_BEARISH" and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
             bearish_entry_zones.append(f"RSI Hidden Bearish Continuation Zone at {current_price:.{decimals}f}")
 
+    # F. Triad SMT CISD Displacement Zone (When 5m displacement candle close is confirmed)
+    if smt_data.get("tier") in ("TRIAD SMT (A+)", "PAIR SMT (A)") and smt_data.get("displacement", {}).get("displacement_confirmed"):
+        if smt_data.get("bias") == "BUY":
+            bullish_entry_zones.append(f"Triad SMT CISD Displacement Zone at {current_price:.{decimals}f}")
+        elif smt_data.get("bias") == "SELL":
+            bearish_entry_zones.append(f"Triad SMT CISD Displacement Zone at {current_price:.{decimals}f}")
+
     # Hard Trend Filter & Veto check:
     # 1. Never BUY into a downtrend (Price < EMAs or Bearish Market Structure) unless a confirmed Bullish CHoCH occurs
     has_bullish_choch = bool(latest_choch and latest_choch.get("direction") == "BULLISH")
@@ -338,6 +370,17 @@ def evaluate_confluence_signal(
     if c_close > c_open and (c_close - c_open) > (c_range * 0.75):
         bearish_entry_zones = []
 
+    # Spread Guardrail: For XAU/USD, block automatic signal generation if live spread exceeds 4.5 pips
+    is_gold = "XAU" in canon
+    if is_gold and live_spread_pips > 4.5:
+        bullish_entry_zones = []
+        bearish_entry_zones = []
+        bullish_score = min(bullish_score, 40)
+        bearish_score = min(bearish_score, 40)
+        spread_block_msg = f"[SPREAD GUARD] Signal generation blocked: Live spread ({live_spread_pips:.1f} pips) exceeds 4.5 pips threshold (News Spike Protection)"
+        bullish_factors.append(spread_block_msg)
+        bearish_factors.append(spread_block_msg)
+
     in_bullish_entry_zone = len(bullish_entry_zones) > 0
     in_bearish_entry_zone = len(bearish_entry_zones) > 0
 
@@ -369,7 +412,9 @@ def evaluate_confluence_signal(
         else:
             active_factors = base_factors
 
-    if confluence_score >= 80:
+    if confluence_score >= 90 and smt_data.get("is_sniper_grade"):
+        grade = "A+ (Sniper Institutional SMT)"
+    elif confluence_score >= 80:
         grade = "A+ (Elite Institutional)"
     elif confluence_score >= 65:
         grade = "A (High Probability)"
@@ -522,6 +567,7 @@ def evaluate_confluence_signal(
             "reward_pips_tp2": reward_pips_tp2,
             "rr_ratio_tp1": rr_tp1,
             "rr_ratio_tp2": rr_tp2,
+            "priority_target": "TP2 (3.5R+ Sniper Target Prioritized)" if (grade.startswith("A+ (Sniper") or smt_data.get("is_sniper_grade")) else "TP1 (2.0R Baseline)",
         },
         "confluence_factors": active_factors,
         "components": {
@@ -530,7 +576,9 @@ def evaluate_confluence_signal(
             "liquidity": liq_data,
             "ict": ict_data,
             "divergence": div_data,
+            "smt": smt_data,
         },
+        "smt": smt_data,
         "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
         "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
     }
@@ -554,7 +602,7 @@ def scan_all_pairs_confluence(
             chart = fetch_chart(symbol=sym, interval=interval, range_period="2d", offline_data=offline_data)
             candles = chart.get("candles", [])
             if candles:
-                sig = evaluate_confluence_signal(symbol=sym, candles=candles, interval=interval)
+                sig = evaluate_confluence_signal(symbol=sym, candles=candles, interval=interval, offline_data=offline_data)
                 comps = sig.get("components", {})
                 smc_c = comps.get("smc", {})
                 fib_c = comps.get("fibonacci", {})

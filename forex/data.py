@@ -39,8 +39,16 @@ def pair_to_yahoo_ticker(symbol: str) -> str:
     canon = normalize_symbol(symbol)
     if canon == "XAU/USD":
         return "GC=F"
+    if canon == "XAG/USD":
+        return "SI=F"
     if canon == "BTC/USD":
         return "BTC-USD"
+    if canon == "ETH/USD":
+        return "ETH-USD"
+    if canon == "UUP":
+        return "UUP"
+    if canon == "QQQ":
+        return "QQQ"
     return canon.replace("/", "") + "=X"
 
 
@@ -49,8 +57,16 @@ def yahoo_ticker_to_pair(ticker: str) -> str:
     clean = ticker.upper().strip()
     if clean in ("GC=F", "GC", "MGC=F"):
         return "XAU/USD"
+    if clean in ("SI=F", "SI", "MSI=F"):
+        return "XAG/USD"
     if clean in ("BTC-USD", "BTCUSD=X", "BTC=F"):
         return "BTC/USD"
+    if clean in ("ETH-USD", "ETHUSD=X", "ETH=F"):
+        return "ETH/USD"
+    if clean in ("UUP", "DXY"):
+        return "UUP"
+    if clean in ("QQQ", "IXIC"):
+        return "QQQ"
     clean = clean.replace("=X", "")
     if len(clean) == 6:
         return f"{clean[:3]}/{clean[3:]}"

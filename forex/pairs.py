@@ -49,6 +49,40 @@ PAIRS: Dict[str, Dict[str, Any]] = {
         "default_spread": 5.0,     # 5 pips = $5.00 spread typical
         "asset_type": "crypto",
     },
+
+    # Internal Validation Benchmarks (Triad SMT only - not listed as tradable pairs)
+    "XAG/USD": {
+        "base": "XAG",
+        "quote": "USD",
+        "pip_size": 0.01,
+        "decimals": 3,
+        "default_spread": 2.0,
+        "asset_type": "metal_benchmark",
+    },
+    "ETH/USD": {
+        "base": "ETH",
+        "quote": "USD",
+        "pip_size": 0.10,
+        "decimals": 2,
+        "default_spread": 3.0,
+        "asset_type": "crypto_benchmark",
+    },
+    "UUP": {
+        "base": "UUP",
+        "quote": "USD",
+        "pip_size": 0.01,
+        "decimals": 2,
+        "default_spread": 0.02,
+        "asset_type": "etf_benchmark",
+    },
+    "QQQ": {
+        "base": "QQQ",
+        "quote": "USD",
+        "pip_size": 0.01,
+        "decimals": 2,
+        "default_spread": 0.05,
+        "asset_type": "etf_benchmark",
+    },
 }
 
 
@@ -59,6 +93,14 @@ def normalize_symbol(symbol: str) -> str:
         return "XAU/USD"
     if s in ("BTCUSD", "BTC-USD", "BTC_USD", "XBT/USD", "XBTUSD", "BITCOIN"):
         return "BTC/USD"
+    if s in ("SI=F", "SILVER", "XAGUSD", "XAG-USD", "XAG_USD"):
+        return "XAG/USD"
+    if s in ("ETHUSD", "ETH-USD", "ETH_USD", "ETHEREUM"):
+        return "ETH/USD"
+    if s in ("UUP", "DXY", "DX-Y.NYB"):
+        return "UUP"
+    if s in ("QQQ", "IXIC", "^IXIC"):
+        return "QQQ"
     if s.endswith("=X"):
         s = s[:-2]
     s = s.replace("-", "/").replace("_", "/")

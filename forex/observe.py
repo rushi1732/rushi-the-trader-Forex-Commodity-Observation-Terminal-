@@ -864,6 +864,8 @@ def observe_pair(
         interval=interval,
         now_dt=now_et,
         asian_range=asian_setup,
+        live_spread_pips=spread_pips,
+        offline_data=offline_data,
     )
 
     # 3. Market Closed or Stale Data Guard
@@ -904,6 +906,8 @@ def observe_pair(
             "liquidity": confluence_sig.get("components", {}).get("liquidity"),
             "ict": confluence_sig.get("components", {}).get("ict"),
             "divergence": confluence_sig.get("components", {}).get("divergence"),
+        "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
+            "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
         }
         market_label = "COMEX Gold Futures (GC=F)" if is_gold else "Spot Forex"
         reason_msg = f"{market_label} market is closed ({open_reason}). Observation only."
@@ -935,6 +939,8 @@ def observe_pair(
             "liquidity": confluence_sig.get("components", {}).get("liquidity"),
             "ict": confluence_sig.get("components", {}).get("ict"),
             "divergence": confluence_sig.get("components", {}).get("divergence"),
+        "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
+            "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
         }
 
     if not is_fresh:
@@ -970,6 +976,8 @@ def observe_pair(
             "liquidity": confluence_sig.get("components", {}).get("liquidity"),
             "ict": confluence_sig.get("components", {}).get("ict"),
             "divergence": confluence_sig.get("components", {}).get("divergence"),
+        "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
+            "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
         }
 
     if len(candles) < 15:
@@ -1031,6 +1039,8 @@ def observe_pair(
         interval=interval,
         now_dt=now_et,
         asian_range=asian_setup,
+        live_spread_pips=spread_pips,
+        offline_data=offline_data,
     )
 
     # 6. Paper Simulation (If setup is confirmed and price is in a valid entry zone)
@@ -1212,6 +1222,7 @@ def observe_pair(
         "liquidity": confluence_sig.get("components", {}).get("liquidity"),
         "ict": confluence_sig.get("components", {}).get("ict"),
         "divergence": confluence_sig.get("components", {}).get("divergence"),
+        "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
         "paper_simulation": paper_simulation,
         "auto_signal": auto_sig,
         "paper_mode": True,
