@@ -217,7 +217,7 @@ def fetch_chart(
                     interval=interval,
                     api_key=cfg["api_key"],
                 )
-                if td_chart and td_chart.get("candles_count", 0) >= 10:
+                if td_chart and td_chart.get("candles_count", 0) >= 30:
                     return td_chart
             except Exception:
                 pass
@@ -303,6 +303,7 @@ def parse_yahoo_chart(data: Dict[str, Any], symbol: str) -> Dict[str, Any]:
         dt = datetime.fromtimestamp(ts, tz=timezone.utc)
         candles.append({
             "timestamp": ts,
+            "time": ts,
             "datetime_utc": dt.isoformat(),
             "open": round(float(o), 5),
             "high": round(float(h), 5),
@@ -429,12 +430,12 @@ def fetch_twelve_data_chart(
     elif interval in ("1d", "1day"):
         td_interval = "1day"
 
-    url = f"https://api.twelvedata.com/time_series?symbol={canon}&interval={td_interval}&outputsize=60&apikey={api_key}"
+    url = f"https://api.twelvedata.com/time_series?symbol={canon}&interval={td_interval}&outputsize=80&apikey={api_key}"
     try:
         raw_text = http_get(url)
         data = json.loads(raw_text)
         chart = parse_twelve_data_chart(data, canon, interval)
-        if chart.get("candles_count", 0) >= 10:
+        if chart.get("candles_count", 0) >= 30:
             _TD_CHART_CACHE[cache_key] = (now_t, chart)
             return chart
     except Exception:

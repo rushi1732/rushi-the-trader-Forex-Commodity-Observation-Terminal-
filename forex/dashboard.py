@@ -4534,8 +4534,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const volHeight = height * 0.18;
             const volTop = mainHeight + 4;
             const n = candles.length;
-            const barW = Math.max(2, (priceWidth / n) * 0.68);
-            const slotW = priceWidth / n;
+            const minSlots = Math.max(n, 50);
+            const slotW = priceWidth / minSlots;
+            const barW = Math.min(14, Math.max(2.5, slotW * 0.70));
+            const xOffset = priceWidth - (n * slotW);
 
             // Compute price min/max
             let minP = Math.min(...candles.map(c => c.low));
@@ -4589,7 +4591,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             // Draw Volume Bars
             for (let i = 0; i < n; i++) {
                 const c = candles[i];
-                const x = i * slotW + slotW / 2;
+                const x = xOffset + i * slotW + slotW / 2;
                 const isBull = c.close >= c.open;
                 ctx.fillStyle = isBull ? "rgba(16, 185, 129, 0.35)" : "rgba(244, 63, 94, 0.35)";
                 const yV = yVol(c.volume);
@@ -4754,7 +4756,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             // Draw Candlesticks
             for (let i = 0; i < n; i++) {
                 const c = candles[i];
-                const x = i * slotW + slotW / 2;
+                const x = xOffset + i * slotW + slotW / 2;
                 const isBull = c.close >= c.open;
                 const col = isBull ? "#10b981" : "#f43f5e";
 
@@ -4782,7 +4784,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 let started = false;
                 for (let i = 0; i < n; i++) {
                     if (ema9[i] !== null && ema9[i] !== undefined) {
-                        const x = i * slotW + slotW / 2;
+                        const x = xOffset + i * slotW + slotW / 2;
                         const y = yPrice(ema9[i]);
                         if (!started) { ctx.moveTo(x, y); started = true; }
                         else { ctx.lineTo(x, y); }
@@ -4797,7 +4799,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 started = false;
                 for (let i = 0; i < n; i++) {
                     if (ema21[i] !== null && ema21[i] !== undefined) {
-                        const x = i * slotW + slotW / 2;
+                        const x = xOffset + i * slotW + slotW / 2;
                         const y = yPrice(ema21[i]);
                         if (!started) { ctx.moveTo(x, y); started = true; }
                         else { ctx.lineTo(x, y); }
@@ -4833,8 +4835,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             // Interactive Crosshair & Hover Tooltip
             if (mouseX !== null && mouseY !== null && mouseX >= 0 && mouseX <= priceWidth) {
-                const idx = Math.min(n - 1, Math.max(0, Math.floor(mouseX / slotW)));
+                const idx = Math.min(n - 1, Math.max(0, Math.floor((mouseX - xOffset) / slotW)));
                 const c = candles[idx];
+                const crossX = xOffset + idx * slotW + slotW / 2;
 
                 // Crosshair lines
                 ctx.save();
@@ -4842,8 +4845,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 ctx.setLineDash([3, 3]);
                 ctx.lineWidth = 1;
                 ctx.beginPath();
-                ctx.moveTo(mouseX, 0);
-                ctx.lineTo(mouseX, height - 20);
+                ctx.moveTo(crossX, 0);
+                ctx.lineTo(crossX, height - 20);
                 ctx.moveTo(0, mouseY);
                 ctx.lineTo(priceWidth, mouseY);
                 ctx.stroke();
@@ -4855,16 +4858,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const e21 = ema21[idx] !== null && ema21[idx] !== undefined ? ema21[idx].toFixed(dec) : '--';
 
                 const statsEl = document.getElementById('chartStatsBar');
-                statsEl.innerHTML = `
-                    <span><strong>Time:</strong> ${dt} UTC</span>
-                    <span><strong>O:</strong> ${c.open.toFixed(dec)}</span>
-                    <span><strong>H:</strong> ${c.high.toFixed(dec)}</span>
-                    <span><strong>L:</strong> ${c.low.toFixed(dec)}</span>
-                    <span><strong>C:</strong> <strong style="color:${c.close >= c.open ? 'var(--accent-green)' : 'var(--accent-rose)'};">${c.close.toFixed(dec)}</strong></span>
-                    <span><strong>Vol:</strong> ${(c.volume || 0).toLocaleString()}</span>
-                    <span style="color:#38bdf8;"><strong>EMA9:</strong> ${e9}</span>
-                    <span style="color:#f59e0b;"><strong>EMA21:</strong> ${e21}</span>
-                `;
+                if (statsEl) {
+                    statsEl.innerHTML = `
+                        <span><strong>Time:</strong> ${dt} UTC</span>
+                        <span><strong>O:</strong> ${c.open.toFixed(dec)}</span>
+                        <span><strong>H:</strong> ${c.high.toFixed(dec)}</span>
+                        <span><strong>L:</strong> ${c.low.toFixed(dec)}</span>
+                        <span><strong>C:</strong> <strong style="color:${c.close >= c.open ? 'var(--accent-green)' : 'var(--accent-rose)'};">${c.close.toFixed(dec)}</strong></span>
+                        <span><strong>Vol:</strong> ${(c.volume || 0).toLocaleString()}</span>
+                        <span style="color:#38bdf8;"><strong>EMA9:</strong> ${e9}</span>
+                        <span style="color:#f59e0b;"><strong>EMA21:</strong> ${e21}</span>
+                    `;
+                }
+            } else if (n > 0) {
+                // Default Stats Bar for latest candle
+                const lastC = candles[n - 1];
+                const dt = new Date(lastC.time * 1000).toISOString().replace('T', ' ').substring(0, 16);
+                const e9 = ema9[n - 1] !== null && ema9[n - 1] !== undefined ? ema9[n - 1].toFixed(dec) : '--';
+                const e21 = ema21[n - 1] !== null && ema21[n - 1] !== undefined ? ema21[n - 1].toFixed(dec) : '--';
+                const statsEl = document.getElementById('chartStatsBar');
+                if (statsEl) {
+                    statsEl.innerHTML = `
+                        <span><strong>Time:</strong> ${dt} UTC</span>
+                        <span><strong>O:</strong> ${lastC.open.toFixed(dec)}</span>
+                        <span><strong>H:</strong> ${lastC.high.toFixed(dec)}</span>
+                        <span><strong>L:</strong> ${lastC.low.toFixed(dec)}</span>
+                        <span><strong>C:</strong> <strong style="color:${lastC.close >= lastC.open ? 'var(--accent-green)' : 'var(--accent-rose)'};">${lastC.close.toFixed(dec)}</strong></span>
+                        <span><strong>Vol:</strong> ${(lastC.volume || 0).toLocaleString()}</span>
+                        <span style="color:#38bdf8;"><strong>EMA9:</strong> ${e9}</span>
+                        <span style="color:#f59e0b;"><strong>EMA21:</strong> ${e21}</span>
+                    `;
+                }
             }
         }
 
@@ -7350,11 +7374,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/chart":
             sym = params.get("symbol", ["XAU/USD"])[0]
             interval = params.get("interval", ["5m"])[0]
-            range_period = "1d" if interval in ("1m", "5m") else ("5d" if interval in ("15m", "1h") else "1mo")
+            range_period = "5d" if interval in ("1m", "5m", "15m", "1h") else "1mo"
             canon = normalize_symbol(sym)
             try:
                 chart = None
                 source_feed = "Yahoo Finance Indicative"
+                min_bars = 10 if self.OFFLINE_DATA is not None else 30
                 if TWELVE_DATA_CONFIG.get("enabled") and TWELVE_DATA_CONFIG.get("api_key") and self.OFFLINE_DATA is None:
                     try:
                         chart = fetch_twelve_data_chart(
@@ -7363,18 +7388,28 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             api_key=TWELVE_DATA_CONFIG["api_key"],
                             offline_data=self.OFFLINE_DATA,
                         )
-                        source_feed = "Twelve Data (Retail Spot Live Feed)"
+                        if chart and len(chart.get("candles", [])) >= min_bars:
+                            source_feed = "Twelve Data (Retail Spot Live Feed)"
+                        else:
+                            chart = None
                     except Exception:
                         chart = None
 
-                if chart is None:
-                    chart = fetch_chart(
+                if chart is None or len(chart.get("candles", [])) < min_bars:
+                    y_chart = fetch_chart(
                         symbol=canon,
                         interval=interval,
                         range_period=range_period,
                         offline_data=self.OFFLINE_DATA,
                     )
-                candles = chart.get("candles", [])
+                    if y_chart and len(y_chart.get("candles", [])) > 0:
+                        chart = y_chart
+                        if "Twelve Data" not in source_feed:
+                            source_feed = "Yahoo Finance Indicative"
+
+                candles = chart.get("candles", []) if chart else []
+                if len(candles) > 80:
+                    candles = candles[-80:]
                 live_c = None
                 if self.OFFLINE_DATA is None:
                     live_c = LIVE_TICKS.get(canon) or load_cached_live_tick(canon)
