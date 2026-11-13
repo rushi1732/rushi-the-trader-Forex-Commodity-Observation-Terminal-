@@ -331,11 +331,13 @@ def evaluate_confluence_signal(
         elif div_data.get("type") == "HIDDEN_BEARISH" and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
             bearish_entry_zones.append(f"RSI Hidden Bearish Continuation Zone at {current_price:.{decimals}f}")
 
-    # F. Triad SMT CISD Displacement Zone (When 5m displacement candle close is confirmed)
+    # F. Triad SMT CISD Displacement Zone (When 5m displacement candle close is confirmed with HTF Context & Premium/Discount Alignment)
     if smt_data.get("tier") in ("TRIAD SMT (A+)", "PAIR SMT (A)") and smt_data.get("displacement", {}).get("displacement_confirmed"):
-        if smt_data.get("bias") == "BUY":
+        has_htf = smt_data.get("htf_context", {}).get("has_context", False)
+        # SMT CISD requires HTF context and dealing range alignment (Discount for BUY, Premium for SELL)
+        if smt_data.get("bias") == "BUY" and has_htf and (zone == "DISCOUNT" or in_ote or inside_ob or nearest_demand):
             bullish_entry_zones.append(f"Triad SMT CISD Displacement Zone at {current_price:.{decimals}f}")
-        elif smt_data.get("bias") == "SELL":
+        elif smt_data.get("bias") == "SELL" and has_htf and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
             bearish_entry_zones.append(f"Triad SMT CISD Displacement Zone at {current_price:.{decimals}f}")
 
     # Hard Trend Filter & Veto check:
@@ -450,26 +452,26 @@ def evaluate_confluence_signal(
         recent_ranges = [max(c["high"] - c["low"], 0.0001) for c in candles]
     avg_bar_range = sum(recent_ranges) / len(recent_ranges) if recent_ranges else (pip_size * 15)
 
-    # Institutional Volatility Buffer (1.25x ATR-14)
-    sl_buffer = avg_bar_range * 1.25
+    # Institutional Volatility Buffer (1.5x ATR-14)
+    sl_buffer = avg_bar_range * 1.5
 
     # Asset-Specific Minimum Safe Risk Distance (Prevents premature noise suffocation)
-    # XAU/USD (Gold): at least $4.00 (40 pips)
-    # BTC/USD: at least $300 (300 pips)
-    # JPY pairs: at least 20 pips
-    # Forex pairs: at least 15 pips
+    # XAU/USD (Gold): at least $7.50 (75 pips) at $3,900+ price level
+    # BTC/USD: at least $650 (650 pips) at $68,000+ price level
+    # JPY pairs: at least 22 pips
+    # Forex pairs: at least 16 pips
     if "XAU" in canon:
-        min_risk_pips = 40.0
-        min_risk_dist = 4.00
+        min_risk_dist = max(7.50, current_price * 0.0020)
+        min_risk_pips = to_pips(canon, min_risk_dist)
     elif "BTC" in canon:
-        min_risk_pips = 300.0
-        min_risk_dist = 300.0
+        min_risk_dist = max(650.0, current_price * 0.0085)
+        min_risk_pips = to_pips(canon, min_risk_dist)
     elif "JPY" in canon:
-        min_risk_pips = 20.0
-        min_risk_dist = from_pips(canon, 20.0)
+        min_risk_pips = 22.0
+        min_risk_dist = from_pips(canon, 22.0)
     else:
-        min_risk_pips = 15.0
-        min_risk_dist = from_pips(canon, 15.0)
+        min_risk_pips = 16.0
+        min_risk_dist = from_pips(canon, 16.0)
 
     # Structural Lookback: 18 candles for true swing anchor (not just 5!)
     structural_lookback = min(len(candles), 18)

@@ -408,8 +408,8 @@ def detect_smt_divergence(
             b1_hh = b1_sh2["price"] > b1_sh1["price"]
             b1_lh = b1_sh2["price"] < b1_sh1["price"]
 
-            # Bearish SMT Divergence condition: Primary LH while Benchmark 1 HH (or vice versa)
-            pair_bearish = (p_lh and b1_hh) or (p_hh and b1_lh)
+            # Bearish SMT Divergence condition: Primary Lower High (weakness) while Benchmark 1 Higher High (sweeping BSL)
+            pair_bearish = p_lh and b1_hh
 
             if pair_bearish:
                 # Check Auto-Invalidation: If primary candle body closed above SH2
@@ -505,8 +505,8 @@ def detect_smt_divergence(
             b1_ll = b1_sl2["price"] < b1_sl1["price"]
             b1_hl = b1_sl2["price"] > b1_sl1["price"]
 
-            # Bullish SMT Divergence condition: Primary HL while Benchmark 1 LL (or vice versa)
-            pair_bullish = (p_hl and b1_ll) or (p_ll and b1_hl)
+            # Bullish SMT Divergence condition: Primary Higher Low (strength) while Benchmark 1 Lower Low (sweeping SSL)
+            pair_bullish = p_hl and b1_ll
 
             if pair_bullish:
                 # Check Auto-Invalidation: If primary candle body closed below SL2
@@ -791,14 +791,16 @@ def analyze_institutional_triad_smt(
     confluence_bonus = 0
 
     if smt_res["detected"] and htf_res["has_context"]:
-        if "TRIAD" in smt_res.get("type", "") and disp_res["displacement_confirmed"]:
-            confluence_bonus = 30
-            final_tier = "TRIAD SMT (A+)"
-        elif "PAIR" in smt_res.get("type", ""):
-            confluence_bonus = 15
-            final_tier = "PAIR SMT (A)"
+        if disp_res["displacement_confirmed"]:
+            if "TRIAD" in smt_res.get("type", ""):
+                confluence_bonus = 30
+                final_tier = "TRIAD SMT (A+)"
+            else:
+                confluence_bonus = 15
+                final_tier = "PAIR SMT (A)"
         else:
-            confluence_bonus = 15
+            confluence_bonus = 0
+            final_tier = "WAITING DISPLACEMENT"
 
     # Human-readable Bilingual Summaries (English + Marathi)
     if final_tier == "TRIAD SMT (A+)":

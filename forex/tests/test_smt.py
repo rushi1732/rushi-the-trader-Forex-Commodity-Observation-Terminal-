@@ -191,6 +191,72 @@ class TestInstitutionalSMT(unittest.TestCase):
         self.assertIn("summary_mr", res)
         self.assertIn("benchmarks", res)
 
+    def test_primary_higher_high_does_not_trigger_bearish_smt(self):
+        """Primary asset making a Higher High (p_hh) while benchmark makes a Lower High (b1_lh)
+        shows Primary relative strength and must NOT fire a Bearish SELL signal on Primary."""
+        # Flip primary to Higher High and benchmark to Lower High
+        p_candles = [dict(c) for c in self.xau_candles]
+        p_candles[10]["high"] = 2045.0  # SH1
+        p_candles[20]["high"] = 2050.0  # SH2 (Higher High)
+
+        b1_candles = [dict(c) for c in self.xag_candles]
+        b1_candles[10]["high"] = 25.50  # SH1
+        b1_candles[20]["high"] = 25.00  # SH2 (Lower High)
+
+        res = detect_smt_divergence(
+            primary_symbol="BTC/USD",
+            primary_candles_5m=p_candles,
+            b1_candles_5m=b1_candles,
+            b1_symbol="ETH/USD",
+        )
+        # Must NOT be detected as Bearish SMT on Primary!
+        self.assertFalse(res["detected"])
+        self.assertNotEqual(res.get("bias"), "SELL")
+
+    def test_primary_lower_low_does_not_trigger_bullish_smt(self):
+        """Primary asset making a Lower Low (p_ll) while benchmark makes a Higher Low (b1_hl)
+        shows Primary breakdown/weakness and must NOT fire a Bullish BUY signal on Primary."""
+        p_candles = [dict(c) for c in self.xau_candles]
+        p_candles[10]["high"] = 2050.0
+        p_candles[20]["high"] = 2055.0  # Neutralize highs (both HH)
+        p_candles[10]["low"] = 2045.0   # SL1
+        p_candles[20]["low"] = 2040.0   # SL2 (Lower Low)
+
+        b1_candles = [dict(c) for c in self.xag_candles]
+        b1_candles[10]["high"] = 25.00
+        b1_candles[20]["high"] = 25.50  # Neutralize highs (both HH)
+        b1_candles[10]["low"] = 24.00   # SL1
+        b1_candles[20]["low"] = 24.50   # SL2 (Higher Low)
+
+        res = detect_smt_divergence(
+            primary_symbol="XAU/USD",
+            primary_candles_5m=p_candles,
+            b1_candles_5m=b1_candles,
+            b1_symbol="XAG/USD",
+        )
+        # Must NOT be detected as Bullish SMT on Primary!
+        self.assertFalse(res["detected"])
+        self.assertNotEqual(res.get("bias"), "BUY")
+
+    def test_btc_minimum_safe_stop_loss_distance(self):
+        """BTC/USD execution plan enforces at least $650.0 risk distance to prevent noise suffocation."""
+        btc_candles = []
+        base_ts = 1700000000
+        for i in range(25):
+            btc_candles.append({
+                "timestamp": base_ts + i * 300,
+                "open": 68500.0 + i * 2.0,
+                "high": 68510.0 + i * 2.0,
+                "low": 68490.0 + i * 2.0,
+                "close": 68505.0 + i * 2.0,
+                "volume": 200,
+            })
+        sig = evaluate_confluence_signal("BTC/USD", btc_candles, interval="5m")
+        plan = sig.get("execution_plan", {})
+        if plan.get("entry_price") and plan.get("stop_loss"):
+            risk_dist = abs(plan["entry_price"] - plan["stop_loss"])
+            self.assertGreaterEqual(risk_dist, 650.0)
+
 
 if __name__ == "__main__":
     unittest.main()
