@@ -50,3 +50,4 @@ self.addEventListener('push', (event) => {
         console.warn('[SW] push event parse notice:', e);
     }
 });
+

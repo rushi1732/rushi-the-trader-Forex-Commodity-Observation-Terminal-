@@ -5024,12 +5024,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const pnl = item.pnl_usd !== undefined ? Number(item.pnl_usd) : 0.0;
                 const isResolved = item.status.includes('CLOSED');
 
-                // Check for notification on closed trades
-                if (isResolved && !notifiedTrades.has(item.id)) {
-                    notifiedTrades.add(item.id);
-                    sendNotification(`Paper Trade ${item.status}`, `${item.symbol} ${item.side} closed at ${item.exit_price || item.simulated_fill}. PnL: $${pnl.toFixed(2)}`);
-                }
-
                 tr.innerHTML = `
                     <td style="color:var(--accent-blue); font-weight:600;">${item.id}</td>
                     <td style="font-weight:600;">${item.symbol}</td>
@@ -6419,7 +6413,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 localStorage.setItem('notificationsEnabled', 'true');
                 updateNotificationsUI();
                 try { playChime(); } catch(e) {}
-                sendNotification("Forex Paper Terminal", "Mobile Notification Bar and Desktop alerts activated.", "status-alert");
             };
 
             if (Notification.permission === "granted") {
@@ -6567,11 +6560,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     showVoiceToast(sig.action, assetName, gradeStr, !isNewSignal, sig.entry_reference, sig.stop_loss);
 
                     if (isNewSignal) {
-                        // Desktop and Mobile Notification Bar push notification
+                        // Desktop and Mobile Notification Bar push notification (ONLY for confirmed BUY/SELL)
                         try {
+                            const iconEmoji = sig.action === 'BUY' ? '🟢' : '🔴';
+                            const notifTitle = `${iconEmoji} ${sig.action} ${assetName} (${gradeStr})`;
+                            let notifBody = `Entry: ${sig.entry_reference} | SL: ${sig.stop_loss}`;
+                            if (sig.take_profit) notifBody += ` | TP: ${sig.take_profit}`;
+
                             sendNotification(
-                                `New Paper Signal: ${sig.action} ${sym}`,
-                                `Grade: ${gradeStr} | Entry: ${sig.entry_reference} | Stop: ${sig.stop_loss}`,
+                                notifTitle,
+                                notifBody,
                                 `signal-${sym}-${sig.action}`
                             );
                         } catch(e) {
@@ -6979,23 +6977,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     statusEl.textContent = `Last scanned: ${dt}`;
                 }
 
-                // Multi-pair scanner updates table and quiet desktop notification only (no voice/toast collision with active chart)
-                if (Array.isArray(results) && isCurtainDismissed) {
-                    const currentSelectedSym = normalizeSym(document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD');
-                    results.forEach(r => {
-                        const sym = normalizeSym(r.symbol || '');
-                        if (sym !== currentSelectedSym && (r.action === 'BUY' || r.action === 'SELL')) {
-                            const isNewScanSignal = (lastScannerNotifiedBySymbol[sym] !== r.action);
-                            if (isNewScanSignal) {
-                                lastScannerNotifiedBySymbol[sym] = r.action;
-                                sendNotification(`Scanner Alert: ${r.action} ${sym}`, `Grade: ${r.grade} | Price: ${r.price}`);
-                            }
-                        } else if (sym !== currentSelectedSym && r.action !== 'BUY' && r.action !== 'SELL') {
-                            delete lastScannerNotifiedBySymbol[sym];
-                        }
-                    });
-                }
-
+                // Multi-pair scanner updates table quietly (ZERO push notifications - only active pair BUY/SELL sends notifications)
                 renderScannerTable(results);
             } catch (err) {
                 console.error("Scanner fetch error:", err);
