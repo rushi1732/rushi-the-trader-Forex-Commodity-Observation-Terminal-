@@ -6835,40 +6835,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     statusEl.textContent = `Last scanned: ${dt}`;
                 }
 
-                // Dual-pair female voice notification for Gold & Bitcoin background scanner (only when curtain dismissed)
+                // Multi-pair scanner updates table and quiet desktop notification only (no voice/toast collision with active chart)
                 if (Array.isArray(results) && isCurtainDismissed) {
                     const currentSelectedSym = normalizeSym(document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD');
-                    const now = Date.now();
                     results.forEach(r => {
                         const sym = normalizeSym(r.symbol || '');
-                        // Background scanner handles the alternate pair without colliding with active chart polling
-                        if (sym !== currentSelectedSym && (sym.includes('XAU') || sym.includes('BTC')) && (r.action === 'BUY' || r.action === 'SELL')) {
-                            const isNewScanSignal = (lastAnnouncedActionBySymbol[sym] !== r.action);
-                            const lastSpoken = lastSpokenTimeBySymbol[sym] || 0;
-                            const shouldRepeatScan = (now - lastSpoken >= 60000);
-
-                            if (isNewScanSignal || shouldRepeatScan) {
-                                const isGold = sym.includes('XAU') || sym.includes('GOLD');
-                                const assetName = isGold ? 'Gold (XAU/USD)' : 'Bitcoin (BTC/USD)';
-                                const gradeStr = formatGradeForVoice(r.grade);
-
-                                // Always display visual alert message banner on mobile and desktop
-                                showVoiceToast(r.action, assetName, gradeStr, !isNewScanSignal, r.price, r.stop_loss || (r.execution_plan ? r.execution_plan.stop_loss : null));
-
-                                if (isNewScanSignal) {
-                                    sendNotification(`Scanner Signal: ${r.action} ${sym}`, `Grade: ${r.grade} | Price: ${r.price}`);
-                                }
-
-                                announceSignalVoice({
-                                    symbol: sym,
-                                    action: r.action,
-                                    grade: r.grade,
-                                    entry_reference: r.price,
-                                    stop_loss: r.stop_loss || (r.execution_plan ? r.execution_plan.stop_loss : null)
-                                }, !isNewScanSignal);
+                        if (sym !== currentSelectedSym && (r.action === 'BUY' || r.action === 'SELL')) {
+                            const isNewScanSignal = (lastScannerNotifiedBySymbol[sym] !== r.action);
+                            if (isNewScanSignal) {
+                                lastScannerNotifiedBySymbol[sym] = r.action;
+                                sendNotification(`Scanner Alert: ${r.action} ${sym}`, `Grade: ${r.grade} | Price: ${r.price}`);
                             }
                         } else if (sym !== currentSelectedSym && r.action !== 'BUY' && r.action !== 'SELL') {
-                            lastAnnouncedActionBySymbol[sym] = null;
                             delete lastScannerNotifiedBySymbol[sym];
                         }
                     });

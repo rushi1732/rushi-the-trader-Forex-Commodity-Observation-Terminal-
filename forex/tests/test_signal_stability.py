@@ -255,6 +255,127 @@ class TestSignalStability(unittest.TestCase):
         # Must NOT instantly reverse to SELL!
         self.assertEqual(sig2["action"], "BUY")
 
+    def test_anti_whiplash_reversal_blocks_flip_flop(self):
+        """After a BUY signal is invalidated or hits SL, reversing to SELL is strictly blocked for 3 bars."""
+        # 1. Establish active BUY
+        buy_conf = {
+            "action": "BUY",
+            "confluence_score": 75,
+            "grade": "Grade A",
+            "is_in_entry_zone": True,
+            "confluence_factors": ["Bullish Order Block"],
+            "execution_plan": {
+                "entry_price": 1.0850,
+                "stop_loss": 1.0825,
+                "take_profit_1": 1.0900,
+                "take_profit_2": 1.0935,
+            },
+        }
+        self.manager.process(
+            symbol=self.symbol,
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=1.0850,
+            candles=self.candles,
+            confluence_signal=buy_conf,
+        )
+
+        # 2. Hit Stop Loss (1.0820 < 1.0825)
+        sig_sl = self.manager.process(
+            symbol=self.symbol,
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=1.0820,
+            candles=self.candles,
+        )
+        self.assertEqual(sig_sl["action"], "NO SIGNAL")
+
+        # 3. Next immediate candle (bar 1): Feed SELL candidate. Must be BLOCKED!
+        sell_conf = {
+            "action": "SELL",
+            "confluence_score": 80,
+            "grade": "Grade A+",
+            "is_in_entry_zone": True,
+            "confluence_factors": ["Bearish Supply Zone"],
+            "execution_plan": {
+                "entry_price": 1.0820,
+                "stop_loss": 1.0845,
+                "take_profit_1": 1.0770,
+            },
+        }
+        bar1_candles = list(self.candles) + [{
+            "timestamp": self.candles[-1]["timestamp"] + 300,
+            "open": 1.0820,
+            "high": 1.0825,
+            "low": 1.0815,
+            "close": 1.0820,
+            "volume": 1000,
+        }]
+        sig_flip1 = self.manager.process(
+            symbol=self.symbol,
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=1.0820,
+            candles=bar1_candles,
+            confluence_signal=sell_conf,
+        )
+        # Flip to SELL must be strictly BLOCKED on bar 1!
+        self.assertEqual(sig_flip1["action"], "NO SIGNAL")
+        self.assertEqual(sig_flip1["status_label"], "WAITING FOR ENTRY ZONE")
+
+        # 4. Bar 2: Feed SELL candidate. Must still be BLOCKED!
+        bar2_candles = list(bar1_candles) + [{
+            "timestamp": bar1_candles[-1]["timestamp"] + 300,
+            "open": 1.0820,
+            "high": 1.0822,
+            "low": 1.0812,
+            "close": 1.0818,
+            "volume": 1000,
+        }]
+        sig_flip2 = self.manager.process(
+            symbol=self.symbol,
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=1.0818,
+            candles=bar2_candles,
+            confluence_signal=sell_conf,
+        )
+        self.assertEqual(sig_flip2["action"], "NO SIGNAL")
+
+        # 5. Bar 3 (3 bars passed): Feed SELL candidate. Cooldown elapsed, SELL is now permitted!
+        bar3_candles = list(bar2_candles) + [{
+            "timestamp": bar2_candles[-1]["timestamp"] + 300,
+            "open": 1.0818,
+            "high": 1.0820,
+            "low": 1.0810,
+            "close": 1.0815,
+            "volume": 1000,
+        }]
+        sig_flip3 = self.manager.process(
+            symbol=self.symbol,
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=1.0815,
+            candles=bar3_candles,
+            confluence_signal=sell_conf,
+        )
+        self.assertEqual(sig_flip3["action"], "SELL")
+
     def test_status_transitions_waiting_vs_no_signal(self):
         """Status is WAITING FOR ENTRY ZONE before entry, and NO SIGNAL when closed or stale."""
         # Market Closed

@@ -68,6 +68,43 @@ def evaluate_confluence_signal(
     current_price = candles[-1]["close"]
     latest_candle = candles[-1]
 
+    # Volatility & ATR Buffer Calculation (14-period true range)
+    sub_candles = candles[-15:]
+    if len(sub_candles) >= 2:
+        recent_ranges = []
+        for i in range(1, len(sub_candles)):
+            c_curr = sub_candles[i]
+            c_prev = sub_candles[i - 1]
+            h = c_curr["high"]
+            l = c_curr["low"]
+            pc = c_prev["close"]
+            tr = max(h - l, abs(h - pc), abs(l - pc))
+            recent_ranges.append(tr)
+    else:
+        recent_ranges = [max(c["high"] - c["low"], 0.0001) for c in candles]
+    avg_bar_range = sum(recent_ranges) / len(recent_ranges) if recent_ranges else (pip_size * 15)
+
+    # Institutional Volatility Buffer (1.5x ATR-14)
+    sl_buffer = avg_bar_range * 1.5
+
+    # Asset-Specific Minimum Safe Risk Distance (Prevents premature noise suffocation)
+    # XAU/USD (Gold): at least $7.50 (75 pips) at $3,900+ price level
+    # BTC/USD: at least $650 (650 pips) at $68,000+ price level
+    # JPY pairs: at least 22 pips
+    # Forex pairs: at least 16 pips
+    if "XAU" in canon:
+        min_risk_dist = max(7.50, current_price * 0.0020)
+        min_risk_pips = to_pips(canon, min_risk_dist)
+    elif "BTC" in canon:
+        min_risk_dist = max(650.0, current_price * 0.0085)
+        min_risk_pips = to_pips(canon, min_risk_dist)
+    elif "JPY" in canon:
+        min_risk_pips = 22.0
+        min_risk_dist = from_pips(canon, 22.0)
+    else:
+        min_risk_pips = 16.0
+        min_risk_dist = from_pips(canon, 16.0)
+
     # 1. Component Analyses
     smc_data = analyze_smc(candles, current_price=current_price)
     fib_data = analyze_fibonacci(candles, current_price=current_price)
@@ -341,19 +378,37 @@ def evaluate_confluence_signal(
             bearish_entry_zones.append(f"Triad SMT CISD Displacement Zone at {current_price:.{decimals}f}")
 
     # Hard Trend Filter & Veto check:
-    # 1. Never BUY into a downtrend (Price < EMAs or Bearish Market Structure) unless a confirmed Bullish CHoCH occurs
-    has_bullish_choch = bool(latest_choch and latest_choch.get("direction") == "BULLISH")
+    # 1. Never BUY into a downtrend (Price < EMAs or Bearish Market Structure) unless a fresh Bullish CHoCH occurs (<= 12 bars)
+    choch_bars_ago = (len(candles) - 1 - latest_choch.get("broken_at_index", 0)) if latest_choch else 999
+    has_bullish_choch = bool(latest_choch and latest_choch.get("direction") == "BULLISH" and choch_bars_ago <= 12)
     if (is_bearish_momentum or trend == "BEARISH") and not has_bullish_choch:
         bullish_entry_zones = []
         bullish_score = min(bullish_score, 30)
-        bullish_factors.append("[TREND VETO] Counter-trend BUY prohibited: Bearish momentum/structure active without Bullish CHoCH")
+        bullish_factors.append("[TREND VETO] Counter-trend BUY prohibited: Bearish momentum/structure active without fresh Bullish CHoCH")
 
-    # 2. Never SELL into an uptrend (Price > EMAs or Bullish Market Structure) unless a confirmed Bearish CHoCH occurs
-    has_bearish_choch = bool(latest_choch and latest_choch.get("direction") == "BEARISH")
+    # 2. Never SELL into an uptrend (Price > EMAs or Bullish Market Structure) unless a fresh Bearish CHoCH occurs (<= 12 bars)
+    has_bearish_choch = bool(latest_choch and latest_choch.get("direction") == "BEARISH" and choch_bars_ago <= 12)
     if (is_bullish_momentum or trend == "BULLISH") and not has_bearish_choch:
         bearish_entry_zones = []
         bearish_score = min(bearish_score, 30)
-        bearish_factors.append("[TREND VETO] Counter-trend SELL prohibited: Bullish momentum/structure active without Bearish CHoCH")
+        bearish_factors.append("[TREND VETO] Counter-trend SELL prohibited: Bullish momentum/structure active without fresh Bearish CHoCH")
+
+    # Opposing Order Block Clearance (Room-to-Run Protection):
+    # Prohibit entering BUY directly into unmitigated Supply Block within 1.2x min risk distance
+    if nearest_supply and nearest_supply["bottom"] > current_price:
+        dist_to_supply = nearest_supply["bottom"] - current_price
+        if dist_to_supply < min_risk_dist * 1.2:
+            bullish_entry_zones = []
+            bullish_score = min(bullish_score, 40)
+            bullish_factors.append(f"[OB OBSTACLE] BUY blocked: Unmitigated Supply OB at {nearest_supply['bottom']} blocks path to target")
+
+    # Prohibit entering SELL directly into unmitigated Demand Block within 1.2x min risk distance
+    if nearest_demand and nearest_demand["top"] < current_price:
+        dist_to_demand = current_price - nearest_demand["top"]
+        if dist_to_demand < min_risk_dist * 1.2:
+            bearish_entry_zones = []
+            bearish_score = min(bearish_score, 40)
+            bearish_factors.append(f"[OB OBSTACLE] SELL blocked: Unmitigated Demand OB at {nearest_demand['top']} blocks path to target")
 
     # Candlestick Rejection & Quality Verification:
     # Do not enter against active high-momentum thrust candles
@@ -435,43 +490,6 @@ def evaluate_confluence_signal(
     reward_pips_tp2 = 0.0
     rr_tp1 = 0.0
     rr_tp2 = 0.0
-
-    # ATR / Volatility buffer: 14-period true range (incorporates price gaps)
-    sub_candles = candles[-15:]
-    if len(sub_candles) >= 2:
-        recent_ranges = []
-        for i in range(1, len(sub_candles)):
-            c_curr = sub_candles[i]
-            c_prev = sub_candles[i - 1]
-            h = c_curr["high"]
-            l = c_curr["low"]
-            pc = c_prev["close"]
-            tr = max(h - l, abs(h - pc), abs(l - pc))
-            recent_ranges.append(tr)
-    else:
-        recent_ranges = [max(c["high"] - c["low"], 0.0001) for c in candles]
-    avg_bar_range = sum(recent_ranges) / len(recent_ranges) if recent_ranges else (pip_size * 15)
-
-    # Institutional Volatility Buffer (1.5x ATR-14)
-    sl_buffer = avg_bar_range * 1.5
-
-    # Asset-Specific Minimum Safe Risk Distance (Prevents premature noise suffocation)
-    # XAU/USD (Gold): at least $7.50 (75 pips) at $3,900+ price level
-    # BTC/USD: at least $650 (650 pips) at $68,000+ price level
-    # JPY pairs: at least 22 pips
-    # Forex pairs: at least 16 pips
-    if "XAU" in canon:
-        min_risk_dist = max(7.50, current_price * 0.0020)
-        min_risk_pips = to_pips(canon, min_risk_dist)
-    elif "BTC" in canon:
-        min_risk_dist = max(650.0, current_price * 0.0085)
-        min_risk_pips = to_pips(canon, min_risk_dist)
-    elif "JPY" in canon:
-        min_risk_pips = 22.0
-        min_risk_dist = from_pips(canon, 22.0)
-    else:
-        min_risk_pips = 16.0
-        min_risk_dist = from_pips(canon, 16.0)
 
     # Structural Lookback: 18 candles for true swing anchor (not just 5!)
     structural_lookback = min(len(candles), 18)

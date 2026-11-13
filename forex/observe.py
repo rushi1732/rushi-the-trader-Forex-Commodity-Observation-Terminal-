@@ -332,28 +332,36 @@ class SignalStateManager:
                 if tp2 is not None and current_price <= tp2:
                     is_tp2_hit = True
 
-            # Check market structure opposite break (BOS or CHoCH)
+            # Check market structure opposite break (BOS or CHoCH) that occurred AFTER signal was confirmed
+            active_ts = active.get("confirmed_candle_ts") or active.get("created_timestamp") or 0
             is_struct_break = False
-            if confluence_signal:
+            if confluence_signal and active_ts > 0:
                 smc_comp = confluence_signal.get("components", {}).get("smc") or {}
                 struct_comp = smc_comp.get("structure") or {}
                 choch = struct_comp.get("latest_choch") or {}
                 bos = struct_comp.get("latest_bos") or {}
                 choch_dir = choch.get("direction") or choch.get("bias")
                 bos_dir = bos.get("direction") or bos.get("bias")
+                choch_ts = choch.get("timestamp", 0)
+                bos_ts = bos.get("timestamp", 0)
 
-                if side == "BUY" and (choch_dir == "BEARISH" or bos_dir == "BEARISH"):
-                    is_struct_break = True
-                elif side == "SELL" and (choch_dir == "BULLISH" or bos_dir == "BULLISH"):
-                    is_struct_break = True
+                # Only invalidate if the opposite structure break actually formed AFTER the trade was confirmed!
+                if side == "BUY":
+                    if (choch_dir == "BEARISH" and choch_ts > active_ts) or (bos_dir == "BEARISH" and bos_ts > active_ts):
+                        is_struct_break = True
+                elif side == "SELL":
+                    if (choch_dir == "BULLISH" and choch_ts > active_ts) or (bos_dir == "BULLISH" and bos_ts > active_ts):
+                        is_struct_break = True
 
             # Check macro trend reversal against active signal
             scan_dir = (scan_info or {}).get("direction", "NEUTRAL") if scan_info else "NEUTRAL"
+            initial_scan_dir = active.get("initial_scan_dir")
             is_trend_reversed = False
-            if side == "BUY" and scan_dir == "BEARISH":
-                is_trend_reversed = True
-            elif side == "SELL" and scan_dir == "BULLISH":
-                is_trend_reversed = True
+            if scan_dir != "NEUTRAL":
+                if side == "BUY" and scan_dir == "BEARISH" and initial_scan_dir != "BEARISH":
+                    is_trend_reversed = True
+                elif side == "SELL" and scan_dir == "BULLISH" and initial_scan_dir != "BULLISH":
+                    is_trend_reversed = True
 
             # Check signal age (90 minutes max duration for intraday 5m setup without hitting target)
             signal_ts = active.get("confirmed_candle_ts") or active.get("created_timestamp")
@@ -495,8 +503,8 @@ class SignalStateManager:
             candidate_reason = f"Confirmed {b_side} signal: completed candle closed beyond setup boundary. 2R target planned."
 
         # Cooldown check:
-        # 1. Prevent instant reversal on the same candle after invalidation (Req 4)
-        # 2. Enforce 3-bar (15m) Circuit Breaker after Stop Loss hit to prevent consecutive losses in falling markets
+        # 1. Anti-Whiplash Reversal Protection: Enforce at least 3 confirmed candles (15m) cooldown before reversing direction
+        # 2. Circuit Breaker after Stop Loss hit: Enforce 3-bar (15m) cooldown to prevent consecutive losses
         if candidate_action and not is_offline_test:
             with self._lock:
                 cooldown = self._cooldown.get(canon)
@@ -504,17 +512,20 @@ class SignalStateManager:
                 last_inv_side = cooldown.get("invalidated_side")
                 last_candle_cd = cooldown.get("candle_ts", 0)
                 cd_reason = cooldown.get("reason")
+
+                bars_passed = 0
+                if candles:
+                    for c in reversed(candles):
+                        if c.get("timestamp", 0) <= last_candle_cd:
+                            break
+                        bars_passed += 1
+
+                # 1. Anti-Whiplash Reversal: Prohibit reversing direction within 3 bars (15m) after invalidation/SL
                 if last_inv_side and last_inv_side != candidate_action:
-                    if confirmed_candle_ts <= last_candle_cd:
-                        # Cannot reverse immediately on the same candle bar
+                    if bars_passed < 3:
                         candidate_action = None
+                # 2. Re-entry Circuit Breaker after SL hit on same side: Prohibit retrying within 3 bars
                 elif cd_reason == "SL_HIT" and last_inv_side == candidate_action:
-                    bars_passed = 0
-                    if candles:
-                        for c in reversed(candles):
-                            if c.get("timestamp", 0) <= last_candle_cd:
-                                break
-                            bars_passed += 1
                     if bars_passed < 3:
                         candidate_action = None
 
@@ -601,6 +612,7 @@ class SignalStateManager:
                 "confirmed_candle_ts": confirmed_candle_ts,
                 "created_timestamp": now_utc.timestamp(),
                 "confirmed_at_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
+                "initial_scan_dir": scan_dir,
                 "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
                 "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 "is_market_open": True,
