@@ -963,6 +963,31 @@
             color: #0f172a;
         }
 
+        .card-tab-btn {
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            padding: 5px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .card-tab-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .card-tab-btn.active {
+            background: var(--accent-blue);
+            color: #0f172a;
+            border-color: var(--accent-blue);
+            font-weight: 700;
+        }
+
         .chart-legend {
             display: flex;
             align-items: center;
@@ -2325,15 +2350,116 @@
                 </div>
             </div>
 
-            <!-- Card 5: Historical Strategy Backtesting (Range Breakout + 2R Plan) -->
-            <div class="col-12">
+            <!-- Card 5: Automatic Signal Engine Trades & Historical Strategy Backtest -->
+            <div class="col-12" id="cardAutoSignalTrades">
                 <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-                            Historical Strategy Backtest (Range Breakout & 2R Exit)
-                        </span>
-                        <div style="display:flex; align-items:center; gap:10px;">
+                    <div class="card-header" style="flex-wrap:wrap; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="card-title" style="display:flex; align-items:center; gap:8px;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                                <span>Automatic Signal Engine - Trade Tracker</span>
+                            </span>
+                            <span class="badge badge-green" id="autoTradesLiveBadge" style="display:inline-flex; align-items:center; gap:4px; font-size:10px;">
+                                <span class="pulse-dot green" style="width:6px; height:6px;"></span>
+                                LIVE TRACKER
+                            </span>
+                        </div>
+
+                        <!-- Tab Switcher: Live Automatic Trades vs Historical Backtest -->
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div class="timeframe-group" style="margin:0;">
+                                <button id="tabBtnAutoTrades" class="card-tab-btn active" onclick="switchCard5Tab('autoTrades')">
+                                    Automatic Signal Trades (लाईव्ह ट्रेड्स)
+                                </button>
+                                <button id="tabBtnBacktest" class="card-tab-btn" onclick="switchCard5Tab('backtest')">
+                                    Historical Strategy Backtest
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 1: Automatic Signal Engine Live Trades List -->
+                    <div id="tabContentAutoTrades">
+                        <!-- Stats Summary Row -->
+                        <div class="backtest-grid" style="margin-bottom:12px;">
+                            <div class="stat-card">
+                                <div class="stat-card-title">Total Signals</div>
+                                <div id="statTotalAutoTrades" class="stat-card-value">0</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-title">Active Trades (चालू)</div>
+                                <div id="statActiveAutoTrades" class="stat-card-value" style="color:var(--accent-blue);">0</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-title">Target Hit (नफा)</div>
+                                <div id="statTargetHitAutoTrades" class="stat-card-value" style="color:var(--accent-green);">0</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-title">SL Hit (तोटा)</div>
+                                <div id="statSlHitAutoTrades" class="stat-card-value" style="color:var(--accent-rose);">0</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-title">Live / Realized P&L</div>
+                                <div id="statNetPnlAutoTrades" class="stat-card-value" style="color:var(--accent-green); font-size:16px;">+$0.00</div>
+                            </div>
+                        </div>
+
+                        <!-- Table Sub-Header Controls -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span id="autoTradesCountLabel" class="badge badge-blue" style="font-size:11px;">
+                                    Showing Latest 5 Trades (नवीनतम ५ ट्रेड्स)
+                                </span>
+                                <span style="font-size:11px; color:var(--text-secondary);">
+                                    ऑटोमॅटिक सिग्नल आल्यावर ट्रेड आपोआप या लिस्टमध्ये ॲड होतो.
+                                </span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <button class="btn" style="padding:4px 10px; font-size:11px; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.4); color:#fca5a5;" onclick="clearJournalHistory()">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    Clear History
+                                </button>
+                                <button class="btn" style="padding:4px 10px; font-size:11px;" onclick="exportJournalCSV()">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                                    Export CSV
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Trades Table -->
+                        <div style="overflow-x:auto; width:100%; border:1px solid var(--border-subtle); border-radius:6px;">
+                            <table class="journal-table" style="font-size:12px; min-width:850px;">
+                                <thead>
+                                    <tr>
+                                        <th># ID</th>
+                                        <th>Trade Time (वेळ)</th>
+                                        <th>Pair & Side</th>
+                                        <th>Entry Price</th>
+                                        <th>Confluence Grade</th>
+                                        <th>Stop Loss (SL)</th>
+                                        <th>Target (TP1 / TP2)</th>
+                                        <th>Live P/L (नफा / तोटा)</th>
+                                        <th>Status (स्थिती)</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="autoTradesBody">
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- View More / Show Less Button -->
+                        <div id="viewMoreContainer" style="display:flex; justify-content:center; align-items:center; margin-top:10px;">
+                            <button id="btnToggleMoreSigTrades" class="btn" onclick="toggleMoreSigTrades()" style="padding:6px 18px; font-size:12px; border-color:var(--accent-blue); color:var(--accent-blue); display:none;">
+                                View More (आणखी ट्रेड्स पहा)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: Historical Strategy Backtest (Range Breakout & 2R Exit) -->
+                    <div id="tabContentBacktest" style="display:none;">
+                        <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-bottom:12px;">
                             <select id="btRange" class="form-control" style="font-size:11px; padding:4px 8px; width:auto;">
                                 <option value="5d">Recent 5 Days (Intraday)</option>
                                 <option value="1mo">Past 1 Month</option>
@@ -2342,63 +2468,63 @@
                                 Run Historical Backtest
                             </button>
                         </div>
-                    </div>
 
-                    <!-- Backtest Metrics Grid -->
-                    <div class="backtest-grid" id="backtestMetrics">
-                        <div class="stat-card">
-                            <div class="stat-card-title">Win Rate</div>
-                            <div id="btWinRate" class="stat-card-value" style="color:var(--accent-blue);">--%</div>
+                        <!-- Backtest Metrics Grid -->
+                        <div class="backtest-grid" id="backtestMetrics">
+                            <div class="stat-card">
+                                <div class="stat-card-title">Win Rate</div>
+                                <div id="btWinRate" class="stat-card-value" style="color:var(--accent-blue);">--%</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-title">Total Trades</div>
+                                <div id="btTotalTrades" class="stat-card-value">--</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-title">Net Simulated P/L</div>
+                                <div id="btNetPnl" class="stat-card-value">$--</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-title">Profit Factor</div>
+                                <div id="btProfitFactor" class="stat-card-value">--</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-title">Max Drawdown</div>
+                                <div id="btMaxDrawdown" class="stat-card-value" style="color:var(--accent-rose);">$--</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-title">Avg Win / Loss</div>
+                                <div id="btAvgWinLoss" class="stat-card-value" style="font-size:14px; margin-top:2px;">$-- / $--</div>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-card-title">Total Trades</div>
-                            <div id="btTotalTrades" class="stat-card-value">--</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-card-title">Net Simulated P/L</div>
-                            <div id="btNetPnl" class="stat-card-value">$--</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-card-title">Profit Factor</div>
-                            <div id="btProfitFactor" class="stat-card-value">--</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-card-title">Max Drawdown</div>
-                            <div id="btMaxDrawdown" class="stat-card-value" style="color:var(--accent-rose);">$--</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-card-title">Avg Win / Loss</div>
-                            <div id="btAvgWinLoss" class="stat-card-value" style="font-size:14px; margin-top:2px;">$-- / $--</div>
-                        </div>
-                    </div>
 
-                    <!-- Historical Trades Table -->
-                    <div style="max-height: 240px; overflow-y:auto; overflow-x:auto; width:100%; border:1px solid var(--border-subtle); border-radius:6px; margin-bottom:12px;">
-                        <table class="journal-table" style="font-size:12px; min-width:600px;">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Side</th>
-                                    <th>Entry Time</th>
-                                    <th>Exit Time</th>
-                                    <th>Entry Price</th>
-                                    <th>Exit Price</th>
-                                    <th>Outcome</th>
-                                    <th>Simulated P/L</th>
-                                </tr>
-                            </thead>
-                            <tbody id="backtestBody">
-                                <tr>
-                                    <td colspan="8" style="text-align:center; color:var(--text-muted); padding:20px;">
-                                        Click 'Run Historical Backtest' to replay candle data under authentic 11-skills rules.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                        <!-- Historical Trades Table -->
+                        <div style="max-height: 240px; overflow-y:auto; overflow-x:auto; width:100%; border:1px solid var(--border-subtle); border-radius:6px; margin-bottom:12px;">
+                            <table class="journal-table" style="font-size:12px; min-width:600px;">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Side</th>
+                                        <th>Entry Time</th>
+                                        <th>Exit Time</th>
+                                        <th>Entry Price</th>
+                                        <th>Exit Price</th>
+                                        <th>Outcome</th>
+                                        <th>Simulated P/L</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="backtestBody">
+                                    <tr>
+                                        <td colspan="8" style="text-align:center; color:var(--text-muted); padding:20px;">
+                                            Click 'Run Historical Backtest' to replay candle data under authentic 11-skills rules.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
 
-                    <div style="font-size:11px; color:var(--text-muted); font-style:italic;">
-                        * <strong>Notice:</strong> Historical backtest strictly evaluates completed candles with 0.5 pip slippage and spread. No future lookahead. Past simulated performance does not guarantee future results.
+                        <div style="font-size:11px; color:var(--text-muted); font-style:italic;">
+                            * <strong>Notice:</strong> Historical backtest strictly evaluates completed candles with 0.5 pip slippage and spread. No future lookahead. Past simulated performance does not guarantee future results.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3364,6 +3490,15 @@
 
             // Update Strategy Intelligence & Decision Matrix
             updateStrategyMatrix(data, isLiveStreaming ? activeTick : null);
+
+            // Auto-track confirmed signal into trade list
+            checkAndAutoLogSignal(autoSig, data);
+
+            // Update live running PnL for active trades using current price
+            const activePrice = (isLiveStreaming && activeTick && activeTick.mid) ? activeTick.mid : (mid || 0);
+            if (activePrice > 0) {
+                updateLiveTradesPnL(activePrice, sym);
+            }
         }
 
         /* -------------------------------------------------------------
@@ -4400,6 +4535,321 @@
         }
 
         /* -------------------------------------------------------------
+           Card 5: Automatic Signal Engine Trades List & Tracker
+           ------------------------------------------------------------- */
+        let showAllSigTrades = false;
+
+        function switchCard5Tab(tab) {
+            const tabAuto = document.getElementById('tabContentAutoTrades');
+            const tabBt = document.getElementById('tabContentBacktest');
+            const btnAuto = document.getElementById('tabBtnAutoTrades');
+            const btnBt = document.getElementById('tabBtnBacktest');
+            if (tab === 'autoTrades') {
+                if (tabAuto) tabAuto.style.display = 'block';
+                if (tabBt) tabBt.style.display = 'none';
+                if (btnAuto) btnAuto.classList.add('active');
+                if (btnBt) btnBt.classList.remove('active');
+            } else {
+                if (tabAuto) tabAuto.style.display = 'none';
+                if (tabBt) tabBt.style.display = 'block';
+                if (btnAuto) btnAuto.classList.remove('active');
+                if (btnBt) btnBt.classList.add('active');
+            }
+        }
+
+        function toggleMoreSigTrades() {
+            showAllSigTrades = !showAllSigTrades;
+            renderAutoTradesTable(cachedJournal);
+        }
+
+        function updateAutoTradesStats(total, active, tp, sl, net) {
+            const elTot = document.getElementById('statTotalAutoTrades');
+            const elAct = document.getElementById('statActiveAutoTrades');
+            const elTp = document.getElementById('statTargetHitAutoTrades');
+            const elSl = document.getElementById('statSlHitAutoTrades');
+            const elNet = document.getElementById('statNetPnlAutoTrades');
+
+            if (elTot) elTot.textContent = total;
+            if (elAct) elAct.textContent = active;
+            if (elTp) elTp.textContent = tp;
+            if (elSl) elSl.textContent = sl;
+            if (elNet) {
+                elNet.textContent = (net >= 0 ? '+' : '') + '$' + net.toFixed(2);
+                elNet.style.color = net >= 0 ? 'var(--accent-green)' : 'var(--accent-rose)';
+            }
+        }
+
+        function renderAutoTradesTable(list) {
+            const tbody = document.getElementById('autoTradesBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (!list || list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:24px; color:var(--text-secondary); font-size:12px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom:6px; opacity:0.6;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg><br>
+                    No signals logged yet. Any BUY or SELL signal from Automatic Signal Engine will appear here in real-time.
+                </td></tr>`;
+                updateAutoTradesStats(0, 0, 0, 0, 0);
+                const btnMore = document.getElementById('btnToggleMoreSigTrades');
+                if (btnMore) btnMore.style.display = 'none';
+                return;
+            }
+
+            let activeCount = 0;
+            let targetHitCount = 0;
+            let slHitCount = 0;
+            let netPnl = 0.0;
+
+            list.forEach(it => {
+                const pnl = Number(it.pnl_usd || 0);
+                netPnl += pnl;
+                const st = (it.status || '').toUpperCase();
+                if (st.includes('SL')) slHitCount++;
+                else if (st.includes('TARGET') || st.includes('TP')) targetHitCount++;
+                else activeCount++;
+            });
+
+            updateAutoTradesStats(list.length, activeCount, targetHitCount, slHitCount, netPnl);
+
+            const totalCount = list.length;
+            const displayed = showAllSigTrades ? list : list.slice(0, 5);
+
+            const btnMore = document.getElementById('btnToggleMoreSigTrades');
+            const countBadge = document.getElementById('autoTradesCountLabel');
+            if (btnMore) {
+                if (totalCount > 5) {
+                    btnMore.style.display = 'inline-block';
+                    btnMore.textContent = showAllSigTrades ? 'Show Less (फक्त ५ ट्रेड्स दाखवा)' : `View More (आणखी ट्रेड्स पहा - एकूण ${totalCount})`;
+                } else {
+                    btnMore.style.display = 'none';
+                }
+            }
+            if (countBadge) {
+                countBadge.textContent = showAllSigTrades ? `Showing All ${totalCount} Trades (सर्व ${totalCount} ट्रेड्स)` : `Showing Latest 5 Trades (नवीनतम ५ ट्रेड्स / एकूण ${totalCount})`;
+            }
+
+            displayed.forEach(item => {
+                const tr = document.createElement('tr');
+                const pnl = Number(item.pnl_usd || 0);
+                const pnlPips = Number(item.pnl_pips || 0);
+                const isBuy = item.side === 'BUY';
+                const st = (item.status || 'ACTIVE').toUpperCase();
+                const isActive = st.includes('ACTIVE') || st === 'OPEN';
+                const isSl = st.includes('SL');
+                const isTp = st.includes('TARGET') || st.includes('TP');
+
+                let statusBadge = '';
+                if (isActive) {
+                    statusBadge = `<span class="badge badge-blue" style="display:inline-flex; align-items:center; gap:4px; font-weight:700;"><span class="pulse-dot green" style="width:6px;height:6px;"></span>ACTIVE</span>`;
+                } else if (isSl) {
+                    statusBadge = `<span class="badge badge-rose" style="font-weight:700;">SL HIT</span>`;
+                } else if (isTp) {
+                    statusBadge = `<span class="badge badge-green" style="font-weight:700;">TARGET HIT</span>`;
+                } else {
+                    statusBadge = `<span class="badge badge-amber">${item.status}</span>`;
+                }
+
+                const pnlColor = pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-rose)';
+                const pnlSign = pnl >= 0 ? '+' : '';
+                const pipsSign = pnlPips >= 0 ? '+' : '';
+                const pnlDisplay = `<span style="color:${pnlColor}; font-weight:700; font-family:var(--font-mono);">${pnlSign}$${pnl.toFixed(2)} <span style="font-size:11px; opacity:0.85;">(${pipsSign}${pnlPips.toFixed(1)} pips)</span></span>`;
+
+                const actionBtn = isActive
+                    ? `<button class="btn" style="padding:2px 8px; font-size:11px; background:rgba(239,68,68,0.15); color:#fca5a5; border-color:rgba(239,68,68,0.4);" onclick="closeJournalTrade('${item.id}')">Close</button>`
+                    : `<span style="color:var(--text-secondary); font-size:11px;">--</span>`;
+
+                const gradeDisplay = item.confluence_grade || (item.confluence_score ? `${item.confluence_score}%` : 'Grade A');
+                const targetDisplay = item.target_price_2 ? `${item.target_price} / ${item.target_price_2}` : `${item.target_price}`;
+
+                tr.innerHTML = `
+                    <td style="color:var(--accent-blue); font-weight:600; font-family:var(--font-mono);">${item.id}</td>
+                    <td style="color:var(--text-secondary); font-size:11px; white-space:nowrap;">${item.timestamp}</td>
+                    <td>
+                        <span class="badge ${isBuy ? 'badge-green' : 'badge-rose'}" style="font-weight:700;">
+                            ${item.symbol} ${item.side}
+                        </span>
+                    </td>
+                    <td style="font-family:var(--font-mono); font-weight:600;">${item.simulated_fill}</td>
+                    <td><span style="font-size:11px; font-weight:600; color:var(--accent-blue);">${gradeDisplay}</span></td>
+                    <td style="color:var(--accent-rose); font-family:var(--font-mono);">${item.stop_price}</td>
+                    <td style="color:var(--accent-green); font-family:var(--font-mono);">${targetDisplay}</td>
+                    <td>${pnlDisplay}</td>
+                    <td>${statusBadge}</td>
+                    <td style="text-align:center;">${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function checkAndAutoLogSignal(autoSig, data) {
+            if (!autoSig || (autoSig.action !== 'BUY' && autoSig.action !== 'SELL')) return;
+            if (!autoSig.entry_reference || !autoSig.stop_loss) return;
+
+            const sym = autoSig.symbol || (data ? data.symbol : 'XAU/USD');
+            const candleTs = autoSig.confirmed_candle_ts || autoSig.created_timestamp || autoSig.timestamp_utc || autoSig.entry_reference;
+            const sigKey = `${normalizeSym(sym)}_${autoSig.action}_${candleTs}`;
+
+            if (!window.loggedSignalKeys) {
+                window.loggedSignalKeys = new Set();
+                if (cachedJournal && cachedJournal.length) {
+                    cachedJournal.forEach(it => {
+                        if (it.sig_key) window.loggedSignalKeys.add(it.sig_key);
+                    });
+                }
+            }
+
+            if (window.loggedSignalKeys.has(sigKey)) return;
+            window.loggedSignalKeys.add(sigKey);
+
+            const isGold = sym.includes('XAU');
+            const isBtc = sym.includes('BTC');
+            const pipSize = isGold ? 0.10 : (isBtc ? 1.0 : 0.0001);
+
+            const entryPrice = Number(autoSig.entry_reference);
+            const stopPrice = Number(autoSig.stop_loss);
+            const tp1Price = Number(autoSig.take_profit || (autoSig.action === 'BUY' ? entryPrice + (isGold ? 15.0 : 0.0050) : entryPrice - (isGold ? 15.0 : 0.0050)));
+            const tp2Price = autoSig.take_profit_2 ? Number(autoSig.take_profit_2) : (autoSig.action === 'BUY' ? entryPrice + (isGold ? 26.5 : 0.0087) : entryPrice - (isGold ? 26.5 : 0.0087));
+            const tp3Price = autoSig.take_profit_3 ? Number(autoSig.take_profit_3) : null;
+
+            const riskDist = Math.abs(entryPrice - stopPrice);
+            const riskPips = autoSig.risk_pips ? Number(autoSig.risk_pips) : Math.round(riskDist / pipSize);
+            const gradeStr = autoSig.grade || (autoSig.confluence_score ? `${autoSig.confluence_score}%` : 'Grade A');
+
+            const tradeId = 'AUTO-' + (cachedJournal.length + 101);
+            const newTrade = {
+                id: tradeId,
+                symbol: sym,
+                side: autoSig.action,
+                simulated_fill: entryPrice,
+                stop_price: stopPrice,
+                target_price: tp1Price,
+                target_price_2: tp2Price,
+                target_price_3: tp3Price,
+                confluence_grade: gradeStr,
+                confluence_score: autoSig.confluence_score || 75,
+                risk_pips: riskPips,
+                risk_usd: 50.0,
+                lot_size: isGold ? 0.05 : 0.20,
+                units: isGold ? 5 : 20000,
+                unit_label: isGold ? 'oz' : 'units',
+                pnl_usd: 0.0,
+                pnl_pips: 0.0,
+                timestamp: autoSig.timestamp_et || autoSig.confirmed_at_et || new Date().toLocaleTimeString(),
+                status: 'ACTIVE',
+                note: `Auto Signal [${autoSig.timeframe || '5m'}]: ${autoSig.strategy || 'SMC/ICT Confluence'}`,
+                sig_key: sigKey
+            };
+
+            if (!Array.isArray(cachedJournal)) cachedJournal = [];
+            cachedJournal.unshift(newTrade);
+            try {
+                localStorage.setItem('rushi_paper_journal', JSON.stringify(cachedJournal));
+            } catch(e) {}
+
+            try {
+                fetch('/api/paper/log-signal', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(autoSig)
+                }).catch(() => {});
+            } catch(e) {}
+
+            renderAutoTradesTable(cachedJournal);
+            renderJournalTable(cachedJournal);
+        }
+
+        function updateLiveTradesPnL(currentPrice, sym) {
+            if (!currentPrice || currentPrice <= 0 || !cachedJournal || cachedJournal.length === 0) return;
+            const normSym = normalizeSym(sym);
+            let changed = false;
+
+            cachedJournal.forEach(item => {
+                const itemSym = normalizeSym(item.symbol || 'XAU/USD');
+                if (itemSym !== normSym) return;
+
+                const st = (item.status || '').toUpperCase();
+                if (!st.includes('ACTIVE') && st !== 'OPEN') return;
+
+                const isGold = itemSym.includes('XAU');
+                const isBtc = itemSym.includes('BTC');
+                const isJpy = itemSym.includes('JPY');
+                const pipSize = isGold ? 0.10 : (isBtc ? 1.0 : (isJpy ? 0.01 : 0.0001));
+
+                const side = item.side;
+                const entry = Number(item.simulated_fill);
+                const stop = Number(item.stop_price);
+                const tp1 = Number(item.target_price);
+                const tp2 = item.target_price_2 ? Number(item.target_price_2) : tp1;
+                const riskUsd = Number(item.risk_usd || 50.0);
+                const riskDist = Math.abs(entry - stop) > 0 ? Math.abs(entry - stop) : (pipSize * 50);
+
+                if (side === 'BUY') {
+                    if (currentPrice <= stop) {
+                        item.status = 'SL HIT';
+                        item.exit_price = stop;
+                        item.pnl_usd = -riskUsd;
+                        item.pnl_pips = -Math.round(riskDist / pipSize);
+                        item.closed_at = new Date().toLocaleTimeString();
+                        changed = true;
+                    } else if (tp2 && currentPrice >= tp2) {
+                        item.status = 'TARGET HIT';
+                        item.exit_price = tp2;
+                        item.pnl_usd = Math.round(riskUsd * 3.5 * 100) / 100;
+                        item.pnl_pips = Math.round((tp2 - entry) / pipSize);
+                        item.closed_at = new Date().toLocaleTimeString();
+                        changed = true;
+                    } else if (tp1 && currentPrice >= tp1) {
+                        item.status = 'TARGET HIT';
+                        item.exit_price = tp1;
+                        item.pnl_usd = Math.round(riskUsd * 2.0 * 100) / 100;
+                        item.pnl_pips = Math.round((tp1 - entry) / pipSize);
+                        item.closed_at = new Date().toLocaleTimeString();
+                        changed = true;
+                    } else {
+                        const priceDiff = currentPrice - entry;
+                        item.pnl_pips = Math.round((priceDiff / pipSize) * 10) / 10;
+                        item.pnl_usd = Math.round(((priceDiff / riskDist) * riskUsd) * 100) / 100;
+                        changed = true;
+                    }
+                } else if (side === 'SELL') {
+                    if (currentPrice >= stop) {
+                        item.status = 'SL HIT';
+                        item.exit_price = stop;
+                        item.pnl_usd = -riskUsd;
+                        item.pnl_pips = -Math.round(riskDist / pipSize);
+                        item.closed_at = new Date().toLocaleTimeString();
+                        changed = true;
+                    } else if (tp2 && currentPrice <= tp2) {
+                        item.status = 'TARGET HIT';
+                        item.exit_price = tp2;
+                        item.pnl_usd = Math.round(riskUsd * 3.5 * 100) / 100;
+                        item.pnl_pips = Math.round((entry - tp2) / pipSize);
+                        item.closed_at = new Date().toLocaleTimeString();
+                        changed = true;
+                    } else if (tp1 && currentPrice <= tp1) {
+                        item.status = 'TARGET HIT';
+                        item.exit_price = tp1;
+                        item.pnl_usd = Math.round(riskUsd * 2.0 * 100) / 100;
+                        item.pnl_pips = Math.round((entry - tp1) / pipSize);
+                        item.closed_at = new Date().toLocaleTimeString();
+                        changed = true;
+                    } else {
+                        const priceDiff = entry - currentPrice;
+                        item.pnl_pips = Math.round((priceDiff / pipSize) * 10) / 10;
+                        item.pnl_usd = Math.round(((priceDiff / riskDist) * riskUsd) * 100) / 100;
+                        changed = true;
+                    }
+                }
+            });
+
+            if (changed) {
+                try { localStorage.setItem('rushi_paper_journal', JSON.stringify(cachedJournal)); } catch(e) {}
+                renderAutoTradesTable(cachedJournal);
+                renderJournalTable(cachedJournal);
+            }
+        }
+
+        /* -------------------------------------------------------------
            Paper Journal & Position Auto-Resolution
            ------------------------------------------------------------- */
         async function fetchJournal() {
@@ -4424,6 +4874,7 @@
                 cachedJournal = merged;
                 localStorage.setItem('rushi_paper_journal', JSON.stringify(merged));
                 renderJournalTable(merged);
+                renderAutoTradesTable(merged);
             } catch (e) {
                 console.error("Fetch journal error:", e);
                 try {
@@ -4431,6 +4882,7 @@
                     localList = localList.filter(it => !(it.id && (it.id === 'SIM-101' || it.id === 'SIM-102') && it.timestamp && it.timestamp.includes('2026-10-30')));
                     cachedJournal = localList;
                     renderJournalTable(localList);
+                    renderAutoTradesTable(localList);
                 } catch(err) {}
             }
         }
@@ -4478,7 +4930,8 @@
 
             if (cachedJournal && cachedJournal.length) {
                 cachedJournal.forEach(item => {
-                    if (item.status !== 'OPEN' || normalizeSym(item.symbol) !== normTickSym) return;
+                    const st = (item.status || '').toUpperCase();
+                    if ((!st.includes('ACTIVE') && st !== 'OPEN') || normalizeSym(item.symbol) !== normTickSym) return;
 
                     const side = item.side;
                     const entry = Number(item.simulated_fill);
@@ -4488,39 +4941,41 @@
 
                     if (side === 'BUY') {
                         if (tick.bid <= stop) {
-                            item.status = 'CLOSED (HIT SL)';
+                            item.status = 'SL HIT';
                             item.exit_price = stop;
                             item.pnl_usd = -risk;
                             changed = true;
                         } else if (tick.bid >= target) {
-                            item.status = 'CLOSED (HIT TP)';
+                            item.status = 'TARGET HIT';
                             item.exit_price = target;
                             item.pnl_usd = risk * 2.0;
                             changed = true;
                         } else {
                             const distPct = Math.abs(entry - stop) > 0 ? (tick.bid - entry) / Math.abs(entry - stop) : 0;
-                            item.pnl_usd = distPct * risk;
+                            item.pnl_usd = Math.round(distPct * risk * 100) / 100;
                         }
                     } else {
                         if (tick.ask >= stop) {
-                            item.status = 'CLOSED (HIT SL)';
+                            item.status = 'SL HIT';
                             item.exit_price = stop;
                             item.pnl_usd = -risk;
                             changed = true;
                         } else if (tick.ask <= target) {
-                            item.status = 'CLOSED (HIT TP)';
+                            item.status = 'TARGET HIT';
                             item.exit_price = target;
                             item.pnl_usd = risk * 2.0;
                             changed = true;
                         } else {
                             const distPct = Math.abs(entry - stop) > 0 ? (entry - tick.ask) / Math.abs(entry - stop) : 0;
-                            item.pnl_usd = distPct * risk;
+                            item.pnl_usd = Math.round(distPct * risk * 100) / 100;
                         }
                     }
                 });
 
                 if (changed) {
+                    try { localStorage.setItem('rushi_paper_journal', JSON.stringify(cachedJournal)); } catch(e) {}
                     renderJournalTable(cachedJournal);
+                    renderAutoTradesTable(cachedJournal);
                 }
             }
 
@@ -4619,6 +5074,7 @@
                     localStorage.setItem('rushi_paper_journal', JSON.stringify(cachedJournal));
                 } catch(e) {}
                 renderJournalTable(cachedJournal);
+                renderAutoTradesTable(cachedJournal);
             }
         }
 
@@ -4628,6 +5084,7 @@
                 try {
                     localStorage.removeItem('rushi_paper_journal');
                 } catch(e) {}
+                if (window.loggedSignalKeys) window.loggedSignalKeys.clear();
                 await fetch('/api/paper/journal/clear', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -4635,10 +5092,12 @@
                 });
                 cachedJournal = [];
                 renderJournalTable([]);
+                renderAutoTradesTable([]);
             } catch (err) {
                 console.error('Error clearing journal:', err);
                 cachedJournal = [];
                 renderJournalTable([]);
+                renderAutoTradesTable([]);
             }
         }
 

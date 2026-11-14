@@ -1074,6 +1074,25 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("clearJournalHistory", html)
         self.assertIn("closeJournalTrade", html)
 
+    def test_auto_signal_trade_tracker_in_card5(self):
+        """Verify Card 5 Automatic Signal Engine Live Trades List and Backtest integration."""
+        url_home = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url_home, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        # 1. Elements in Card 5
+        self.assertIn("tabContentAutoTrades", html)
+        self.assertIn("tabBtnAutoTrades", html)
+        self.assertIn("tabBtnBacktest", html)
+        self.assertIn("autoTradesBody", html)
+        self.assertIn("btnToggleMoreSigTrades", html)
+        self.assertIn("statNetPnlAutoTrades", html)
+        # 2. JavaScript functions
+        self.assertIn("switchCard5Tab", html)
+        self.assertIn("toggleMoreSigTrades", html)
+        self.assertIn("renderAutoTradesTable", html)
+        self.assertIn("checkAndAutoLogSignal", html)
+        self.assertIn("updateLiveTradesPnL", html)
+
 
 if __name__ == "__main__":
     unittest.main()
