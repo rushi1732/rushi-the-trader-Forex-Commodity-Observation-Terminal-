@@ -169,11 +169,14 @@ class SignalStateManager:
                 "stop_loss": None,
                 "take_profit": None,
                 "take_profit_2": None,
+                "take_profit_3": None,
                 "reward_risk": None,
                 "reward_risk_tp2": None,
+                "reward_risk_tp3": None,
                 "risk_pips": None,
                 "reward_pips": None,
                 "reward_pips_tp2": None,
+                "reward_pips_tp3": None,
                 "confluence_score": None,
                 "grade": None,
                 "confluence_factors": [],
@@ -201,11 +204,14 @@ class SignalStateManager:
                 "stop_loss": None,
                 "take_profit": None,
                 "take_profit_2": None,
+                "take_profit_3": None,
                 "reward_risk": None,
                 "reward_risk_tp2": None,
+                "reward_risk_tp3": None,
                 "risk_pips": None,
                 "reward_pips": None,
                 "reward_pips_tp2": None,
+                "reward_pips_tp3": None,
                 "confluence_score": None,
                 "grade": None,
                 "confluence_factors": [],
@@ -233,11 +239,14 @@ class SignalStateManager:
                 "stop_loss": None,
                 "take_profit": None,
                 "take_profit_2": None,
+                "take_profit_3": None,
                 "reward_risk": None,
                 "reward_risk_tp2": None,
+                "reward_risk_tp3": None,
                 "risk_pips": None,
                 "reward_pips": None,
                 "reward_pips_tp2": None,
+                "reward_pips_tp3": None,
                 "confluence_score": None,
                 "grade": None,
                 "confluence_factors": [],
@@ -449,11 +458,14 @@ class SignalStateManager:
         candidate_sl = None
         candidate_tp1 = None
         candidate_tp2 = None
+        candidate_tp3 = None
         candidate_rr = 2.0
         candidate_rr_tp2 = 3.5
+        candidate_rr_tp3 = 4.5
         candidate_risk_pips = None
         candidate_reward_pips = None
         candidate_reward_pips_tp2 = None
+        candidate_reward_pips_tp3 = None
         candidate_score = None
         candidate_grade = None
         candidate_factors = []
@@ -475,11 +487,14 @@ class SignalStateManager:
                 candidate_sl = plan["stop_loss"]
                 candidate_tp1 = plan["take_profit_1"]
                 candidate_tp2 = plan.get("take_profit_2")
+                candidate_tp3 = plan.get("take_profit_3")
                 candidate_rr = plan.get("rr_ratio_tp1", 2.0)
                 candidate_rr_tp2 = plan.get("rr_ratio_tp2", 3.5)
+                candidate_rr_tp3 = plan.get("rr_ratio_tp3", 4.5)
                 candidate_risk_pips = plan.get("risk_pips")
                 candidate_reward_pips = plan.get("reward_pips_tp1")
                 candidate_reward_pips_tp2 = plan.get("reward_pips_tp2")
+                candidate_reward_pips_tp3 = plan.get("reward_pips_tp3")
                 factors_str = " | ".join(candidate_factors[:2]) if candidate_factors else "Institutional multi-factor alignment"
                 candidate_reason = f"Confirmed {c_action} Institutional Setup ({candidate_grade}, Score: {candidate_score}%): {factors_str}"
         elif is_offline_test and paper_simulation and isinstance(paper_simulation, dict) and "error" not in paper_simulation:
@@ -601,11 +616,14 @@ class SignalStateManager:
                 "tp1_hit": False,
                 "take_profit": candidate_tp1,
                 "take_profit_2": candidate_tp2,
+                "take_profit_3": candidate_tp3,
                 "reward_risk": candidate_rr,
                 "reward_risk_tp2": candidate_rr_tp2,
+                "reward_risk_tp3": candidate_rr_tp3,
                 "risk_pips": candidate_risk_pips,
                 "reward_pips": candidate_reward_pips,
                 "reward_pips_tp2": candidate_reward_pips_tp2,
+                "reward_pips_tp3": candidate_reward_pips_tp3,
                 "confluence_score": candidate_score,
                 "grade": candidate_grade,
                 "confluence_factors": candidate_factors,
@@ -655,11 +673,14 @@ class SignalStateManager:
             "stop_loss": None,
             "take_profit": None,
             "take_profit_2": None,
+            "take_profit_3": None,
             "reward_risk": None,
             "reward_risk_tp2": None,
+            "reward_risk_tp3": None,
             "risk_pips": None,
             "reward_pips": None,
             "reward_pips_tp2": None,
+            "reward_pips_tp3": None,
             "confluence_score": None,
             "grade": None,
             "confluence_factors": [],
@@ -1180,9 +1201,14 @@ def observe_pair(
                     "stop_price": plan_c["stop_loss"],
                     "target_price": plan_c["take_profit_1"],
                     "target_price_2": plan_c.get("take_profit_2"),
+                    "target_price_3": plan_c.get("take_profit_3"),
                     "risk_pips": plan_c.get("risk_pips"),
                     "target_pips": plan_c.get("reward_pips_tp1"),
+                    "target_pips_tp2": plan_c.get("reward_pips_tp2"),
+                    "target_pips_tp3": plan_c.get("reward_pips_tp3"),
                     "reward_risk": plan_c.get("rr_ratio_tp1", 2.0),
+                    "reward_risk_tp2": plan_c.get("rr_ratio_tp2", 3.5),
+                    "reward_risk_tp3": plan_c.get("rr_ratio_tp3", 4.5),
                     "paper_lot_size": sizing_c.get("lot_size", 0.01),
                     "paper_units": sizing_c.get("units", 1000),
                     "simulated_max_loss_usd": sizing_c.get("max_loss_usd", 50.0),

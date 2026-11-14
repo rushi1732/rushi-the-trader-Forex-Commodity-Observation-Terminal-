@@ -480,16 +480,19 @@ def evaluate_confluence_signal(
     else:
         grade = "C (Consolidation / Wait)"
 
-    # 4. Construct Execution Plan (Entry, Stop Loss, TP1, TP2, R:R)
+    # 4. Construct Execution Plan (Entry, Stop Loss, TP1, TP2, TP3, R:R)
     entry_price = current_price
     stop_loss = 0.0
     take_profit_1 = 0.0
     take_profit_2 = 0.0
+    take_profit_3 = 0.0
     risk_pips = 0.0
     reward_pips_tp1 = 0.0
     reward_pips_tp2 = 0.0
+    reward_pips_tp3 = 0.0
     rr_tp1 = 0.0
     rr_tp2 = 0.0
+    rr_tp3 = 0.0
 
     # Structural Lookback: 18 candles for true swing anchor (not just 5!)
     structural_lookback = min(len(candles), 18)
@@ -518,7 +521,7 @@ def evaluate_confluence_signal(
         reward_pips_tp1 = round(to_pips(canon, tp1_dist), 1)
         rr_tp1 = 2.0
 
-        # TP2 = 1:3.5 R:R or BSL liquidity pool
+        # TP2 = 1:3.5 R:R or BSL liquidity pool (240 - 290 pips on Gold)
         bsl_target = liq_data.get("bsl_target")
         if bsl_target and bsl_target > current_price + risk_dist * 2.5:
             take_profit_2 = round(bsl_target, decimals)
@@ -529,6 +532,12 @@ def evaluate_confluence_signal(
 
         reward_pips_tp2 = round(to_pips(canon, tp2_dist), 1)
         rr_tp2 = round(tp2_dist / risk_dist, 2)
+
+        # TP3 = 1:4.5 R:R Macro Swing Runner (300 - 380 pips on Gold)
+        tp3_dist = risk_dist * 4.5
+        take_profit_3 = round(current_price + tp3_dist, decimals)
+        reward_pips_tp3 = round(to_pips(canon, tp3_dist), 1)
+        rr_tp3 = 4.5
 
     elif signal_side == "SELL":
         # Anchor Stop Loss strictly above structural high and Supply Block top
@@ -546,13 +555,13 @@ def evaluate_confluence_signal(
         risk_dist = max(min_risk_dist, stop_loss - current_price)
         risk_pips = round(to_pips(canon, risk_dist), 1)
 
-        # TP1 = 1:2 R:R from actual entry reference
+        # TP1 = 1:2 R:R from actual entry reference (140 - 170 pips on Gold)
         tp1_dist = risk_dist * 2.0
         take_profit_1 = round(current_price - tp1_dist, decimals)
         reward_pips_tp1 = round(to_pips(canon, tp1_dist), 1)
         rr_tp1 = 2.0
 
-        # TP2 = 1:3.5 R:R or SSL liquidity pool
+        # TP2 = 1:3.5 R:R or SSL liquidity pool (240 - 290 pips on Gold)
         ssl_target = liq_data.get("ssl_target")
         if ssl_target and ssl_target < current_price - risk_dist * 2.5:
             take_profit_2 = round(ssl_target, decimals)
@@ -564,17 +573,26 @@ def evaluate_confluence_signal(
         reward_pips_tp2 = round(to_pips(canon, tp2_dist), 1)
         rr_tp2 = round(tp2_dist / risk_dist, 2)
 
+        # TP3 = 1:4.5 R:R Macro Swing Runner (300 - 380 pips on Gold)
+        tp3_dist = risk_dist * 4.5
+        take_profit_3 = round(current_price - tp3_dist, decimals)
+        reward_pips_tp3 = round(to_pips(canon, tp3_dist), 1)
+        rr_tp3 = 4.5
+
     else:
         # NEUTRAL / NO SIGNAL: Keep all execution plan fields completely blank
         entry_price = None
         stop_loss = None
         take_profit_1 = None
         take_profit_2 = None
+        take_profit_3 = None
         risk_pips = None
         reward_pips_tp1 = None
         reward_pips_tp2 = None
+        reward_pips_tp3 = None
         rr_tp1 = None
         rr_tp2 = None
+        rr_tp3 = None
 
     return {
         "symbol": canon,
@@ -594,11 +612,14 @@ def evaluate_confluence_signal(
             "stop_loss": stop_loss,
             "take_profit_1": take_profit_1,
             "take_profit_2": take_profit_2,
+            "take_profit_3": take_profit_3,
             "risk_pips": risk_pips,
             "reward_pips_tp1": reward_pips_tp1,
             "reward_pips_tp2": reward_pips_tp2,
+            "reward_pips_tp3": reward_pips_tp3,
             "rr_ratio_tp1": rr_tp1,
             "rr_ratio_tp2": rr_tp2,
+            "rr_ratio_tp3": rr_tp3,
             "priority_target": "TP2 (3.5R+ Sniper Target Prioritized)" if (grade.startswith("A+ (Sniper") or smt_data.get("is_sniper_grade")) else "TP1 (2.0R Baseline)",
         },
         "confluence_factors": active_factors,

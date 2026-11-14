@@ -102,41 +102,8 @@ GOLD_CALIBRATION: Dict[str, Any] = {
     "updated_at": "",
 }
 
-# In-memory paper observation journal
-PAPER_JOURNAL: List[Dict[str, Any]] = [
-    {
-        "id": "SIM-101",
-        "symbol": "XAU/USD",
-        "side": "BUY",
-        "simulated_fill": 2740.18,
-        "stop_price": 2735.00,
-        "target_price": 2750.54,
-        "lot_size": 0.10,
-        "units": 10,
-        "unit_label": "oz",
-        "risk_usd": 50.00,
-        "pnl_usd": 0.0,
-        "timestamp": "2026-10-30 09:15 ET",
-        "status": "OPEN",
-        "note": "London session simulated breakout setup",
-    },
-    {
-        "id": "SIM-102",
-        "symbol": "EUR/USD",
-        "side": "BUY",
-        "simulated_fill": 1.08669,
-        "stop_price": 1.08500,
-        "target_price": 1.09007,
-        "lot_size": 0.29,
-        "units": 29000,
-        "unit_label": "units",
-        "risk_usd": 49.01,
-        "pnl_usd": 0.0,
-        "timestamp": "2026-10-30 08:30 ET",
-        "status": "OPEN",
-        "note": "Asian range breakout paper observation",
-    }
-]
+# In-memory paper observation journal (starts clean; trades logged by user or auto-signals)
+PAPER_JOURNAL: List[Dict[str, Any]] = []
 
 
 def update_journal_positions(current_price: float, symbol: str) -> List[Dict[str, Any]]:
@@ -2533,8 +2500,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <span id="autoSignalTarget" class="meta-v">--</span>
                         </div>
                         <div class="meta-item">
-                            <span class="meta-k">Take Profit 2 (3.5R+)</span>
+                            <span class="meta-k">Take Profit 2 (3.5R Target)</span>
                             <span id="autoSignalTarget2" class="meta-v">--</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-k">Take Profit 3 (4.5R Swing Runner)</span>
+                            <span id="autoSignalTarget3" class="meta-v">--</span>
                         </div>
                         <div class="meta-item">
                             <span class="meta-k">Confluence Grade</span>
@@ -3040,8 +3011,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
                             Paper Observation Journal (Simulated Positions)
                         </span>
-                        <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
                             <span class="badge badge-amber">SIMULATED ONLY  -  NO REAL MONEY</span>
+                            <button id="btnClearJournal" class="btn" style="padding:4px 10px; font-size:11px; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.4); color:#fca5a5;" onclick="clearJournalHistory()">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                Clear Journal
+                            </button>
                             <button id="btnExportCsv" class="btn" style="padding:4px 10px; font-size:11px;" onclick="exportJournalCSV()">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                                 Export CSV
@@ -3065,6 +3040,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     <th>Strategy / Setup</th>
                                     <th>Timestamp</th>
                                     <th>Status</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody id="journalBody">
@@ -3799,6 +3775,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const elStop = document.getElementById('autoSignalStop');
             const elTarget = document.getElementById('autoSignalTarget');
             const elTarget2 = document.getElementById('autoSignalTarget2');
+            const elTarget3 = document.getElementById('autoSignalTarget3');
             const elConf = document.getElementById('autoSignalConfluence');
             const elRR = document.getElementById('autoSignalRR');
             const elTime = document.getElementById('autoSignalTime');
@@ -3850,9 +3827,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
                 const activeEntry = (elEntry && elEntry.textContent !== '--') ? Number(elEntry.textContent) : (mid || 0);
 
-                const stopDist = isBtc ? 200.0 : (decimals === 2 ? 5.0 : 0.0025);
-                const tp1Dist = isBtc ? 400.0 : (decimals === 2 ? 10.0 : 0.0050);
-                const tp2Dist = isBtc ? 700.0 : (decimals === 2 ? 17.5 : 0.0087);
+                const stopDist = isBtc ? 200.0 : (decimals === 2 ? 7.5 : 0.0025);
+                const tp1Dist = isBtc ? 400.0 : (decimals === 2 ? 15.0 : 0.0050);
+                const tp2Dist = isBtc ? 700.0 : (decimals === 2 ? 26.5 : 0.0087);
+                const tp3Dist = isBtc ? 900.0 : (decimals === 2 ? 34.0 : 0.0112);
 
                 if (elStop) {
                     const fallbackStop = action === 'BUY' ? (Number(activeEntry) - stopDist) : (Number(activeEntry) + stopDist);
@@ -3883,7 +3861,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if ((action === 'BUY' && tpVal <= activeEntry) || (action === 'SELL' && tpVal >= activeEntry)) {
                         tpVal = fallbackTp1;
                     }
-                    elTarget.textContent = (tpVal !== null && tpVal !== undefined) ? Number(tpVal).toFixed(decimals) : '--';
+                    const rPips1 = autoSig.reward_pips ? ` (+${autoSig.reward_pips} pips)` : '';
+                    elTarget.textContent = (tpVal !== null && tpVal !== undefined) ? Number(tpVal).toFixed(decimals) + rPips1 : '--';
                 }
                 if (elTarget2) {
                     const fallbackTp2 = action === 'BUY' ? (Number(activeEntry) + tp2Dist) : (Number(activeEntry) - tp2Dist);
@@ -3898,7 +3877,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     if ((action === 'BUY' && tp2Val <= activeEntry) || (action === 'SELL' && tp2Val >= activeEntry)) {
                         tp2Val = fallbackTp2;
                     }
-                    elTarget2.textContent = (tp2Val !== null && tp2Val !== undefined) ? Number(tp2Val).toFixed(decimals) : '--';
+                    const rPips2 = autoSig.reward_pips_tp2 ? ` (+${autoSig.reward_pips_tp2} pips)` : '';
+                    elTarget2.textContent = (tp2Val !== null && tp2Val !== undefined) ? Number(tp2Val).toFixed(decimals) + rPips2 : '--';
+                }
+                if (elTarget3) {
+                    const fallbackTp3 = action === 'BUY' ? (Number(activeEntry) + tp3Dist) : (Number(activeEntry) - tp3Dist);
+                    let tp3Val = autoSig.take_profit_3;
+                    // Sanity check: discard cross-asset take profit 3
+                    if (tp3Val && activeEntry && Math.abs(tp3Val - activeEntry) / activeEntry > 0.25) {
+                        tp3Val = fallbackTp3;
+                    }
+                    if (!tp3Val || (action === 'BUY' && tp3Val <= activeEntry) || (action === 'SELL' && tp3Val >= activeEntry)) {
+                        tp3Val = confPlan.take_profit_3 || fallbackTp3;
+                    }
+                    if ((action === 'BUY' && tp3Val <= activeEntry) || (action === 'SELL' && tp3Val >= activeEntry)) {
+                        tp3Val = fallbackTp3;
+                    }
+                    const rPips3 = autoSig.reward_pips_tp3 ? ` (+${autoSig.reward_pips_tp3} pips)` : '';
+                    elTarget3.textContent = (tp3Val !== null && tp3Val !== undefined) ? Number(tp3Val).toFixed(decimals) + rPips3 : '--';
                 }
                 if (elConf) {
                     const cScore = (autoSig.confluence_score !== null && autoSig.confluence_score !== undefined)
@@ -3911,7 +3907,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (elRR) {
                     const rr1 = autoSig.reward_risk || confPlan.rr_ratio_tp1 || 2.0;
                     const rr2 = autoSig.reward_risk_tp2 || confPlan.rr_ratio_tp2 || 3.5;
-                    elRR.textContent = `${rr1}:1 (TP1) / ${rr2}:1 (TP2)`;
+                    const rr3 = autoSig.reward_risk_tp3 || confPlan.rr_ratio_tp3 || 4.5;
+                    elRR.textContent = `${rr1}:1 (TP1) / ${rr2}:1 (TP2) / ${rr3}:1 (TP3)`;
                 }
                 if (elTime) {
                     elTime.textContent = autoSig.timestamp_et || autoSig.timestamp_utc || data.timestamp_et || new Date().toLocaleTimeString();
@@ -3950,6 +3947,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (elStop) elStop.textContent = '--';
                 if (elTarget) elTarget.textContent = '--';
                 if (elTarget2) elTarget2.textContent = '--';
+                if (elTarget3) elTarget3.textContent = '--';
                 if (elConf) elConf.textContent = '--';
                 if (elRR) elRR.textContent = '--';
                 if (elTime) elTime.textContent = '--';
@@ -5007,11 +5005,33 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         async function fetchJournal() {
             try {
                 const res = await fetch('/api/paper/journal');
-                const list = await res.json();
-                cachedJournal = list;
-                renderJournalTable(list);
+                let list = await res.json();
+                if (!Array.isArray(list)) list = [];
+                // Filter out any stale mock trades from Oct 2026
+                list = list.filter(it => !(it.id && (it.id === 'SIM-101' || it.id === 'SIM-102') && it.timestamp && it.timestamp.includes('2026-10-30')));
+
+                let localList = [];
+                try {
+                    localList = JSON.parse(localStorage.getItem('rushi_paper_journal') || '[]');
+                    localList = localList.filter(it => !(it.id && (it.id === 'SIM-101' || it.id === 'SIM-102') && it.timestamp && it.timestamp.includes('2026-10-30')));
+                } catch(e) {}
+
+                const map = new Map();
+                localList.forEach(it => { if (it && it.id) map.set(it.id, it); });
+                list.forEach(it => { if (it && it.id) map.set(it.id, it); });
+                const merged = Array.from(map.values());
+
+                cachedJournal = merged;
+                localStorage.setItem('rushi_paper_journal', JSON.stringify(merged));
+                renderJournalTable(merged);
             } catch (e) {
                 console.error("Fetch journal error:", e);
+                try {
+                    let localList = JSON.parse(localStorage.getItem('rushi_paper_journal') || '[]');
+                    localList = localList.filter(it => !(it.id && (it.id === 'SIM-101' || it.id === 'SIM-102') && it.timestamp && it.timestamp.includes('2026-10-30')));
+                    cachedJournal = localList;
+                    renderJournalTable(localList);
+                } catch(err) {}
             }
         }
 
@@ -5019,10 +5039,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const tbody = document.getElementById('journalBody');
             if (!tbody) return;
             tbody.innerHTML = '';
+            if (!list || list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:18px; color:var(--text-secondary); font-size:12px;">No paper trades recorded yet. Log an active signal or simulate a trade above.</td></tr>';
+                return;
+            }
             list.forEach(item => {
                 const tr = document.createElement('tr');
                 const pnl = item.pnl_usd !== undefined ? Number(item.pnl_usd) : 0.0;
-                const isResolved = item.status.includes('CLOSED');
+                const isResolved = item.status && item.status.includes('CLOSED');
+                const actionBtn = !isResolved
+                    ? `<button class="btn" style="padding:2px 8px; font-size:11px; background:rgba(239,68,68,0.15); color:#fca5a5; border-color:rgba(239,68,68,0.4);" onclick="closeJournalTrade('${item.id}')">Close</button>`
+                    : `<span style="color:var(--text-secondary); font-size:11px;">--</span>`;
 
                 tr.innerHTML = `
                     <td style="color:var(--accent-blue); font-weight:600;">${item.id}</td>
@@ -5037,6 +5064,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <td style="font-size:11px; color:var(--text-secondary); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.note || ''}">${item.note || 'Observation'}</td>
                     <td style="color:var(--text-secondary);">${item.timestamp}</td>
                     <td><span class="badge ${item.status.includes('HIT TP') ? 'badge-green' : (item.status.includes('HIT SL') ? 'badge-rose' : 'badge-amber')}">${item.status}</span></td>
+                    <td style="text-align:center;">${actionBtn}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -5155,6 +5183,63 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function exportJournalCSV() {
             window.location.href = '/api/paper/journal/export';
+        }
+
+        async function closeJournalTrade(tradeId) {
+            if (!tradeId) return;
+            if (!confirm(`Are you sure you want to close simulated trade ${tradeId}?`)) return;
+            try {
+                let currentExit = null;
+                if (cachedJournal) {
+                    const pos = cachedJournal.find(p => p.id === tradeId);
+                    if (pos) {
+                        const nSym = normalizeSym(pos.symbol);
+                        const tick = tdLiveTicks[nSym];
+                        if (tick && tick.mid) currentExit = tick.mid;
+                        else if (currentObservation && normalizeSym(currentObservation.symbol) === nSym) {
+                            currentExit = currentObservation.current_price;
+                        }
+                    }
+                }
+                await fetch('/api/paper/journal/close', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: tradeId, exit_price: currentExit })
+                });
+            } catch (err) {
+                console.error('Error closing trade on server:', err);
+            }
+            if (cachedJournal) {
+                const pos = cachedJournal.find(p => p.id === tradeId);
+                if (pos) {
+                    pos.status = 'CLOSED (MANUAL)';
+                    pos.closed_at = new Date().toISOString();
+                }
+                try {
+                    localStorage.setItem('rushi_paper_journal', JSON.stringify(cachedJournal));
+                } catch(e) {}
+                renderJournalTable(cachedJournal);
+            }
+        }
+
+        async function clearJournalHistory() {
+            if (!confirm('Are you sure you want to clear all paper trade history from the journal?')) return;
+            try {
+                try {
+                    localStorage.removeItem('rushi_paper_journal');
+                } catch(e) {}
+                await fetch('/api/paper/journal/clear', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                cachedJournal = [];
+                renderJournalTable([]);
+            } catch (err) {
+                console.error('Error clearing journal:', err);
+                cachedJournal = [];
+                renderJournalTable([]);
+            }
         }
 
         async function logAutoSignal() {
@@ -8108,6 +8193,47 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+            return
+
+        # 2d. API: Close Paper Journal Position Manually
+        if path == "/api/paper/journal/close":
+            trade_id = payload.get("id")
+            exit_price = payload.get("exit_price")
+            found = False
+            for item in PAPER_JOURNAL:
+                if item.get("id") == trade_id:
+                    found = True
+                    item["status"] = "CLOSED (MANUAL)"
+                    if exit_price:
+                        try:
+                            ep = float(exit_price)
+                            item["exit_price"] = ep
+                            side = item.get("side", "BUY")
+                            fill = float(item.get("simulated_fill", ep))
+                            risk = float(item.get("risk_usd", 50.0))
+                            stop = float(item.get("stop_price", fill))
+                            risk_dist = abs(fill - stop) if abs(fill - stop) > 0 else 1.0
+                            if side == "BUY":
+                                item["pnl_usd"] = round(((ep - fill) / risk_dist) * risk, 2)
+                            else:
+                                item["pnl_usd"] = round(((fill - ep) / risk_dist) * risk, 2)
+                        except Exception:
+                            item["pnl_usd"] = 0.0
+                    item["closed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+                    break
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "id": trade_id, "found": found}).encode("utf-8"))
+            return
+
+        # 2e. API: Clear Entire Paper Journal History
+        if path == "/api/paper/journal/clear":
+            PAPER_JOURNAL.clear()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "count": 0}).encode("utf-8"))
             return
 
         # 3. API: Run/Simulate Skill (Paper Only)

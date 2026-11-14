@@ -1004,6 +1004,76 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("showNotification", html)
         self.assertIn("/sw.js", html)
 
+    def test_paper_journal_close_and_clear_endpoints(self):
+        """Verify manual trade close and clear endpoints for paper journal."""
+        from forex.dashboard import PAPER_JOURNAL
+        # 1. Start clean
+        PAPER_JOURNAL.clear()
+
+        # Add a simulated trade
+        payload_add = {
+            "symbol": "XAU/USD",
+            "side": "BUY",
+            "simulated_fill": 2740.0,
+            "stop_price": 2732.5,
+            "target_price": 2766.5,
+        }
+        req_add = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/paper/journal",
+            data=json.dumps(payload_add).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req_add, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            res = json.loads(resp.read().decode("utf-8"))
+            self.assertTrue(res.get("success"))
+            trade_id = res["entry"]["id"]
+
+        self.assertEqual(len(PAPER_JOURNAL), 1)
+        self.assertEqual(PAPER_JOURNAL[0]["status"], "OPEN")
+
+        # 2. Close the trade via /api/paper/journal/close
+        payload_close = {"id": trade_id, "exit_price": 2755.0}
+        req_close = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/paper/journal/close",
+            data=json.dumps(payload_close).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req_close, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            res_close = json.loads(resp.read().decode("utf-8"))
+            self.assertTrue(res_close.get("success"))
+
+        self.assertEqual(PAPER_JOURNAL[0]["status"], "CLOSED (MANUAL)")
+        self.assertEqual(PAPER_JOURNAL[0]["exit_price"], 2755.0)
+
+        # 3. Clear journal via /api/paper/journal/clear
+        req_clear = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/paper/journal/clear",
+            data=json.dumps({}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req_clear, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            res_clear = json.loads(resp.read().decode("utf-8"))
+            self.assertTrue(res_clear.get("success"))
+
+        self.assertEqual(len(PAPER_JOURNAL), 0)
+
+    def test_multi_target_tp3_in_html(self):
+        """Verify Take Profit 3 and Clear Journal elements are present in HTML."""
+        url_home = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url_home, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        self.assertIn("autoSignalTarget3", html)
+        self.assertIn("Take Profit 3", html)
+        self.assertIn("btnClearJournal", html)
+        self.assertIn("clearJournalHistory", html)
+        self.assertIn("closeJournalTrade", html)
+
 
 if __name__ == "__main__":
     unittest.main()
