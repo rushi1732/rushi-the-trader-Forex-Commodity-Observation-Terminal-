@@ -36,6 +36,7 @@ from .licenses import (
     create_license,
     reset_license_device,
     revoke_license,
+    delete_license,
     list_all_licenses,
     MASTER_ADMIN_KEY,
     sanitize_key,
@@ -8074,7 +8075,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 let html = '';
                 data.licenses.forEach(lic => {
                     const isMaster = lic.key === 'RUSHI-ADMIN-777';
-                    const statusColor = lic.status === 'ACTIVE' ? 'var(--accent-green)' : (lic.status === 'EXPIRED' ? '#fbbf24' : 'var(--accent-rose)');
+                    const status = lic.status || (lic.is_active === false ? 'REVOKED' : (lic.expires_at && new Date(lic.expires_at) < new Date() ? 'EXPIRED' : 'ACTIVE'));
+                    const statusColor = status === 'ACTIVE' ? 'var(--accent-green)' : (status === 'EXPIRED' ? '#fbbf24' : 'var(--accent-rose)');
                     const deviceBadge = lic.bound_device_model ? `<span style="color:var(--text-primary); font-weight:600;">${lic.bound_device_model}</span><br><span style="color:var(--text-muted); font-size:10px;">ID: ${lic.bound_device_id.substring(0,8)}...</span>` : '<span style="color:#fbbf24; font-style:italic;">Pending 1st Open</span>';
                     const expText = lic.expires_at ? lic.expires_at.split('T')[0] : 'Lifetime';
                     const origin = window.location.origin;
@@ -8087,14 +8089,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 ${lic.note ? `<br><span style="color:var(--text-muted); font-size:10px;">${lic.note}</span>` : ''}
                             </td>
                             <td style="padding:8px 6px; font-family:var(--font-mono); color:#fbbf24;">${lic.key}</td>
-                            <td style="padding:8px 6px;"><span style="color:${statusColor}; font-weight:700;">${lic.status}</span></td>
+                            <td style="padding:8px 6px;"><span style="color:${statusColor}; font-weight:700;">${status}</span></td>
                             <td style="padding:8px 6px;">${deviceBadge}</td>
                             <td style="padding:8px 6px; color:var(--text-secondary);">${expText}</td>
                             <td style="padding:8px 6px; text-align:right; white-space:nowrap;">
                                 ${!isMaster ? `
                                     <button class="btn" onclick="resetClientDevice('${lic.key}')" title="Reset device lock so client can bind a new phone" style="padding:3px 6px; font-size:10px; margin-right:4px;">Reset Phone</button>
-                                    <button class="btn" onclick="revokeClientLicense('${lic.key}')" title="Block access" style="padding:3px 6px; font-size:10px; margin-right:4px; color:var(--accent-rose); border-color:rgba(244,63,94,0.3);">Revoke</button>
-                                ` : '<span style="color:var(--text-muted); font-size:10px;">Master</span>'}
+                                    <button class="btn" onclick="revokeClientLicense('${lic.key}')" title="Block access" style="padding:3px 6px; font-size:10px; margin-right:4px; color:#fbbf24; border-color:rgba(251,191,36,0.3);">Revoke</button>
+                                    <button class="btn" onclick="deleteClientLicense('${lic.key}')" title="Permanently delete key" style="padding:3px 6px; font-size:10px; margin-right:4px; color:var(--accent-rose); border-color:rgba(244,63,94,0.3);">Delete</button>
+                                ` : '<span style="color:var(--text-muted); font-size:10px; margin-right:4px;">Master</span>'}
                                 <button class="btn" onclick="navigator.clipboard.writeText('${fullLink}'); alert('Link copied!');" style="padding:3px 6px; font-size:10px;">Copy</button>
                             </td>
                         </tr>
@@ -8144,6 +8147,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     loadAdminLicenses();
                 } else {
                     alert(`Error: ${data.error || 'Failed to revoke'}`);
+                }
+            } catch (e) {
+                alert('Network error: ' + e.message);
+            }
+        }
+
+        async function deleteClientLicense(targetKey) {
+            if (!confirm(`Are you sure you want to permanently delete license key ${targetKey}? This action cannot be undone.`)) {
+                return;
+            }
+            try {
+                const resp = await fetch('/api/license/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin_key: currentVipKey, key: targetKey })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    alert(`License ${targetKey} deleted successfully!`);
+                    loadAdminLicenses();
+                } else {
+                    alert(`Error: ${data.error || 'Failed to delete'}`);
                 }
             } catch (e) {
                 alert('Network error: ' + e.message);
@@ -9380,6 +9405,23 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 return
             target_key = str(payload.get("key", "")).strip()
             res = revoke_license(target_key)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
+
+        # 10. API: Delete License (Admin Only)
+        if path == "/api/license/delete":
+            admin_key = str(payload.get("admin_key", self.headers.get("x-admin-key", ""))).strip()
+            if sanitize_key(admin_key) != sanitize_key(MASTER_ADMIN_KEY):
+                self.send_response(403)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Unauthorized: Master Admin Key Required"}).encode("utf-8"))
+                return
+            target_key = str(payload.get("key", "")).strip()
+            res = delete_license(target_key)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()

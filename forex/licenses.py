@@ -58,27 +58,34 @@ def load_licenses() -> Dict[str, Any]:
         if _CACHE is not None:
             return dict(_CACHE)
 
+        loaded_data = None
+        # 1. Base from packaged LICENSES_FILE
         if os.path.exists(LICENSES_FILE):
             try:
                 with open(LICENSES_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     if isinstance(data, dict) and "licenses" in data:
-                        _CACHE = data
-                        return dict(data)
+                        loaded_data = data
             except Exception:
                 pass
 
-        # Also check /tmp on serverless environments
+        # 2. Serverless /tmp overlay
         tmp_file = "/tmp/forex_licenses.json"
         if os.path.exists(tmp_file):
             try:
                 with open(tmp_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, dict) and "licenses" in data:
-                        _CACHE = data
-                        return dict(data)
+                    tmp_data = json.load(f)
+                    if isinstance(tmp_data, dict) and "licenses" in tmp_data:
+                        if loaded_data is None:
+                            loaded_data = tmp_data
+                        else:
+                            loaded_data["licenses"].update(tmp_data.get("licenses", {}))
             except Exception:
                 pass
+
+        if loaded_data is not None:
+            _CACHE = loaded_data
+            return dict(loaded_data)
 
         default_reg = _get_default_registry()
         _CACHE = default_reg
@@ -311,8 +318,23 @@ def reset_license_device(key: str) -> Dict[str, Any]:
     return {"success": True, "key": clean_key, "message": "डिव्हाइस लॉक यशस्वीरीत्या रिसेट झाला. आता ग्राहक नवीन मोबाईलवर उघडू शकतो."}
 
 
+def compute_license_status(lic: Dict[str, Any]) -> str:
+    """Computes ACTIVE, EXPIRED, or REVOKED status."""
+    if not lic.get("is_active", True):
+        return "REVOKED"
+    expires_at = lic.get("expires_at")
+    if expires_at:
+        try:
+            exp_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) > exp_dt:
+                return "EXPIRED"
+        except Exception:
+            pass
+    return "ACTIVE"
+
+
 def revoke_license(key: str) -> Dict[str, Any]:
-    """Revokes/deletes an access key."""
+    """Revokes an access key."""
     clean_key = sanitize_key(key)
     registry = load_licenses()
     licenses = registry.get("licenses", {})
@@ -324,8 +346,26 @@ def revoke_license(key: str) -> Dict[str, Any]:
     return {"success": False, "error": "Key not found"}
 
 
-def list_all_licenses() -> List[Dict[str, Any]]:
-    """Returns list of all active licenses for the Admin panel."""
+def delete_license(key: str) -> Dict[str, Any]:
+    """Permanently deletes an access key from registry."""
+    clean_key = sanitize_key(key)
     registry = load_licenses()
     licenses = registry.get("licenses", {})
-    return list(licenses.values())
+
+    if clean_key in licenses:
+        del licenses[clean_key]
+        save_licenses(registry)
+        return {"success": True, "message": "की यशस्वीरित्या हटवली."}
+    return {"success": False, "error": "Key not found"}
+
+
+def list_all_licenses() -> List[Dict[str, Any]]:
+    """Returns list of all active licenses for the Admin panel with computed status."""
+    registry = load_licenses()
+    licenses = registry.get("licenses", {})
+    results = []
+    for k, v in licenses.items():
+        item = dict(v)
+        item["status"] = compute_license_status(item)
+        results.append(item)
+    return results

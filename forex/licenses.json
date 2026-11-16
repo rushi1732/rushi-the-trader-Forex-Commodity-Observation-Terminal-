@@ -12,54 +12,6 @@
       "device_model": null,
       "is_active": true,
       "note": "Default 1-Device Demo Key"
-    },
-    "RUSHI-RAHULF-5B8058": {
-      "key": "RUSHI-RAHULF-5B8058",
-      "client_name": "Rahul Forex",
-      "created_at": "2026-11-16T11:04:42.293553+00:00",
-      "expires_at": "2026-12-16T11:04:42.293553+00:00",
-      "bound_device_id": "DEVICE_C_PHONE_3",
-      "bound_hw_hash": "HW_HASH_777",
-      "bound_at": "2026-11-16T11:04:42.309741+00:00",
-      "device_model": "OnePlus 12",
-      "is_active": true,
-      "note": ""
-    },
-    "TEST-PHONE-SWAP-01": {
-      "key": "TEST-PHONE-SWAP-01",
-      "client_name": "New Phone User",
-      "created_at": "2026-11-16T11:16:23.158949+00:00",
-      "expires_at": "2026-12-01T11:16:23.158949+00:00",
-      "bound_device_id": "new-iphone-16",
-      "bound_hw_hash": "hw-new",
-      "bound_at": "2026-11-16T11:16:23.170942+00:00",
-      "device_model": "iPhone 16 Pro",
-      "is_active": true,
-      "note": ""
-    },
-    "TEST-REVOKE-KEY-01": {
-      "key": "TEST-REVOKE-KEY-01",
-      "client_name": "Revoked Client",
-      "created_at": "2026-11-16T11:16:23.173910+00:00",
-      "expires_at": "2026-11-23T11:16:23.173910+00:00",
-      "bound_device_id": null,
-      "bound_hw_hash": null,
-      "bound_at": null,
-      "device_model": null,
-      "is_active": false,
-      "note": ""
-    },
-    "TEST-STUDENT-KEY-01": {
-      "key": "TEST-STUDENT-KEY-01",
-      "client_name": "Test Student",
-      "created_at": "2026-11-16T11:16:23.180375+00:00",
-      "expires_at": "2026-12-16T11:16:23.180375+00:00",
-      "bound_device_id": "device-uuid-phone-a",
-      "bound_hw_hash": "hw-a",
-      "bound_at": "2026-11-16T11:16:23.183372+00:00",
-      "device_model": "OnePlus 12",
-      "is_active": true,
-      "note": ""
     }
   }
 }
