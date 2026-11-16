@@ -137,10 +137,27 @@ def detect_asian_range_breakout(
 
     latest = post_asian_candles[-1]
     curr_close = latest["close"]
+    open_val = latest.get("open", curr_close)
+    high_val = latest.get("high", max(open_val, curr_close))
+    low_val = latest.get("low", min(open_val, curr_close))
+    c_range = max(0.0001, high_val - low_val)
+    upper_wick = high_val - max(open_val, curr_close)
+    lower_wick = min(open_val, curr_close) - low_val
 
-    # Bullish Breakout: London / NY candle closed above Asian High
+    # Bullish Breakout or Rejection (Judas Swing / False Breakout)
     if curr_close > asian_high:
         pips_above = to_pips(symbol, curr_close - asian_high)
+        # If upper wick is >= 40% of candle range, candle rejected at high (Bearish Judas Swing)
+        if "open" in latest and (upper_wick / c_range) >= 0.40:
+            return {
+                "setup": "ASIAN_HIGH_SWEEP_REJECTION",
+                "direction": "SHORT",
+                "trigger_price": curr_close,
+                "reference_level": asian_high,
+                "pips_beyond": pips_above,
+                "range_pips": asian_range_pips,
+                "reason": f"Swept Asian High ({asian_high}) but rejected with {upper_wick/c_range*100:.0f}% upper wick (Judas Swing / Trap)",
+            }
         return {
             "setup": "ASIAN_BREAKOUT_BULLISH",
             "direction": "LONG",
@@ -151,9 +168,20 @@ def detect_asian_range_breakout(
             "reason": f"Closed {pips_above:.1f} pips above Asian High ({asian_high})",
         }
 
-    # Bearish Breakdown: London / NY candle closed below Asian Low
+    # Bearish Breakdown or Rejection (Turtle Soup / False Breakdown)
     if curr_close < asian_low:
         pips_below = to_pips(symbol, asian_low - curr_close)
+        # If lower wick is >= 40% of candle range, candle rejected at low (Bullish Turtle Soup)
+        if "open" in latest and (lower_wick / c_range) >= 0.40:
+            return {
+                "setup": "ASIAN_LOW_SWEEP_REJECTION",
+                "direction": "LONG",
+                "trigger_price": curr_close,
+                "reference_level": asian_low,
+                "pips_beyond": pips_below,
+                "range_pips": asian_range_pips,
+                "reason": f"Swept Asian Low ({asian_low}) but rejected with {lower_wick/c_range*100:.0f}% lower wick (Turtle Soup / Trap)",
+            }
         return {
             "setup": "ASIAN_BREAKOUT_BEARISH",
             "direction": "SHORT",

@@ -44,6 +44,7 @@ from .smc import analyze_smc
 from .fibonacci import analyze_fibonacci
 from .liquidity import analyze_liquidity
 from .ict import analyze_ict
+from .smt import aggregate_5m_to_15m
 
 BANNER_FOREX = """
 ========================================================================================
@@ -544,13 +545,14 @@ class SignalStateManager:
                     if bars_passed < 3:
                         candidate_action = None
 
-        # Strict Technical Bias Alignment Gate (Card 2 vs Card 3 Consistency)
-        # Never generate BUY when 20-period Technical Bias is BEARISH
-        # Never generate SELL when 20-period Technical Bias is BULLISH
+        # Strict Technical Bias & HTF Alignment Gate (Card 2 vs Card 3 Consistency)
+        # Never generate BUY when 15m HTF or 20-period Technical Bias is BEARISH
+        # Never generate SELL when 15m HTF or 20-period Technical Bias is BULLISH
         scan_dir = (scan_info or {}).get("direction", "NEUTRAL") if scan_info else "NEUTRAL"
-        if candidate_action == "BUY" and scan_dir == "BEARISH":
+        htf_dir = (confluence_signal or {}).get("htf_trend", "NEUTRAL") if confluence_signal else "NEUTRAL"
+        if candidate_action == "BUY" and (scan_dir == "BEARISH" or htf_dir == "BEARISH"):
             candidate_action = None
-        elif candidate_action == "SELL" and scan_dir == "BULLISH":
+        elif candidate_action == "SELL" and (scan_dir == "BULLISH" or htf_dir == "BULLISH"):
             candidate_action = None
 
         if candidate_action in ("BUY", "SELL") and candle_is_closed:
@@ -891,12 +893,14 @@ def observe_pair(
         spread_pips = info.get("default_spread", 1.0)
         bid, ask = calc_spread_prices(canon, latest_close, spread_pips)
 
+    candles_15m = aggregate_5m_to_15m(candles) if candles and len(candles) >= 15 else None
     confluence_sig = evaluate_confluence_signal(
         symbol=canon,
         candles=candles,
         interval=interval,
         now_dt=now_et,
         asian_range=asian_setup,
+        candles_15m=candles_15m,
         live_spread_pips=spread_pips,
         offline_data=offline_data,
     )
@@ -939,40 +943,6 @@ def observe_pair(
             "liquidity": confluence_sig.get("components", {}).get("liquidity"),
             "ict": confluence_sig.get("components", {}).get("ict"),
             "divergence": confluence_sig.get("components", {}).get("divergence"),
-        "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
-            "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
-        }
-        market_label = "COMEX Gold Futures (GC=F)" if is_gold else "Spot Forex"
-        reason_msg = f"{market_label} market is closed ({open_reason}). Observation only."
-        auto_sig = build_auto_signal(
-            symbol=canon,
-            timeframe=interval,
-            is_open=False,
-            is_fresh=is_fresh,
-            now_et=now_et,
-            now_utc=now_utc,
-            status_reason=reason_msg,
-            latest_price=latest_candle["close"],
-            confluence_signal=confluence_sig,
-        )
-        return {
-            "symbol": canon,
-            "status": "NO SIGNAL",
-            "reason": reason_msg,
-            "source": source_label,
-            "data_freshness": freshness_reason,
-            "latest_price": latest_candle["close"],
-            "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
-            "paper_mode": True,
-            "disclaimer": disclaimer_text,
-            "auto_signal": auto_sig,
-            "confluence_signal": confluence_sig,
-            "smc": confluence_sig.get("components", {}).get("smc"),
-            "fibonacci": confluence_sig.get("components", {}).get("fibonacci"),
-            "liquidity": confluence_sig.get("components", {}).get("liquidity"),
-            "ict": confluence_sig.get("components", {}).get("ict"),
-            "divergence": confluence_sig.get("components", {}).get("divergence"),
-        "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
             "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
         }
 
@@ -1009,7 +979,6 @@ def observe_pair(
             "liquidity": confluence_sig.get("components", {}).get("liquidity"),
             "ict": confluence_sig.get("components", {}).get("ict"),
             "divergence": confluence_sig.get("components", {}).get("divergence"),
-        "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
             "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
         }
 

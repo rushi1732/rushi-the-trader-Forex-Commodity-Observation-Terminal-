@@ -27,7 +27,7 @@ from .smc import analyze_smc
 from .ict import analyze_ict
 from .liquidity import analyze_liquidity
 from .divergence import detect_divergence
-from .smt import analyze_institutional_triad_smt
+from .smt import analyze_institutional_triad_smt, aggregate_5m_to_15m
 from .data import fetch_chart, MAJOR_PAIRS
 from .backtest import calculate_ema
 
@@ -105,6 +105,13 @@ def evaluate_confluence_signal(
         min_risk_pips = 16.0
         min_risk_dist = from_pips(canon, 16.0)
 
+    # Ensure 15m HTF candles are available (synthesizing from 5m if needed)
+    if not candles_15m or len(candles_15m) < 10:
+        try:
+            candles_15m = aggregate_5m_to_15m(candles)
+        except Exception:
+            candles_15m = []
+
     # 1. Component Analyses
     smc_data = analyze_smc(candles, current_price=current_price)
     fib_data = analyze_fibonacci(candles, current_price=current_price)
@@ -117,7 +124,56 @@ def evaluate_confluence_signal(
     bullish_factors = []
     bearish_factors = []
 
-    # Factor 0: Trend & Exponential Moving Average (EMA) Momentum (9, 21, 50)
+    # Factor 0A: Higher Timeframe (15m HTF) Macro Trend & Structure
+    htf_trend = "NEUTRAL"
+    htf_bearish = False
+    htf_bullish = False
+    if candles_15m and len(candles_15m) >= 10:
+        closes_15m = [c["close"] for c in candles_15m]
+        ema9_15m_s = calculate_ema(closes_15m, 9) if len(closes_15m) >= 9 else []
+        ema21_15m_s = calculate_ema(closes_15m, 21) if len(closes_15m) >= 21 else []
+        ema50_15m_s = calculate_ema(closes_15m, 50) if len(closes_15m) >= 50 else []
+        ema9_15m = ema9_15m_s[-1] if ema9_15m_s and ema9_15m_s[-1] is not None else None
+        ema21_15m = ema21_15m_s[-1] if ema21_15m_s and ema21_15m_s[-1] is not None else None
+        ema50_15m = ema50_15m_s[-1] if ema50_15m_s and ema50_15m_s[-1] is not None else None
+
+        smc_15m = analyze_smc(candles_15m, current_price=current_price)
+        trend_15m = smc_15m.get("trend", "NEUTRAL")
+
+        if ema50_15m and current_price < ema50_15m:
+            if (ema21_15m and current_price < ema21_15m < ema50_15m) or trend_15m == "BEARISH":
+                htf_bearish = True
+                htf_trend = "BEARISH"
+                bearish_score += 25
+                bearish_factors.append(f"15m HTF Macro Trend is BEARISH (Price {current_price:.2f} < 15m EMA-50 {ema50_15m:.2f})")
+        elif ema50_15m and current_price > ema50_15m:
+            if (ema21_15m and current_price > ema21_15m > ema50_15m) or trend_15m == "BULLISH":
+                htf_bullish = True
+                htf_trend = "BULLISH"
+                bullish_score += 25
+                bullish_factors.append(f"15m HTF Macro Trend is BULLISH (Price {current_price:.2f} > 15m EMA-50 {ema50_15m:.2f})")
+        elif ema21_15m and current_price < ema21_15m:
+            htf_bearish = True
+            htf_trend = "BEARISH"
+            bearish_score += 20
+            bearish_factors.append(f"15m HTF Macro Trend is BEARISH (Price {current_price:.2f} < 15m EMA-21 {ema21_15m:.2f})")
+        elif ema21_15m and current_price > ema21_15m:
+            htf_bullish = True
+            htf_trend = "BULLISH"
+            bullish_score += 20
+            bullish_factors.append(f"15m HTF Macro Trend is BULLISH (Price {current_price:.2f} > 15m EMA-21 {ema21_15m:.2f})")
+        elif trend_15m == "BEARISH":
+            htf_bearish = True
+            htf_trend = "BEARISH"
+            bearish_score += 15
+            bearish_factors.append("15m HTF Market Structure is BEARISH (Lower Highs & Lower Lows)")
+        elif trend_15m == "BULLISH":
+            htf_bullish = True
+            htf_trend = "BULLISH"
+            bullish_score += 15
+            bullish_factors.append("15m HTF Market Structure is BULLISH (Higher Highs & Higher Lows)")
+
+    # Factor 0B: Trend & Exponential Moving Average (EMA) Momentum (9, 21, 50)
     closes = [c["close"] for c in candles]
     ema9_series = calculate_ema(closes, 9)
     ema21_series = calculate_ema(closes, 21)
@@ -216,19 +272,19 @@ def evaluate_confluence_signal(
     sweet_spot = fib_data.get("ote_sweet_spot")
 
     if zone == "DISCOUNT":
-        if not is_bearish_momentum or (latest_choch and latest_choch.get("direction") == "BULLISH"):
+        if not htf_bearish and (not is_bearish_momentum or (latest_choch and latest_choch.get("direction") == "BULLISH")):
             bullish_score += 10
             bullish_factors.append(f"Price in Discount Zone (< Equilibrium {fib_data.get('equilibrium')}) - Favorable for Longs")
     elif zone == "PREMIUM":
-        if not is_bullish_momentum or (latest_choch and latest_choch.get("direction") == "BEARISH"):
+        if not htf_bullish and (not is_bullish_momentum or (latest_choch and latest_choch.get("direction") == "BEARISH")):
             bearish_score += 10
             bearish_factors.append(f"Price in Premium Zone (> Equilibrium {fib_data.get('equilibrium')}) - Favorable for Shorts")
 
     if in_ote:
-        if zone == "DISCOUNT" and not is_bearish_momentum:
+        if zone == "DISCOUNT" and not htf_bearish and not is_bearish_momentum:
             bullish_score += 15
             bullish_factors.append(f"In ICT Optimal Trade Entry (OTE) 61.8% - 78.6% Golden Pocket (Sweet spot: {sweet_spot})")
-        elif zone == "PREMIUM" and not is_bullish_momentum:
+        elif zone == "PREMIUM" and not htf_bullish and not is_bullish_momentum:
             bearish_score += 15
             bearish_factors.append(f"In ICT Optimal Trade Entry (OTE) 61.8% - 78.6% Golden Pocket (Sweet spot: {sweet_spot})")
 
@@ -346,9 +402,9 @@ def evaluate_confluence_signal(
         ote_top = fib_data.get("ote_zone", {}).get("top", 0)
         ote_bot = fib_data.get("ote_zone", {}).get("bottom", 0)
         ote_range_str = f"({min(ote_top, ote_bot):.{decimals}f} - {max(ote_top, ote_bot):.{decimals}f})"
-        if zone == "DISCOUNT":
+        if zone == "DISCOUNT" and not htf_bearish and not is_bearish_momentum:
             bullish_entry_zones.append(f"Fibonacci Discount OTE Zone {ote_range_str}")
-        elif zone == "PREMIUM":
+        elif zone == "PREMIUM" and not htf_bullish and not is_bullish_momentum:
             bearish_entry_zones.append(f"Fibonacci Premium OTE Zone {ote_range_str}")
 
     # D. Liquidity Sweep & Stop-Loss Hunt (Turtle Soup Reversal Zone on latest/recent candle)
@@ -363,35 +419,74 @@ def evaluate_confluence_signal(
 
     # E. RSI Hidden Divergence Continuation Zone (Uptrend Pullback or Downtrend Bounce)
     if div_data.get("is_continuation"):
-        if div_data.get("type") == "HIDDEN_BULLISH" and (zone == "DISCOUNT" or in_ote or inside_ob or nearest_demand):
+        if div_data.get("type") == "HIDDEN_BULLISH" and not htf_bearish and (zone == "DISCOUNT" or in_ote or inside_ob or nearest_demand):
             bullish_entry_zones.append(f"RSI Hidden Bullish Continuation Zone at {current_price:.{decimals}f}")
-        elif div_data.get("type") == "HIDDEN_BEARISH" and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
+        elif div_data.get("type") == "HIDDEN_BEARISH" and not htf_bullish and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
             bearish_entry_zones.append(f"RSI Hidden Bearish Continuation Zone at {current_price:.{decimals}f}")
 
     # F. Triad SMT CISD Displacement Zone (When 5m displacement candle close is confirmed with HTF Context & Premium/Discount Alignment)
     if smt_data.get("tier") in ("TRIAD SMT (A+)", "PAIR SMT (A)") and smt_data.get("displacement", {}).get("displacement_confirmed"):
         has_htf = smt_data.get("htf_context", {}).get("has_context", False)
         # SMT CISD requires HTF context and dealing range alignment (Discount for BUY, Premium for SELL)
-        if smt_data.get("bias") == "BUY" and has_htf and (zone == "DISCOUNT" or in_ote or inside_ob or nearest_demand):
+        if smt_data.get("bias") == "BUY" and has_htf and not htf_bearish and (zone == "DISCOUNT" or in_ote or inside_ob or nearest_demand):
             bullish_entry_zones.append(f"Triad SMT CISD Displacement Zone at {current_price:.{decimals}f}")
-        elif smt_data.get("bias") == "SELL" and has_htf and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
+        elif smt_data.get("bias") == "SELL" and has_htf and not htf_bullish and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
             bearish_entry_zones.append(f"Triad SMT CISD Displacement Zone at {current_price:.{decimals}f}")
 
     # Hard Trend Filter & Veto check:
-    # 1. Never BUY into a downtrend (Price < EMAs or Bearish Market Structure) unless a fresh Bullish CHoCH occurs (<= 12 bars)
+    # 1. HARD HTF MACRO TREND VETO:
+    # Prohibit BUY when 15m HTF Trend is BEARISH; prohibit SELL when 15m HTF Trend is BULLISH.
+    # Minor 5m noise or bounces cannot override 15m/1h macro institutional flows.
+    if htf_bearish:
+        bullish_entry_zones = []
+        bullish_score = min(bullish_score, 25)
+        bullish_factors.append("[HTF TREND VETO] BUY prohibited: 15m Macro Trend is BEARISH (15m EMA-21 < EMA-50). Never buy into macro selloffs.")
+
+    if htf_bullish:
+        bearish_entry_zones = []
+        bearish_score = min(bearish_score, 25)
+        bearish_factors.append("[HTF TREND VETO] SELL prohibited: 15m Macro Trend is BULLISH (15m EMA-21 > EMA-50). Never short into macro rallies.")
+
+    # 2. Local 5m Trend & Momentum Veto:
+    # Never BUY into a 5m downtrend unless a verified Bullish CHoCH occurs with strong body (not an upper rejection wick)
     choch_bars_ago = (len(candles) - 1 - latest_choch.get("broken_at_index", 0)) if latest_choch else 999
-    has_bullish_choch = bool(latest_choch and latest_choch.get("direction") == "BULLISH" and choch_bars_ago <= 12)
+    c_last = candles[-1] if candles else {}
+    c_rng = max(0.0001, c_last.get("high", 0) - c_last.get("low", 0))
+    u_wick = c_last.get("high", 0) - max(c_last.get("open", 0), c_last.get("close", 0))
+    l_wick = min(c_last.get("open", 0), c_last.get("close", 0)) - c_last.get("low", 0)
+
+    has_bullish_choch = bool(
+        latest_choch and latest_choch.get("direction") == "BULLISH" and choch_bars_ago <= 12
+        and (u_wick / c_rng) < 0.40
+        and (ema50 is None or current_price >= (ema50 - (pip_size * 2)))
+    )
     if (is_bearish_momentum or trend == "BEARISH") and not has_bullish_choch:
         bullish_entry_zones = []
         bullish_score = min(bullish_score, 30)
-        bullish_factors.append("[TREND VETO] Counter-trend BUY prohibited: Bearish momentum/structure active without fresh Bullish CHoCH")
+        bullish_factors.append("[TREND VETO] Counter-trend BUY prohibited: Bearish momentum/structure active without confirmed displacement Bullish CHoCH")
 
-    # 2. Never SELL into an uptrend (Price > EMAs or Bullish Market Structure) unless a fresh Bearish CHoCH occurs (<= 12 bars)
-    has_bearish_choch = bool(latest_choch and latest_choch.get("direction") == "BEARISH" and choch_bars_ago <= 12)
+    has_bearish_choch = bool(
+        latest_choch and latest_choch.get("direction") == "BEARISH" and choch_bars_ago <= 12
+        and (l_wick / c_rng) < 0.40
+        and (ema50 is None or current_price <= (ema50 + (pip_size * 2)))
+    )
     if (is_bullish_momentum or trend == "BULLISH") and not has_bearish_choch:
         bearish_entry_zones = []
         bearish_score = min(bearish_score, 30)
-        bearish_factors.append("[TREND VETO] Counter-trend SELL prohibited: Bullish momentum/structure active without fresh Bearish CHoCH")
+        bearish_factors.append("[TREND VETO] Counter-trend SELL prohibited: Bullish momentum/structure active without confirmed displacement Bearish CHoCH")
+
+    # 3. Liquidity Trap & Judas Swing Guard:
+    # If recent BSL sweep occurred or price printed a heavy upper rejection wick (>= 40%) at a high, block BUY
+    if recent_bsl or (c_last.get("close", 0) > c_last.get("open", 0) and (u_wick / c_rng) >= 0.40):
+        bullish_entry_zones = []
+        bullish_score = min(bullish_score, 30)
+        bullish_factors.append("[LIQUIDITY TRAP GUARD] BUY blocked: Buy-Side Liquidity swept / Heavy upper rejection wick. Risk of institutional dump.")
+
+    # If recent SSL sweep occurred or price printed a heavy lower rejection wick (>= 40%) at a low, block SELL
+    if recent_ssl or (c_last.get("close", 0) < c_last.get("open", 0) and (l_wick / c_rng) >= 0.40):
+        bearish_entry_zones = []
+        bearish_score = min(bearish_score, 30)
+        bearish_factors.append("[LIQUIDITY TRAP GUARD] SELL blocked: Sell-Side Liquidity swept / Heavy lower rejection wick. Risk of institutional rally.")
 
     # Opposing Order Block Clearance (Room-to-Run Protection):
     # Prohibit entering BUY directly into unmitigated Supply Block within 1.2x min risk distance
@@ -602,6 +697,7 @@ def evaluate_confluence_signal(
         "bullish_score": bullish_score,
         "bearish_score": bearish_score,
         "timeframe": interval,
+        "htf_trend": htf_trend,
         "current_price": current_price,
         "is_in_entry_zone": (in_bullish_entry_zone if signal_side == "BUY" else (in_bearish_entry_zone if signal_side == "SELL" else (in_bullish_entry_zone or in_bearish_entry_zone))),
         "active_entry_zone": active_entry_zone,
