@@ -1751,6 +1751,11 @@
                     Twelve Data Real-Time: <span id="tdStatusLabel" style="font-weight:700;">Connected</span>
                 </button>
 
+                <button id="btnAdminManager" class="btn" onclick="openLicenseModal()" title="VIP 1-Device Link Manager" style="border-color:rgba(245,158,11,0.6); color:#fbbf24; display:none; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>1-Device Links</span>
+                </button>
+
                 <button class="btn" onclick="fetchObservation(); fetchChart();">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                     Refresh
@@ -2790,6 +2795,167 @@
             <div style="display:flex; justify-content:flex-end; gap:10px;">
                 <button class="btn" onclick="closeTwelveDataModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveTwelveDataConfig()">Save & Connect Feed</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1-Device Security Enforcement Fullscreen Lock Overlay -->
+    <div id="deviceLockOverlay" style="display:none; position:fixed; inset:0; z-index:999999; background:radial-gradient(circle at center, rgba(30,10,18,0.98) 0%, rgba(10,12,18,0.99) 100%); backdrop-filter:blur(14px); padding:20px; overflow-y:auto; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-card); border:2px solid rgba(244,63,94,0.6); border-radius:12px; max-width:480px; width:100%; padding:28px; box-shadow:0 25px 60px rgba(244,63,94,0.25); text-align:center;">
+            <div style="width:64px; height:64px; margin:0 auto 16px; border-radius:50%; background:rgba(244,63,94,0.15); border:2px solid var(--accent-rose); display:flex; align-items:center; justify-content:center; color:var(--accent-rose);">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.5"/></svg>
+            </div>
+            
+            <h2 id="lockOverlayTitle" style="color:var(--accent-rose); font-size:20px; font-weight:800; margin-bottom:8px; letter-spacing:0.5px;">
+                डिव्हाइस लॉक: ॲक्सेस नाकारला!
+            </h2>
+            <div id="lockOverlaySubtitle" style="color:var(--text-secondary); font-size:13px; line-height:1.6; margin-bottom:18px;">
+                हा ॲक्सेस लिंक आधीच दुसऱ्या मोबाईलवर चालू आहे. सुरक्षेच्या कारणास्तव एका लिंकवर फक्त १ च मोबाईल वापरण्याची परवानगी आहे.
+            </div>
+
+            <div style="background:rgba(15,23,42,0.8); border:1px solid rgba(244,63,94,0.3); border-radius:8px; padding:14px; text-align:left; font-size:12px; margin-bottom:20px; line-height:1.7;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:6px;">
+                    <span style="color:var(--text-muted);">तुमची VIP Key:</span>
+                    <strong id="lockKeyDisplay" style="font-family:var(--font-mono); color:#fbbf24;">VIP-XXXX-XXXX</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:6px;">
+                    <span style="color:var(--text-muted);">नोंदणीकृत फोन:</span>
+                    <span id="lockRegisteredDevice" style="font-weight:600; color:var(--accent-green);">Registered Phone</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:6px;">
+                    <span style="color:var(--text-muted);">सध्याचा फोन:</span>
+                    <span id="lockCurrentDevice" style="font-weight:600; color:var(--accent-rose);">Unregistered Phone</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--text-muted);">सुरक्षा स्थिती:</span>
+                    <span id="lockReasonDisplay" style="color:var(--accent-rose); font-weight:700;">SINGLE-DEVICE ENFORCED</span>
+                </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <a id="btnLockWhatsAppHelp" href="https://wa.me/919373024888" target="_blank" class="btn" style="background:#25D366; color:#000; font-weight:700; border:none; justify-content:center; padding:12px; display:inline-flex; align-items:center; gap:8px; text-decoration:none; border-radius:6px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                    <span>ॲडमिनशी संपर्क साधा (WhatsApp वर अनलॉक करा)</span>
+                </a>
+
+                <button class="btn" onclick="promptSwitchKey()" style="background:transparent; border-color:var(--border-color); color:var(--text-secondary); justify-content:center; padding:10px;">
+                    वेगळी VIP Key किंवा Admin Login वापरा
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIP Activation Modal (Prompt for Key if opened directly without key) -->
+    <div id="vipActivationModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 440px; text-align:center;">
+            <div style="width:52px; height:52px; margin:0 auto 12px; border-radius:50%; background:rgba(245,158,11,0.15); border:2px solid #fbbf24; display:flex; align-items:center; justify-content:center; color:#fbbf24;">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </div>
+            <h3 style="font-size:18px; margin-bottom:8px; font-weight:700;">VIP Trade Terminal ॲक्सेस</h3>
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px; line-height:1.5;">
+                कृपया तुमचा अधिकृत VIP ॲक्सेस की (Key) प्रविष्ट करा. प्रत्येक की फक्त एकाच मोबाईल किंवा कॉम्प्युटरवर लॉक होते.
+            </p>
+
+            <div class="form-group" style="margin-bottom:14px; text-align:left;">
+                <label style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">VIP License Key / Master Key</label>
+                <input id="vipKeyManualInput" type="text" class="form-control" placeholder="उदा. VIP-XXXX-XXXX किंवा RUSHI-ADMIN-777" style="font-family:var(--font-mono); font-size:13px; text-transform:uppercase; text-align:center;">
+                <div id="vipKeyInputError" style="color:var(--accent-rose); font-size:11px; margin-top:4px; display:none;"></div>
+            </div>
+
+            <button class="btn btn-primary" onclick="submitManualVipKey()" style="width:100%; justify-content:center; padding:12px; font-weight:700; margin-bottom:10px;">
+                ॲक्सेस अनलॉक करा (Verify & Lock Device)
+            </button>
+
+            <a href="https://wa.me/919373024888?text=Hello%20Rushi,%20I%20want%20to%20get%20access%20to%20VIP%20Trading%20Signals." target="_blank" style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#25D366; text-decoration:none; margin-top:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                <span>नवीन VIP Key मिळवण्यासाठी WhatsApp वर मेसेज करा</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Admin 1-Device License Manager Modal -->
+    <div id="licenseManagerModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 760px; max-height: 90vh; overflow-y: auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">
+                <h3 style="font-size:16px; display:flex; align-items:center; gap:8px; margin:0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>VIP 1-Device Link Manager (Admin Portal)</span>
+                </h3>
+                <button class="btn" onclick="closeLicenseModal()" style="padding:4px 8px;">✕</button>
+            </div>
+
+            <!-- Create New 1-Device Link Section -->
+            <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:20px;">
+                <h4 style="font-size:13px; color:var(--text-primary); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    नवीन १-डिव्हाइस लिंक तयार करा (Generate 1-Device Link)
+                </h4>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>ग्राहकाचे नाव (Client Name)</label>
+                        <input id="licClientName" type="text" class="form-control" placeholder="उदा. Rahul Jadhav">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>कालावधी दिवस (Days, 0 = Lifetime)</label>
+                        <input id="licDurationDays" type="number" class="form-control" value="30">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>कस्टम की (वैकल्पिक / Optional Key)</label>
+                        <input id="licCustomKey" type="text" class="form-control" placeholder="उदा. RAHUL-VIP-77">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>नोंद / मोबाईल (Note / Mobile No)</label>
+                        <input id="licNote" type="text" class="form-control" placeholder="उदा. Paid via PhonePe">
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button class="btn btn-primary" onclick="generateClientLicense()" style="display:inline-flex; align-items:center; gap:6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        १-डिव्हाइस लिंक तयार करा (Generate Link)
+                    </button>
+                </div>
+
+                <!-- Generated Link Alert Box -->
+                <div id="newLicenseResultBox" style="display:none; margin-top:14px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.4); border-radius:6px; padding:12px;">
+                    <div style="font-size:12px; color:var(--accent-green); font-weight:700; margin-bottom:6px;">
+                        लिंक यशस्वीरित्या तयार झाली! (पहिल्यांदा ज्या मोबाईलवर उघडेल, तिथेच कायमची लॉक होईल)
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input id="generatedLinkInput" type="text" readonly class="form-control" style="font-family:var(--font-mono); font-size:12px; background:var(--bg-card);">
+                        <button class="btn" onclick="copyGeneratedLink()" style="white-space:nowrap;">Copy Link</button>
+                        <button class="btn" onclick="shareViaWhatsApp()" style="background:#25D366; color:#000; font-weight:700; border:none; white-space:nowrap;">WhatsApp</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Licenses Table -->
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="font-size:13px; color:var(--text-primary); margin:0;">सक्रिय ग्राहक आणि डिव्हाइस यादी (Active Clients & Bound Devices)</h4>
+                    <button class="btn" onclick="loadAdminLicenses()" style="padding:4px 8px; font-size:11px;">
+                        यादी रिफ्रेश करा (Refresh)
+                    </button>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
+                        <thead>
+                            <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted);">
+                                <th style="padding:8px 6px;">ग्राहक (Client)</th>
+                                <th style="padding:8px 6px;">Key</th>
+                                <th style="padding:8px 6px;">स्थिती (Status)</th>
+                                <th style="padding:8px 6px;">लॉक डिव्हाइस (Bound Device)</th>
+                                <th style="padding:8px 6px;">कालबाह्य (Expires)</th>
+                                <th style="padding:8px 6px; text-align:right;">ॲक्शन (Actions)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="licenseTableBody">
+                            <tr>
+                                <td colspan="6" style="padding:16px; text-align:center; color:var(--text-muted);">लोड होत आहे...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -7010,8 +7176,393 @@
             }
         }
 
+        /* -------------------------------------------------------------
+           1-Device License & Anti-Piracy Security System
+           ------------------------------------------------------------- */
+        let currentVipKey = '';
+        let currentUserIsAdmin = false;
+        let isDeviceAuthorized = false;
+
+        function getOrCreateDeviceId() {
+            let devId = localStorage.getItem('rushi_device_uuid');
+            if (!devId) {
+                devId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('dev-' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36));
+                try { localStorage.setItem('rushi_device_uuid', devId); } catch(e){}
+            }
+            try {
+                document.cookie = "rushi_device_uuid=" + devId + "; path=/; max-age=315360000; SameSite=Lax";
+            } catch(e){}
+            return devId;
+        }
+
+        function getHardwareHash() {
+            try {
+                const parts = [
+                    navigator.userAgent || '',
+                    navigator.platform || '',
+                    navigator.language || '',
+                    screen.width + 'x' + screen.height + 'x' + (screen.colorDepth || 24),
+                    window.devicePixelRatio || 1,
+                    navigator.hardwareConcurrency || 2,
+                    Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+                ];
+                const str = parts.join('###');
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    const char = str.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash |= 0;
+                }
+                return 'hw_' + Math.abs(hash).toString(16);
+            } catch(e) {
+                return 'hw_generic';
+            }
+        }
+
+        function getDeviceModelName() {
+            try {
+                const ua = navigator.userAgent;
+                if (/iPhone/i.test(ua)) return 'Apple iPhone';
+                if (/iPad/i.test(ua)) return 'Apple iPad';
+                if (/Android/i.test(ua)) {
+                    const match = ua.match(/Android.*?; (.*?)(?:Build|\))/);
+                    return match && match[1] ? match[1].trim() : 'Android Device';
+                }
+                if (/Windows/i.test(ua)) return 'Windows PC';
+                if (/Mac/i.test(ua)) return 'Mac';
+                return 'Web Client';
+            } catch(e) {
+                return 'Unknown Device';
+            }
+        }
+
+        async function verifyLicenseWithBackend(key) {
+            if (!key) {
+                showVipActivationModal();
+                return false;
+            }
+            const devId = getOrCreateDeviceId();
+            const hwHash = getHardwareHash();
+            const devModel = getDeviceModelName();
+
+            try {
+                const resp = await fetch('/api/license/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        key: key,
+                        device_id: devId,
+                        hw_hash: hwHash,
+                        device_model: devModel
+                    })
+                });
+                const data = await resp.json();
+                
+                if (data.status === 'GRANTED') {
+                    currentVipKey = key;
+                    currentUserIsAdmin = !!data.is_admin;
+                    isDeviceAuthorized = true;
+                    
+                    document.getElementById('deviceLockOverlay').style.display = 'none';
+                    document.getElementById('vipActivationModal').classList.remove('active');
+
+                    const adminBtn = document.getElementById('btnAdminManager');
+                    if (adminBtn) {
+                        adminBtn.style.display = currentUserIsAdmin ? 'inline-flex' : 'none';
+                    }
+                    return true;
+                } else if (data.reason === 'DEVICE_MISMATCH') {
+                    showDeviceLockScreen(data, key);
+                    return false;
+                } else if (data.reason === 'EXPIRED') {
+                    showDeviceLockScreen({
+                        title: 'VIP ॲक्सेस कालबाह्य (Expired)',
+                        reason: 'तुमचा सबस्क्रिप्शन कालावधी संपला आहे. कृपया नूतनीकरण करण्यासाठी ॲडमिनशी संपर्क साधा.',
+                        ...data
+                    }, key);
+                    return false;
+                } else if (data.reason === 'REVOKED') {
+                    showDeviceLockScreen({
+                        title: 'ॲक्सेस रद्द केला (Revoked)',
+                        reason: 'हा VIP ॲक्सेस ॲडमिनने ब्लॉक/रद्द केला आहे.',
+                        ...data
+                    }, key);
+                    return false;
+                } else {
+                    showVipActivationModal(data.message || 'अवैध की (Invalid Key). कृपया खरी VIP Key प्रविष्ट करा.');
+                    return false;
+                }
+            } catch (err) {
+                console.warn('License verification network fallback:', err);
+                if (key.toUpperCase() === 'RUSHI-ADMIN-777') {
+                    currentUserIsAdmin = true;
+                    const adminBtn = document.getElementById('btnAdminManager');
+                    if (adminBtn) adminBtn.style.display = 'inline-flex';
+                    return true;
+                }
+                return true;
+            }
+        }
+
+        function showDeviceLockScreen(data, key) {
+            const overlay = document.getElementById('deviceLockOverlay');
+            if (!overlay) return;
+
+            document.getElementById('vipActivationModal').classList.remove('active');
+            overlay.style.display = 'flex';
+
+            const keyEl = document.getElementById('lockKeyDisplay');
+            if (keyEl) keyEl.textContent = key || 'N/A';
+
+            const regDevEl = document.getElementById('lockRegisteredDevice');
+            if (regDevEl) regDevEl.textContent = data.bound_device_model || data.registered_device || 'Other Mobile Phone';
+
+            const currDevEl = document.getElementById('lockCurrentDevice');
+            if (currDevEl) currDevEl.textContent = getDeviceModelName() + ' (This Device)';
+
+            const reasonEl = document.getElementById('lockReasonDisplay');
+            if (reasonEl) reasonEl.textContent = data.reason || 'SINGLE-DEVICE LOCKED';
+
+            const titleEl = document.getElementById('lockOverlayTitle');
+            if (titleEl && data.title) titleEl.textContent = data.title;
+
+            const subEl = document.getElementById('lockOverlaySubtitle');
+            if (subEl && data.reason && data.reason !== 'DEVICE_MISMATCH') {
+                subEl.textContent = data.reason;
+            }
+
+            const waBtn = document.getElementById('btnLockWhatsAppHelp');
+            if (waBtn) {
+                const msg = encodeURIComponent(`Hello Rushi, my VIP Key (${key}) is locked to another phone. Please reset my device.`);
+                waBtn.href = `https://wa.me/919373024888?text=${msg}`;
+            }
+        }
+
+        function showVipActivationModal(errorMsg) {
+            const modal = document.getElementById('vipActivationModal');
+            if (!modal) return;
+            document.getElementById('deviceLockOverlay').style.display = 'none';
+            modal.classList.add('active');
+
+            const errEl = document.getElementById('vipKeyInputError');
+            if (errEl) {
+                if (errorMsg) {
+                    errEl.textContent = errorMsg;
+                    errEl.style.display = 'block';
+                } else {
+                    errEl.style.display = 'none';
+                }
+            }
+            const input = document.getElementById('vipKeyManualInput');
+            if (input) {
+                input.value = currentVipKey || localStorage.getItem('rushi_vip_key') || '';
+                setTimeout(() => input.focus(), 150);
+            }
+        }
+
+        async function submitManualVipKey() {
+            const input = document.getElementById('vipKeyManualInput');
+            const key = (input ? input.value : '').trim().toUpperCase();
+            if (!key) {
+                showVipActivationModal('कृपया तुमची VIP Key प्रविष्ट करा.');
+                return;
+            }
+            const ok = await verifyLicenseWithBackend(key);
+            if (ok) {
+                localStorage.setItem('rushi_vip_key', key);
+                document.getElementById('vipActivationModal').classList.remove('active');
+            }
+        }
+
+        function promptSwitchKey() {
+            localStorage.removeItem('rushi_vip_key');
+            currentVipKey = '';
+            showVipActivationModal();
+        }
+
+        function openLicenseModal() {
+            if (!currentUserIsAdmin) {
+                alert('Master Admin Access Required!');
+                return;
+            }
+            document.getElementById('licenseManagerModal').classList.add('active');
+            loadAdminLicenses();
+        }
+
+        function closeLicenseModal() {
+            document.getElementById('licenseManagerModal').classList.remove('active');
+        }
+
+        async function generateClientLicense() {
+            const clientName = document.getElementById('licClientName').value.trim() || 'VIP Client';
+            const durationDays = parseInt(document.getElementById('licDurationDays').value, 10) || 30;
+            const customKey = document.getElementById('licCustomKey').value.trim();
+            const note = document.getElementById('licNote').value.trim();
+
+            try {
+                const resp = await fetch('/api/license/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        admin_key: currentVipKey,
+                        client_name: clientName,
+                        duration_days: durationDays,
+                        custom_key: customKey,
+                        note: note
+                    })
+                });
+                const data = await resp.json();
+                if (data.success && data.license) {
+                    const origin = window.location.origin;
+                    const fullLink = `${origin}/?key=${data.license.key}`;
+                    const resultBox = document.getElementById('newLicenseResultBox');
+                    const linkInput = document.getElementById('generatedLinkInput');
+                    if (resultBox && linkInput) {
+                        linkInput.value = fullLink;
+                        resultBox.style.display = 'block';
+                    }
+                    loadAdminLicenses();
+                } else {
+                    alert('Error generating license: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Failed to connect to backend: ' + e.message);
+            }
+        }
+
+        function copyGeneratedLink() {
+            const linkInput = document.getElementById('generatedLinkInput');
+            if (!linkInput) return;
+            linkInput.select();
+            navigator.clipboard.writeText(linkInput.value).then(() => {
+                alert('1-Device Link Copied to Clipboard!');
+            }).catch(() => {
+                document.execCommand('copy');
+                alert('1-Device Link Copied!');
+            });
+        }
+
+        function shareViaWhatsApp() {
+            const linkInput = document.getElementById('generatedLinkInput');
+            if (!linkInput || !linkInput.value) return;
+            const msg = encodeURIComponent(`*RUSHI THE TRADER - VIP Signals Access*\n\nYour Exclusive 1-Device Access Link:\n${linkInput.value}\n\n*NOTE:* This link is locked to 1 mobile phone only. It will not work if forwarded to any other device.`);
+            window.open(`https://wa.me/?text=${msg}`, '_blank');
+        }
+
+        async function loadAdminLicenses() {
+            const tbody = document.getElementById('licenseTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:16px; text-align:center; color:var(--text-muted);">लोड होत आहे...</td></tr>';
+
+            try {
+                const resp = await fetch(`/api/license/list?admin_key=${encodeURIComponent(currentVipKey)}`);
+                const data = await resp.json();
+                if (!data.licenses || !data.licenses.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="padding:16px; text-align:center; color:var(--text-muted);">अजून कोणतीही VIP Links तयार केलेली नाहीत.</td></tr>';
+                    return;
+                }
+
+                let html = '';
+                data.licenses.forEach(lic => {
+                    const isMaster = lic.key === 'RUSHI-ADMIN-777';
+                    const statusColor = lic.status === 'ACTIVE' ? 'var(--accent-green)' : (lic.status === 'EXPIRED' ? '#fbbf24' : 'var(--accent-rose)');
+                    const deviceBadge = lic.bound_device_model ? `<span style="color:var(--text-primary); font-weight:600;">${lic.bound_device_model}</span><br><span style="color:var(--text-muted); font-size:10px;">ID: ${lic.bound_device_id.substring(0,8)}...</span>` : '<span style="color:#fbbf24; font-style:italic;">Pending 1st Open</span>';
+                    const expText = lic.expires_at ? lic.expires_at.split('T')[0] : 'Lifetime';
+                    const origin = window.location.origin;
+                    const fullLink = `${origin}/?key=${lic.key}`;
+
+                    html += `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <td style="padding:8px 6px;">
+                                <strong>${lic.client_name || 'Client'}</strong>
+                                ${lic.note ? `<br><span style="color:var(--text-muted); font-size:10px;">${lic.note}</span>` : ''}
+                            </td>
+                            <td style="padding:8px 6px; font-family:var(--font-mono); color:#fbbf24;">${lic.key}</td>
+                            <td style="padding:8px 6px;"><span style="color:${statusColor}; font-weight:700;">${lic.status}</span></td>
+                            <td style="padding:8px 6px;">${deviceBadge}</td>
+                            <td style="padding:8px 6px; color:var(--text-secondary);">${expText}</td>
+                            <td style="padding:8px 6px; text-align:right; white-space:nowrap;">
+                                ${!isMaster ? `
+                                    <button class="btn" onclick="resetClientDevice('${lic.key}')" title="Reset device lock so client can bind a new phone" style="padding:3px 6px; font-size:10px; margin-right:4px;">Reset Phone</button>
+                                    <button class="btn" onclick="revokeClientLicense('${lic.key}')" title="Block access" style="padding:3px 6px; font-size:10px; margin-right:4px; color:var(--accent-rose); border-color:rgba(244,63,94,0.3);">Revoke</button>
+                                ` : '<span style="color:var(--text-muted); font-size:10px;">Master</span>'}
+                                <button class="btn" onclick="navigator.clipboard.writeText('${fullLink}'); alert('Link copied!');" style="padding:3px 6px; font-size:10px;">Copy</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="6" style="padding:16px; text-align:center; color:var(--accent-rose);">त्रुटी: ${e.message}</td></tr>`;
+            }
+        }
+
+        async function resetClientDevice(targetKey) {
+            if (!confirm(`Are you sure you want to reset the device binding for ${targetKey}? The client can then bind their new phone on their next link click.`)) {
+                return;
+            }
+            try {
+                const resp = await fetch('/api/license/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin_key: currentVipKey, key: targetKey })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    alert(`Device lock reset successfully for ${targetKey}!`);
+                    loadAdminLicenses();
+                } else {
+                    alert(`Error: ${data.error || 'Failed to reset'}`);
+                }
+            } catch (e) {
+                alert('Network error: ' + e.message);
+            }
+        }
+
+        async function revokeClientLicense(targetKey) {
+            if (!confirm(`Are you sure you want to REVOKE/BLOCK access for ${targetKey}?`)) {
+                return;
+            }
+            try {
+                const resp = await fetch('/api/license/revoke', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin_key: currentVipKey, key: targetKey })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    alert(`Access revoked for ${targetKey}!`);
+                    loadAdminLicenses();
+                } else {
+                    alert(`Error: ${data.error || 'Failed to revoke'}`);
+                }
+            } catch (e) {
+                alert('Network error: ' + e.message);
+            }
+        }
+
+        async function initLicenseSecurity() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let keyFromUrl = urlParams.get('key');
+            if (keyFromUrl) {
+                keyFromUrl = keyFromUrl.trim().toUpperCase();
+                localStorage.setItem('rushi_vip_key', keyFromUrl);
+                urlParams.delete('key');
+                const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+                window.history.replaceState({}, document.title, newUrl);
+            }
+            const activeKey = keyFromUrl || localStorage.getItem('rushi_vip_key');
+            if (!activeKey) {
+                showVipActivationModal();
+                return;
+            }
+            await verifyLicenseWithBackend(activeKey);
+        }
+
         // Initialize on load
         window.addEventListener('DOMContentLoaded', () => {
+            // Enforce Single-Device License Security
+            initLicenseSecurity();
 
 
             // Trigger Opening Welcome Animation & Indian Female Voice Greeting immediately
@@ -7097,7 +7648,7 @@
                 }
             });
 
-            ['riskModal', 'calibrateModal', 'twelveDataModal'].forEach(id => {
+            ['riskModal', 'calibrateModal', 'twelveDataModal', 'licenseManagerModal'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     el.addEventListener('click', (e) => {
