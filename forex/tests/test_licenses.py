@@ -129,6 +129,44 @@ class TestLicenses(unittest.TestCase):
         self.assertEqual(res["status"], "BLOCKED")
         self.assertEqual(res["reason"], "INVALID_KEY")
 
+    def test_signed_vip_key_lifecycle(self):
+        """HMAC signed VIP keys can self-validate statelessly across cold lambda starts."""
+        signed_key = lic_mod.sign_key("RAHUL", 30)
+        self.assertTrue(signed_key.startswith("VIP-RAHUL-30-"))
+
+        # Valid signature verification
+        info = lic_mod.verify_signed_key(signed_key)
+        self.assertIsNotNone(info)
+        self.assertEqual(info["client_name"], "RAHUL")
+        self.assertEqual(info["duration_days"], 30)
+
+        # Tampered signature detection
+        tampered_key = signed_key[:-2] + "99"
+        self.assertIsNone(lic_mod.verify_signed_key(tampered_key))
+
+        # First activation on Device A
+        res_open = lic_mod.verify_device_license(signed_key, "dev-phone-rahul", "hw-rahul", "Samsung Galaxy S24")
+        self.assertEqual(res_open["status"], "GRANTED")
+        token = res_open.get("device_token")
+        self.assertTrue(bool(token))
+
+        # Device token verification
+        self.assertTrue(lic_mod.verify_device_token(signed_key, "dev-phone-rahul", token))
+        self.assertFalse(lic_mod.verify_device_token(signed_key, "dev-pirate-phone", token))
+
+        # Reopen / Refresh on Device A with device token succeeds
+        res_refresh = lic_mod.verify_device_license(
+            signed_key, "dev-phone-rahul", "hw-rahul", "Samsung Galaxy S24", device_token=token
+        )
+        self.assertEqual(res_refresh["status"], "GRANTED")
+
+        # Second phone tries to access -> Rejected with DEVICE_MISMATCH
+        res_pirate = lic_mod.verify_device_license(
+            signed_key, "dev-pirate-phone", "hw-pirate", "iPhone 15 Pro", device_token=None
+        )
+        self.assertEqual(res_pirate["status"], "BLOCKED")
+        self.assertEqual(res_pirate["reason"], "DEVICE_MISMATCH")
+
 
 if __name__ == "__main__":
     unittest.main()

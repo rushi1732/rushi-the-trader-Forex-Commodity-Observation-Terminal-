@@ -20,6 +20,8 @@ import json
 import threading
 import uuid
 import re
+import hmac
+import hashlib
 
 
 LICENSES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "licenses.json")
@@ -136,6 +138,9 @@ def save_licenses(data: Dict[str, Any]) -> None:
         pass
 
 
+RUSHI_SIGNING_SECRET = os.environ.get("RUSHI_SECRET_KEY", "RUSHI-SECRET-VIP-DEVICE-SALT-999")
+
+
 def sanitize_key(key: str) -> str:
     """Normalizes key string."""
     if not key:
@@ -143,11 +148,59 @@ def sanitize_key(key: str) -> str:
     return re.sub(r"[^A-Za-z0-9\-_]", "", key.strip()).upper()
 
 
+def sign_key(client_name: str, duration_days: int = 30) -> str:
+    """Generates a cryptographically HMAC-signed VIP key."""
+    safe_name = re.sub(r"[^A-Z0-9]", "", (client_name or "VIP").upper())[:10] or "VIP"
+    days_val = int(duration_days) if duration_days else 0
+    payload = f"{safe_name}:{days_val}"
+    sig = hmac.new(RUSHI_SIGNING_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:8].upper()
+    return f"VIP-{safe_name}-{days_val}-{sig}"
+
+
+def verify_signed_key(key: str) -> Optional[Dict[str, Any]]:
+    """Verifies if key has a valid HMAC signature; returns client_name and duration_days if valid."""
+    clean_key = sanitize_key(key)
+    if not clean_key.startswith("VIP-"):
+        return None
+    parts = clean_key.split("-")
+    if len(parts) != 4:
+        return None
+    prefix, name, days_str, sig = parts
+    if prefix != "VIP":
+        return None
+    try:
+        days_val = int(days_str)
+    except ValueError:
+        return None
+    payload = f"{name}:{days_val}"
+    expected_sig = hmac.new(RUSHI_SIGNING_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:8].upper()
+    if hmac.compare_digest(sig, expected_sig):
+        return {"client_name": name, "duration_days": days_val}
+    return None
+
+
+def generate_device_token(key: str, device_id: str) -> str:
+    """Generates HMAC binding token proving this device was bound to this key."""
+    clean_key = sanitize_key(key)
+    clean_dev = (device_id or "").strip()
+    payload = f"{clean_key}:{clean_dev}"
+    return hmac.new(RUSHI_SIGNING_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+
+
+def verify_device_token(key: str, device_id: str, token: str) -> bool:
+    """Verifies HMAC device token."""
+    if not token:
+        return False
+    expected = generate_device_token(key, device_id)
+    return hmac.compare_digest(expected, token.strip())
+
+
 def verify_device_license(
     key: str,
     device_id: str,
     hw_hash: Optional[str] = None,
     device_model: Optional[str] = None,
+    device_token: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Verifies if the given device is authorized to access the terminal using the key.
@@ -182,12 +235,33 @@ def verify_device_license(
     licenses = registry.get("licenses", {})
 
     if clean_key not in licenses:
-        return {
-            "status": "BLOCKED",
-            "reason": "INVALID_KEY",
-            "message": "अवैध ॲक्सेस की (Invalid Key)! ही लिंक अस्तित्वात नाही.",
-            "is_admin": False,
-        }
+        signed_info = verify_signed_key(clean_key)
+        if signed_info:
+            now = datetime.now(timezone.utc)
+            days = signed_info.get("duration_days", 30)
+            exp_iso = (now + timedelta(days=days)).isoformat() if days > 0 else None
+            new_item = {
+                "key": clean_key,
+                "client_name": signed_info.get("client_name", "VIP Client"),
+                "created_at": now.isoformat(),
+                "expires_at": exp_iso,
+                "bound_device_id": None,
+                "bound_hw_hash": None,
+                "bound_at": None,
+                "device_model": None,
+                "is_active": True,
+                "note": "Auto-Verified Signed VIP Key",
+            }
+            licenses[clean_key] = new_item
+            save_licenses(registry)
+            lic = new_item
+        else:
+            return {
+                "status": "BLOCKED",
+                "reason": "INVALID_KEY",
+                "message": "अवैध ॲक्सेस की (Invalid Key)! ही लिंक अस्तित्वात नाही.",
+                "is_admin": False,
+            }
 
     lic = licenses[clean_key]
 
@@ -235,6 +309,7 @@ def verify_device_license(
         lic["device_model"] = device_model or "Mobile Device"
         save_licenses(registry)
 
+        token = generate_device_token(clean_key, clean_device_id)
         return {
             "status": "GRANTED",
             "is_admin": False,
@@ -243,19 +318,26 @@ def verify_device_license(
             "client_name": lic.get("client_name", "Client"),
             "bound_at": now_iso,
             "device_model": lic.get("device_model"),
+            "device_token": token,
             "message": "डिव्हाइस यशस्वीरीत्या रजिस्टर झाले! आता ही लिंक फक्त याच मोबाईलवर चालेल.",
         }
 
     # 4. Device Verification: Compare with registered device!
     is_same_device = (bound_id == clean_device_id)
+    if not is_same_device and device_token and verify_device_token(clean_key, clean_device_id, device_token):
+        if bound_id is None:
+            lic["bound_device_id"] = clean_device_id
+            save_licenses(registry)
+        is_same_device = True
+
     # Optional hardware fallback in case cookies were cleared on same device
     if not is_same_device and hw_hash and bound_hw and hw_hash == bound_hw:
-        # Same hardware signature -> restore device_id
         lic["bound_device_id"] = clean_device_id
         save_licenses(registry)
         is_same_device = True
 
     if is_same_device:
+        token = generate_device_token(clean_key, clean_device_id)
         return {
             "status": "GRANTED",
             "is_admin": False,
@@ -264,6 +346,7 @@ def verify_device_license(
             "client_name": lic.get("client_name", "Client"),
             "bound_at": lic.get("bound_at"),
             "device_model": lic.get("device_model"),
+            "device_token": token,
             "message": "डिव्हाइस व्हेरिफाय झाले. ॲक्सेस मंजूर!",
         }
 
@@ -295,8 +378,7 @@ def create_license(
     if custom_key:
         new_key = sanitize_key(custom_key)
     else:
-        rand_suffix = uuid.uuid4().hex[:6].upper()
-        new_key = f"RUSHI-{safe_name[:6]}-{rand_suffix}"
+        new_key = sign_key(client_name, duration_days or 30)
 
     now_dt = datetime.now(timezone.utc)
     expires_at = (now_dt + timedelta(days=duration_days)).isoformat() if duration_days else None

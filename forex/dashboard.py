@@ -3442,12 +3442,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             <div class="form-group" style="margin-bottom:12px;">
                 <label>Supabase Project URL</label>
-                <input id="sbUrlInput" type="text" class="form-control" placeholder="https://xyzcompany.supabase.co" style="font-family:var(--font-mono); font-size:12px;">
+                <input id="sbUrlInput" type="text" class="form-control" value="https://jyqumcnykzmsiodbokj.supabase.co" placeholder="https://jyqumcnykzmsiodbokj.supabase.co" style="font-family:var(--font-mono); font-size:12px;">
             </div>
 
             <div class="form-group" style="margin-bottom:12px;">
-                <label>Supabase API Key (anon / service_role)</label>
-                <input id="sbKeyInput" type="password" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="font-family:var(--font-mono); font-size:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <label style="margin:0;">Supabase API Key (Publishable / Secret Key)</label>
+                    <span style="font-size:11px; color:#60a5fa; cursor:pointer;" onclick="toggleKeyVisibility()">Show/Hide Key</span>
+                </div>
+                <input id="sbKeyInput" type="password" class="form-control" placeholder="sb_secret_... किंवा sb_publishable_... किंवा eyJh..." style="font-family:var(--font-mono); font-size:12px;">
+                <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">
+                    Supabase Dashboard &gt; Settings &gt; API Keys मधून <strong>Secret keys</strong> (sb_secret_...) किंवा <strong>Publishable key</strong> (sb_publishable_...) इथे पेस्ट करा.
+                </div>
             </div>
 
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
@@ -7874,16 +7880,41 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             document.getElementById('supabaseModal').classList.remove('active');
         }
 
+        function toggleKeyVisibility() {
+            const el = document.getElementById('sbKeyInput');
+            if (el) el.type = el.type === 'password' ? 'text' : 'password';
+        }
+
         async function loadSupabaseConfig() {
             try {
+                const localUrl = localStorage.getItem('rushi_sb_url') || 'https://jyqumcnykzmsiodbokj.supabase.co';
+                const localKey = localStorage.getItem('rushi_sb_key') || '';
+
                 const res = await fetch('/api/supabase');
                 const data = await res.json();
                 supabaseConfig = data;
 
                 const urlIn = document.getElementById('sbUrlInput');
+                const keyIn = document.getElementById('sbKeyInput');
                 const enabledCb = document.getElementById('sbEnabledCheckbox');
-                if (urlIn) urlIn.value = data.url || 'https://jyqumcnykzmsiodbokj.supabase.co';
+                if (urlIn) urlIn.value = data.url || localUrl;
+                if (keyIn && !keyIn.value && localKey) keyIn.value = localKey;
                 if (enabledCb) enabledCb.checked = true;
+
+                // Auto-sync credentials from browser localStorage to serverless backend if needed
+                if (!data.configured && localKey && localUrl) {
+                    fetch('/api/supabase/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: localUrl, key: localKey, enabled: true })
+                    }).then(r => r.json()).then(savedData => {
+                        if (savedData.success) {
+                            fetch('/api/supabase').then(r2 => r2.json()).then(fresh => {
+                                updateSupabaseUI(fresh);
+                            });
+                        }
+                    }).catch(() => {});
+                }
 
                 updateSupabaseUI(data);
             } catch (err) {
@@ -7957,7 +7988,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
             if (!key) {
-                alert('कृपया तुमच्या Supabase मधील API Key (Secret key sb_secret_... किंवा anon key) खालील बॉक्समध्ये पेस्ट करा!');
+                alert('कृपया तुमच्या Supabase मधील API Key (Secret key sb_secret_... किंवा Publishable key sb_publishable_...) खालील बॉक्समध्ये पेस्ट करा!');
                 document.getElementById('sbKeyInput').focus();
                 return;
             }
@@ -7970,6 +8001,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 });
                 const data = await res.json();
                 if (data.success) {
+                    try {
+                        localStorage.setItem('rushi_sb_url', url);
+                        localStorage.setItem('rushi_sb_key', key);
+                    } catch(e){}
                     alert('Supabase credentials saved successfully! Cloud sync initialized.');
                     closeSupabaseModal();
                     loadSupabaseConfig();
@@ -7986,8 +8021,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const res = await fetch('/api/supabase/schema');
                 const data = await res.json();
                 await navigator.clipboard.writeText(data.schema);
-                alert('Supabase SQL Schema copied to clipboard! Paste it into Supabase SQL Editor and click RUN.');
+                alert('Supabase SQL Schema clipboard वर कॉपी झाला आहे! Supabase Dashboard -> SQL Editor मध्ये जाऊन पेस्ट करा आणि Run दाबा.');
             } catch (err) {
+                alert('Failed to copy schema: ' + err.message);
+            }
+        }
                 alert('Failed to copy schema: ' + err.message);
             }
         }
@@ -8060,6 +8098,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const devId = getOrCreateDeviceId();
             const hwHash = getHardwareHash();
             const devModel = getDeviceModelName();
+            const devToken = localStorage.getItem('rushi_dev_token_' + key) || '';
 
             try {
                 const resp = await fetch('/api/license/verify', {
@@ -8069,7 +8108,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         key: key,
                         device_id: devId,
                         hw_hash: hwHash,
-                        device_model: devModel
+                        device_model: devModel,
+                        device_token: devToken
                     })
                 });
                 const data = await resp.json();
@@ -8078,6 +8118,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     currentVipKey = key;
                     currentUserIsAdmin = !!data.is_admin;
                     isDeviceAuthorized = true;
+                    if (data.device_token) {
+                        try {
+                            localStorage.setItem('rushi_dev_token_' + key, data.device_token);
+                            document.cookie = "rushi_dev_token_" + key + "=" + data.device_token + "; path=/; max-age=315360000; SameSite=Lax";
+                        } catch(e){}
+                    }
                     
                     document.getElementById('deviceLockOverlay').style.display = 'none';
                     document.getElementById('vipActivationModal').classList.remove('active');
@@ -8383,15 +8429,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         async function initLicenseSecurity() {
             const urlParams = new URLSearchParams(window.location.search);
-            let keyFromUrl = urlParams.get('key');
-            if (keyFromUrl) {
-                keyFromUrl = keyFromUrl.trim().toUpperCase();
-                localStorage.setItem('rushi_vip_key', keyFromUrl);
-                urlParams.delete('key');
-                const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
-                window.history.replaceState({}, document.title, newUrl);
+            let activeKey = urlParams.get('key');
+            if (activeKey) {
+                activeKey = activeKey.trim().toUpperCase();
+                try {
+                    localStorage.setItem('rushi_vip_key', activeKey);
+                    document.cookie = "rushi_vip_key=" + activeKey + "; path=/; max-age=315360000; SameSite=Lax";
+                } catch(e){}
+            } else {
+                activeKey = localStorage.getItem('rushi_vip_key');
+                if (!activeKey) {
+                    const m = document.cookie.match(/rushi_vip_key=([^;]+)/);
+                    if (m) activeKey = m[1].trim().toUpperCase();
+                }
             }
-            const activeKey = keyFromUrl || localStorage.getItem('rushi_vip_key');
             if (!activeKey) {
                 showVipActivationModal();
                 return;
@@ -9594,7 +9645,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             device_id = str(payload.get("device_id", "")).strip()
             hw_hash = str(payload.get("hw_hash", "")).strip()
             device_model = str(payload.get("device_model", "")).strip()
-            res = verify_device_license(key, device_id, hw_hash=hw_hash, device_model=device_model)
+            device_token = str(payload.get("device_token", "")).strip()
+            res = verify_device_license(key, device_id, hw_hash=hw_hash, device_model=device_model, device_token=device_token)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
