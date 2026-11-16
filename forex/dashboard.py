@@ -8024,9 +8024,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 alert('Failed to copy schema: ' + err.message);
             }
         }
-                alert('Failed to copy schema: ' + err.message);
-            }
-        }
 
         /* -------------------------------------------------------------
            1-Device License & Anti-Piracy Security System
