@@ -85,8 +85,8 @@ END $$;
 
 
 def get_default_config() -> Dict[str, Any]:
-    """Default Supabase configuration from environment or empty placeholders."""
-    url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+    """Default Supabase configuration from environment or project URL."""
+    url = os.environ.get("SUPABASE_URL", "https://jyqumcnykzmsiodbokj.supabase.co").strip().rstrip("/")
     key = os.environ.get("SUPABASE_KEY", os.environ.get("SUPABASE_ANON_KEY", os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""))).strip()
     return {
         "url": url,

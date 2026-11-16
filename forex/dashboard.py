@@ -7882,8 +7882,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 const urlIn = document.getElementById('sbUrlInput');
                 const enabledCb = document.getElementById('sbEnabledCheckbox');
-                if (urlIn) urlIn.value = data.url || '';
-                if (enabledCb) enabledCb.checked = data.enabled !== false;
+                if (urlIn) urlIn.value = data.url || 'https://jyqumcnykzmsiodbokj.supabase.co';
+                if (enabledCb) enabledCb.checked = true;
 
                 updateSupabaseUI(data);
             } catch (err) {
@@ -7951,6 +7951,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const url = document.getElementById('sbUrlInput').value.trim();
             const key = document.getElementById('sbKeyInput').value.trim();
             const enabled = document.getElementById('sbEnabledCheckbox').checked;
+
+            if (!url) {
+                alert('कृपया Supabase Project URL टाका (उदा. https://jyqumcnykzmsiodbokj.supabase.co)');
+                return;
+            }
+            if (!key) {
+                alert('कृपया तुमच्या Supabase मधील API Key (Secret key sb_secret_... किंवा anon key) खालील बॉक्समध्ये पेस्ट करा!');
+                document.getElementById('sbKeyInput').focus();
+                return;
+            }
 
             try {
                 const res = await fetch('/api/supabase/save', {
