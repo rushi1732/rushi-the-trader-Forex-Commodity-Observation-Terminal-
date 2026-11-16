@@ -1997,7 +1997,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .welcome-fullpage-overlay.slide-up {
             transform: translateY(-100%);
-            pointer-events: none;
+            opacity: 0;
+            pointer-events: none !important;
+            transition: transform 0.75s cubic-bezier(0.77, 0, 0.175, 1), opacity 0.4s ease;
         }
 
         .welcome-fullpage-card {
@@ -2275,9 +2277,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <audio id="audioAlertsActive" src="/audio/voice_alerts_active.mp3" preload="auto" playsinline style="display:none;"></audio>
 
     <!-- Full-Screen Welcome Curtain Screen -->
-    <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="triggerVoiceFromCurtainClick(event)">
-        <div class="welcome-fullpage-card">
-            <button onclick="event.stopPropagation(); unlockAudio(); dismissCurtainScreen();" style="position:absolute; top:16px; right:18px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:6px;" title="Skip and open terminal">
+    <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="dismissCurtainScreen()">
+        <div class="welcome-fullpage-card" onclick="event.stopPropagation()">
+            <button onclick="event.stopPropagation(); dismissCurtainScreen();" style="position:absolute; top:16px; right:18px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:6px;" title="Skip and open terminal">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
             <div class="welcome-logo-circle">
@@ -2303,13 +2305,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 </div>
             </div>
             <div>
-                <button id="welcomeEnterBtn" class="welcome-enter-btn" onclick="event.stopPropagation(); triggerVoiceFromCurtainClick(event)">
+                <button id="welcomeEnterBtn" class="welcome-enter-btn" onclick="event.stopPropagation(); dismissCurtainScreen();">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    <span id="welcomeBtnText">Click Anywhere to Play Voice & Enter</span>
+                    <span id="welcomeBtnText">Enter Terminal (डॅशबोर्ड सुरू करा)</span>
                 </button>
             </div>
             <div class="welcome-fullpage-hint">
-                Screen will automatically slide up when speech completes
+                Tap button or anywhere to open terminal immediately (टॅप करून लगेच सुरू करा)
             </div>
         </div>
     </div>
@@ -6944,9 +6946,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let welcomeDismissTimer = null;
 
         function dismissCurtainScreen() {
-            unlockAudio();
             if (isCurtainDismissed) return;
             isCurtainDismissed = true;
+            isWelcomeSpeaking = false;
+            try { unlockAudio(); } catch(e){}
             if (welcomeDismissTimer) {
                 clearTimeout(welcomeDismissTimer);
                 welcomeDismissTimer = null;
@@ -6954,6 +6957,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (window._curtainSafetyTimer) {
                 clearTimeout(window._curtainSafetyTimer);
                 window._curtainSafetyTimer = null;
+            }
+            if (window._curtainAutoDismiss) {
+                clearTimeout(window._curtainAutoDismiss);
+                window._curtainAutoDismiss = null;
             }
             const overlay = document.getElementById('welcomeFullPageOverlay');
             if (overlay) {
@@ -6963,7 +6970,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     overlay.style.display = 'none';
                     document.body.style.overflow = 'auto';
                     document.documentElement.style.overflow = 'auto';
-                }, 700);
+                }, 750);
             }
 
             // Immediately check for any active BUY/SELL signal once curtain opens!
@@ -7014,7 +7021,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (speechLabel) speechLabel.textContent = "Welcome complete! Opening terminal...";
                 if (btnText) btnText.textContent = "Opening Terminal...";
                 if (welcomeDismissTimer) clearTimeout(welcomeDismissTimer);
-                welcomeDismissTimer = setTimeout(dismissCurtainScreen, 600);
+                welcomeDismissTimer = setTimeout(dismissCurtainScreen, 400);
             };
 
             const onBlocked = () => {
@@ -7023,26 +7030,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     clearTimeout(window._curtainSafetyTimer);
                     window._curtainSafetyTimer = null;
                 }
-                if (speechLabel) speechLabel.textContent = "Tap below to play Indian voice greeting";
-                if (btnText) btnText.textContent = "Tap to Play Voice & Enter Terminal";
+                if (speechLabel) speechLabel.textContent = "Opening live terminal...";
+                if (btnText) btnText.textContent = "Enter Terminal (डॅशबोर्ड सुरू करा)";
                 if (enterBtn) enterBtn.classList.add('pulse-ready');
             };
 
             isWelcomeSpeaking = true;
             if (speechLabel) speechLabel.textContent = `Speaking: "${greeting} Sir..."`;
-            if (btnText) btnText.textContent = "Speaking Greeting... (Please wait)";
-            if (enterBtn) enterBtn.classList.remove('pulse-ready');
+            if (btnText) btnText.textContent = "Enter Terminal (डॅशबोर्ड सुरू करा)";
 
-            // Safety fallback watchdog: ONLY armed when user gestures, with generous 12s so it NEVER cuts speech short!
-            if (isUserGesture) {
-                if (window._curtainSafetyTimer) clearTimeout(window._curtainSafetyTimer);
-                window._curtainSafetyTimer = setTimeout(() => {
-                    if (!isCurtainDismissed && isWelcomeSpeaking) {
-                        console.warn("Welcome curtain speech timeout. Auto-revealing terminal.");
-                        onFinished();
-                    }
-                }, 12000);
-            }
+            // Guaranteed safety timer: automatically slides UP after 3.0s so it NEVER gets stuck!
+            if (window._curtainSafetyTimer) clearTimeout(window._curtainSafetyTimer);
+            window._curtainSafetyTimer = setTimeout(() => {
+                if (!isCurtainDismissed) {
+                    console.log("Welcome curtain timer elapsed. Auto-revealing terminal.");
+                    onFinished();
+                }
+            }, 3000);
 
             const targetEl = document.getElementById(welcomeAudioId);
             if (targetEl) {
@@ -7091,24 +7095,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function triggerVoiceFromCurtainClick(e) {
-            if (isCurtainDismissed) return;
-
-            // If already speaking, DO NOT INTERRUPT OR DISMISS EARLY!
-            if (isWelcomeSpeaking) {
-                console.log("Welcome speech in progress. Waiting for audio to finish naturally.");
-                return;
-            }
-
-            const greeting = getTimeOfDayGreeting();
-            let welcomeAudioId = 'audioWelcomeMorning';
-            if (greeting === 'Good Afternoon') welcomeAudioId = 'audioWelcomeAfternoon';
-            else if (greeting === 'Good Evening') welcomeAudioId = 'audioWelcomeEvening';
-            else if (greeting === 'Good Night') welcomeAudioId = 'audioWelcomeNight';
-
-            // Unlock audio without pausing the welcome audio!
-            unlockAudio(welcomeAudioId);
-
-            playWelcomeCurtainVoice(true);
+            // Immediately dismiss curtain and reveal live terminal!
+            dismissCurtainScreen();
         }
 
         function triggerWelcomeExperience(forceReplay = false) {
@@ -7117,6 +7105,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const overlay = document.getElementById('welcomeFullPageOverlay');
             if (overlay) {
                 overlay.style.display = 'flex';
+                overlay.style.pointerEvents = 'auto';
                 void overlay.offsetWidth;
                 overlay.classList.remove('slide-up');
             }
@@ -7130,6 +7119,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
 
             if (enterBtn) enterBtn.classList.remove('pulse-ready');
+
+            // Guaranteed auto-dismiss on page load: slides UP after 3 seconds unconditionally
+            if (window._curtainAutoDismiss) clearTimeout(window._curtainAutoDismiss);
+            window._curtainAutoDismiss = setTimeout(() => {
+                if (!isCurtainDismissed) {
+                    dismissCurtainScreen();
+                }
+            }, 3000);
+
             try {
                 playWelcomeCurtainVoice(false);
             } catch (e) {
