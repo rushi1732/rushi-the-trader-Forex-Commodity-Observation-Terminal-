@@ -163,6 +163,17 @@ def update_journal_positions(current_price: float, symbol: str) -> List[Dict[str
                 dist_pct = (entry - current_price) / abs(entry - stop) if abs(entry - stop) > 0 else 0
                 item["pnl_usd"] = round(dist_pct * risk_usd, 2)
 
+    if resolved_events:
+        try:
+            from .supabase_client import is_supabase_configured, upsert_journal_to_supabase
+            if is_supabase_configured():
+                for res_ev in resolved_events:
+                    matched = next((x for x in PAPER_JOURNAL if x.get("id") == res_ev["id"]), None)
+                    if matched:
+                        threading.Thread(target=upsert_journal_to_supabase, args=(matched,), daemon=True).start()
+        except Exception:
+            pass
+
     return resolved_events
 
 # Catalog of the 11 Trading Skills from day-trader-skill repository
@@ -2361,6 +2372,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     Twelve Data Real-Time: <span id="tdStatusLabel" style="font-weight:700;">Connected</span>
                 </button>
 
+                <button id="btnSupabase" class="btn" onclick="openSupabaseModal()" title="Supabase PostgreSQL Cloud Database for Device Links, Signal Tracker & Journal" style="border-color:rgba(59,130,246,0.5); color:#60a5fa; display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                    Supabase: <span id="supabaseStatusLabel" style="font-weight:700;">Connect</span>
+                </button>
+
                 <button id="btnAdminManager" class="btn" onclick="openLicenseModal()" title="VIP 1-Device Link Manager" style="border-color:rgba(245,158,11,0.6); color:#fbbf24; display:none; align-items:center; gap:6px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     <span>1-Device Links</span>
@@ -3405,6 +3421,64 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div style="display:flex; justify-content:flex-end; gap:10px;">
                 <button class="btn" onclick="closeTwelveDataModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveTwelveDataConfig()">Save & Connect Feed</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase PostgreSQL Cloud Database Modal -->
+    <div id="supabaseModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 520px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
+                <h3 style="font-size:16px; margin:0; display:flex; align-items:center; gap:8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                    <span>Supabase Cloud Database (PostgreSQL)</span>
+                </h3>
+                <button class="btn" onclick="closeSupabaseModal()" style="padding:4px 8px;">✕</button>
+            </div>
+
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px; line-height:1.5;">
+                Supabase मुळे तुमचे <strong>1-Device Link डेटा</strong>, <strong>Automatic Signal Engine ट्रेड्स</strong>, आणि <strong>Paper Observation Journal</strong> क्लाउडवर कायमचे सुरक्षित राहतात. Vercel रीस्टार्ट झाले तरी डेटा कधीही डिलीट होणार नाही.
+            </p>
+
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Supabase Project URL</label>
+                <input id="sbUrlInput" type="text" class="form-control" placeholder="https://xyzcompany.supabase.co" style="font-family:var(--font-mono); font-size:12px;">
+            </div>
+
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Supabase API Key (anon / service_role)</label>
+                <input id="sbKeyInput" type="password" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="font-family:var(--font-mono); font-size:12px;">
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+                <input id="sbEnabledCheckbox" type="checkbox" checked style="cursor:pointer; width:16px; height:16px;">
+                <label for="sbEnabledCheckbox" style="font-size:12px; color:var(--text-primary); cursor:pointer;">Enable Supabase as Primary Cloud Database</label>
+            </div>
+
+            <div id="sbStatusBox" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:6px; padding:10px 12px; margin-bottom:14px; font-size:11px; color:var(--text-secondary);">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span>क्लाउड स्थिती (Cloud Status):</span>
+                    <span id="sbStatusText" style="font-weight:700; color:#fbbf24;">Checking...</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span>1-Device Links Sync:</span>
+                    <span id="sbSyncLicenses" style="color:var(--text-muted);">forex_licenses</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span>Signal Tracker & Journal Sync:</span>
+                    <span id="sbSyncJournal" style="color:var(--text-muted);">forex_journal</span>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <button class="btn" onclick="copySupabaseSchema()" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    Copy SQL Schema
+                </button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn" onclick="testSupabase()" style="font-size:11px;">Test Connection</button>
+                    <button class="btn btn-primary" onclick="saveSupabaseConfigModal()" style="font-size:11px;">Save & Sync Cloud</button>
+                </div>
             </div>
         </div>
     </div>
@@ -7787,6 +7861,128 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         /* -------------------------------------------------------------
+           Supabase Cloud Database Client
+           ------------------------------------------------------------- */
+        let supabaseConfig = { url: '', enabled: false, configured: false };
+
+        function openSupabaseModal() {
+            document.getElementById('supabaseModal').classList.add('active');
+            loadSupabaseConfig();
+        }
+
+        function closeSupabaseModal() {
+            document.getElementById('supabaseModal').classList.remove('active');
+        }
+
+        async function loadSupabaseConfig() {
+            try {
+                const res = await fetch('/api/supabase');
+                const data = await res.json();
+                supabaseConfig = data;
+
+                const urlIn = document.getElementById('sbUrlInput');
+                const enabledCb = document.getElementById('sbEnabledCheckbox');
+                if (urlIn) urlIn.value = data.url || '';
+                if (enabledCb) enabledCb.checked = data.enabled !== false;
+
+                updateSupabaseUI(data);
+            } catch (err) {
+                console.warn('Failed to load Supabase config:', err);
+            }
+        }
+
+        function updateSupabaseUI(status) {
+            const btnLabel = document.getElementById('supabaseStatusLabel');
+            const statusText = document.getElementById('sbStatusText');
+            const syncLic = document.getElementById('sbSyncLicenses');
+            const syncJrn = document.getElementById('sbSyncJournal');
+
+            if (status.configured && status.enabled) {
+                if (btnLabel) {
+                    btnLabel.textContent = 'Connected';
+                    btnLabel.style.color = 'var(--accent-green)';
+                }
+                if (statusText) {
+                    statusText.textContent = 'Connected (Active PostgreSQL)';
+                    statusText.style.color = 'var(--accent-green)';
+                }
+                if (syncLic) syncLic.innerHTML = '<span style="color:var(--accent-green); font-weight:700;">Synced (forex_licenses)</span>';
+                if (syncJrn) syncJrn.innerHTML = '<span style="color:var(--accent-green); font-weight:700;">Synced (forex_journal)</span>';
+            } else if (status.url) {
+                if (btnLabel) {
+                    btnLabel.textContent = 'Configured';
+                    btnLabel.style.color = '#fbbf24';
+                }
+                if (statusText) {
+                    statusText.textContent = 'Configured (Testing Needed)';
+                    statusText.style.color = '#fbbf24';
+                }
+            } else {
+                if (btnLabel) {
+                    btnLabel.textContent = 'Connect';
+                    btnLabel.style.color = '#60a5fa';
+                }
+                if (statusText) {
+                    statusText.textContent = 'Not Connected (Local Storage Mode)';
+                    statusText.style.color = 'var(--text-muted)';
+                }
+                if (syncLic) syncLic.textContent = 'Local /tmp fallback';
+                if (syncJrn) syncJrn.textContent = 'Local storage fallback';
+            }
+        }
+
+        async function testSupabase() {
+            const statusText = document.getElementById('sbStatusText');
+            if (statusText) {
+                statusText.textContent = 'Connecting...';
+                statusText.style.color = '#60a5fa';
+            }
+            try {
+                const res = await fetch('/api/supabase/test', { method: 'POST' });
+                const data = await res.json();
+                alert(data.message || (data.connected ? 'Connected!' : 'Connection failed'));
+                loadSupabaseConfig();
+            } catch (err) {
+                alert('Test failed: ' + err.message);
+            }
+        }
+
+        async function saveSupabaseConfigModal() {
+            const url = document.getElementById('sbUrlInput').value.trim();
+            const key = document.getElementById('sbKeyInput').value.trim();
+            const enabled = document.getElementById('sbEnabledCheckbox').checked;
+
+            try {
+                const res = await fetch('/api/supabase/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, key, enabled })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Supabase credentials saved successfully! Cloud sync initialized.');
+                    closeSupabaseModal();
+                    loadSupabaseConfig();
+                } else {
+                    alert('Error saving Supabase credentials: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Network error: ' + err.message);
+            }
+        }
+
+        async function copySupabaseSchema() {
+            try {
+                const res = await fetch('/api/supabase/schema');
+                const data = await res.json();
+                await navigator.clipboard.writeText(data.schema);
+                alert('Supabase SQL Schema copied to clipboard! Paste it into Supabase SQL Editor and click RUN.');
+            } catch (err) {
+                alert('Failed to copy schema: ' + err.message);
+            }
+        }
+
+        /* -------------------------------------------------------------
            1-Device License & Anti-Piracy Security System
            ------------------------------------------------------------- */
         let currentVipKey = '';
@@ -8197,6 +8393,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         window.addEventListener('DOMContentLoaded', () => {
             // Enforce Single-Device License Security
             initLicenseSecurity();
+            loadSupabaseConfig();
 
 
             // Trigger Opening Welcome Animation & Indian Female Voice Greeting immediately
@@ -8282,7 +8479,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             });
 
-            ['riskModal', 'calibrateModal', 'twelveDataModal', 'licenseManagerModal'].forEach(id => {
+            ['riskModal', 'calibrateModal', 'twelveDataModal', 'licenseManagerModal', 'supabaseModal'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     el.addEventListener('click', (e) => {
@@ -9015,6 +9212,31 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(TWELVE_DATA_CONFIG).encode("utf-8"))
             return
 
+        # 14. API: Supabase Cloud Database Config & Status
+        if path == "/api/supabase":
+            from .supabase_client import load_supabase_config, is_supabase_configured
+            cfg = load_supabase_config()
+            status = {
+                "url": cfg.get("url", ""),
+                "enabled": cfg.get("enabled", False),
+                "configured": is_supabase_configured(),
+                "has_key": bool(cfg.get("key")),
+            }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(status).encode("utf-8"))
+            return
+
+        # 15. API: Supabase SQL Schema
+        if path == "/api/supabase/schema":
+            from .supabase_client import DEFAULT_SQL_SCHEMA
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"schema": DEFAULT_SQL_SCHEMA}).encode("utf-8"))
+            return
+
         # 13. API: List Licenses (Admin Only)
         if path == "/api/license/list":
             admin_key = str(params.get("admin_key", [""])[0] or self.headers.get("x-admin-key", "")).strip()
@@ -9158,6 +9380,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 "note": payload.get("note", "Dashboard paper simulation"),
             }
             PAPER_JOURNAL.insert(0, new_entry)
+            try:
+                from .supabase_client import is_supabase_configured, upsert_journal_to_supabase
+                if is_supabase_configured():
+                    threading.Thread(target=upsert_journal_to_supabase, args=(new_entry,), daemon=True).start()
+            except Exception:
+                pass
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -9228,6 +9456,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 "note": f"Auto Signal [{timeframe}]: {strategy}",
             }
             PAPER_JOURNAL.insert(0, new_entry)
+            try:
+                from .supabase_client import is_supabase_configured, upsert_journal_to_supabase
+                if is_supabase_configured():
+                    threading.Thread(target=upsert_journal_to_supabase, args=(new_entry,), daemon=True).start()
+            except Exception:
+                pass
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -9409,6 +9643,39 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
+
+        # 11. API: Supabase Test Connection
+        if path == "/api/supabase/test":
+            from .supabase_client import test_supabase_connection
+            res = test_supabase_connection()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
+
+        # 12. API: Supabase Save Configuration & Sync
+        if path == "/api/supabase/save":
+            from .supabase_client import save_supabase_config, test_supabase_connection, upsert_journal_to_supabase, upsert_license_to_supabase
+            from .licenses import load_licenses
+            url = str(payload.get("url", "")).strip()
+            key = str(payload.get("key", "")).strip()
+            enabled = bool(payload.get("enabled", True))
+            cfg = save_supabase_config(url, key, enabled)
+            test_res = test_supabase_connection() if cfg.get("enabled") else {"connected": False, "message": "Supabase disabled"}
+
+            if test_res.get("connected"):
+                lic_data = load_licenses()
+                for l_item in lic_data.get("licenses", {}).values():
+                    threading.Thread(target=upsert_license_to_supabase, args=(l_item,), daemon=True).start()
+                for j_item in PAPER_JOURNAL:
+                    threading.Thread(target=upsert_journal_to_supabase, args=(j_item,), daemon=True).start()
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "config": {"url": cfg["url"], "enabled": cfg["enabled"]}, "test": test_res}).encode("utf-8"))
             return
 
         # 10. API: Delete License (Admin Only)

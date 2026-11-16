@@ -83,6 +83,18 @@ def load_licenses() -> Dict[str, Any]:
             except Exception:
                 pass
 
+        # 3. Supabase Cloud Database overlay (if configured)
+        try:
+            from .supabase_client import is_supabase_configured, fetch_licenses_from_supabase
+            if is_supabase_configured():
+                supa_lics = fetch_licenses_from_supabase()
+                if supa_lics:
+                    if loaded_data is None:
+                        loaded_data = _get_default_registry()
+                    loaded_data["licenses"].update(supa_lics)
+        except Exception:
+            pass
+
         if loaded_data is not None:
             _CACHE = loaded_data
             return dict(loaded_data)
@@ -115,6 +127,13 @@ def save_licenses(data: Dict[str, Any]) -> None:
     """Thread-safe persist licenses registry."""
     with _LOCK:
         _save_licenses_unlocked(data)
+    try:
+        from .supabase_client import is_supabase_configured, upsert_license_to_supabase
+        if is_supabase_configured():
+            for lic in data.get("licenses", {}).values():
+                threading.Thread(target=upsert_license_to_supabase, args=(lic,), daemon=True).start()
+    except Exception:
+        pass
 
 
 def sanitize_key(key: str) -> str:
@@ -355,6 +374,12 @@ def delete_license(key: str) -> Dict[str, Any]:
     if clean_key in licenses:
         del licenses[clean_key]
         save_licenses(registry)
+        try:
+            from .supabase_client import is_supabase_configured, delete_license_from_supabase
+            if is_supabase_configured():
+                threading.Thread(target=delete_license_from_supabase, args=(clean_key,), daemon=True).start()
+        except Exception:
+            pass
         return {"success": True, "message": "की यशस्वीरित्या हटवली."}
     return {"success": False, "error": "Key not found"}
 
