@@ -368,6 +368,13 @@ def evaluate_confluence_signal(
         if nearest_supply and nearest_supply["bottom"] <= current_price <= nearest_supply["top"]:
             bearish_entry_zones.append(f"Bearish Supply Zone ({nearest_supply['bottom']} - {nearest_supply['top']})")
 
+    # Proximity & Mitigation to Active Order Block (Tapping outer boundary within institutional buffer)
+    ob_mitigation_buf = max(pip_size * 5, from_pips(canon, 6.0))
+    if nearest_demand and abs(current_price - nearest_demand["top"]) <= ob_mitigation_buf:
+        bullish_entry_zones.append(f"Bullish Demand Mitigation Zone ({nearest_demand['bottom']:.{decimals}f} - {nearest_demand['top']:.{decimals}f})")
+    if nearest_supply and abs(current_price - nearest_supply["bottom"]) <= ob_mitigation_buf:
+        bearish_entry_zones.append(f"Bearish Supply Mitigation Zone ({nearest_supply['bottom']:.{decimals}f} - {nearest_supply['top']:.{decimals}f})")
+
     # B. Fair Value Gap (FVG) Entry Zones
     if inside_fvg:
         if inside_fvg.get("type") == "BULLISH_FVG":
@@ -401,6 +408,36 @@ def evaluate_confluence_signal(
             bullish_entry_zones.append(f"RSI Hidden Bullish Continuation Zone at {current_price:.{decimals}f}")
         elif div_data.get("type") == "HIDDEN_BEARISH" and not htf_bullish and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
             bearish_entry_zones.append(f"RSI Hidden Bearish Continuation Zone at {current_price:.{decimals}f}")
+
+    # F. Market Structure Breakout (BOS / CHoCH) & Trend Continuation Zone
+    choch_bars_ago = (len(candles) - 1 - latest_choch.get("broken_at_index", 0)) if latest_choch else 999
+    bos_bars_ago = (len(candles) - 1 - latest_bos.get("broken_at_index", 0)) if latest_bos else 999
+    if latest_bos and bos_bars_ago <= 8:
+        if latest_bos.get("direction") == "BULLISH" and not htf_bearish and not is_bearish_momentum:
+            bullish_entry_zones.append(f"Bullish BOS Breakout & Continuation Zone at {latest_bos['price']:.{decimals}f}")
+        elif latest_bos.get("direction") == "BEARISH" and not htf_bullish and not is_bullish_momentum:
+            bearish_entry_zones.append(f"Bearish BOS Breakdown & Continuation Zone at {latest_bos['price']:.{decimals}f}")
+    elif latest_choch and choch_bars_ago <= 8:
+        if latest_choch.get("direction") == "BULLISH" and not htf_bearish and not is_bearish_momentum:
+            bullish_entry_zones.append(f"Bullish CHoCH Reversal Zone at {latest_choch['price']:.{decimals}f}")
+        elif latest_choch.get("direction") == "BEARISH" and not htf_bullish and not is_bullish_momentum:
+            bearish_entry_zones.append(f"Bearish CHoCH Reversal Zone at {latest_choch['price']:.{decimals}f}")
+
+    # G. Dynamic Institutional Trend Support / EMA-9/21 Value Area
+    if is_bullish_momentum and not htf_bearish and ema9 and ema21:
+        if current_price >= ema21 and abs(current_price - ema9) <= max(pip_size * 6, from_pips(canon, 8.0)):
+            bullish_entry_zones.append(f"Dynamic Institutional EMA-9/21 Support Zone ({ema9:.{decimals}f})")
+    elif is_bearish_momentum and not htf_bullish and ema9 and ema21:
+        if current_price <= ema21 and abs(current_price - ema9) <= max(pip_size * 6, from_pips(canon, 8.0)):
+            bearish_entry_zones.append(f"Dynamic Institutional EMA-9/21 Resistance Zone ({ema9:.{decimals}f})")
+
+    # H. Active Session Killzone Expansion (High-probability institutional volume window)
+    if kz_data.get("is_killzone_active"):
+        kz_name = kz_data.get("primary_session", "Session Killzone")
+        if bullish_score >= 60 and not htf_bearish and not is_bearish_momentum:
+            bullish_entry_zones.append(f"Institutional Killzone Expansion Zone ({kz_name})")
+        elif bearish_score >= 60 and not htf_bullish and not is_bullish_momentum:
+            bearish_entry_zones.append(f"Institutional Killzone Expansion Zone ({kz_name})")
 
     # Hard Trend Filter & Veto check:
     # 1. HARD HTF MACRO TREND VETO:
@@ -445,51 +482,49 @@ def evaluate_confluence_signal(
         bearish_factors.append("[TREND VETO] Counter-trend SELL prohibited: Bullish momentum/structure active without confirmed displacement Bearish CHoCH")
 
     # 3. Liquidity Trap & Judas Swing Guard:
-    # If recent BSL sweep occurred or price printed a heavy upper rejection wick (>= 40%) at a high, block BUY
-    if recent_bsl or (c_last.get("close", 0) > c_last.get("open", 0) and (u_wick / c_rng) >= 0.40):
+    # If recent BSL sweep printed a heavy rejection wick or dumped, block BUY
+    has_bsl_dump = bool(recent_bsl and (c_last.get("close", 0) < c_last.get("open", 0) or (u_wick / c_rng) >= 0.35))
+    if has_bsl_dump or (c_last.get("close", 0) > c_last.get("open", 0) and (u_wick / c_rng) >= 0.40):
         bullish_entry_zones = []
         bullish_score = min(bullish_score, 30)
         bullish_factors.append("[LIQUIDITY TRAP GUARD] BUY blocked: Buy-Side Liquidity swept / Heavy upper rejection wick. Risk of institutional dump.")
 
-    # If recent SSL sweep occurred or price printed a heavy lower rejection wick (>= 40%) at a low, block SELL
-    if recent_ssl or (c_last.get("close", 0) < c_last.get("open", 0) and (l_wick / c_rng) >= 0.40):
+    # If recent SSL sweep printed a heavy lower rejection wick or pumped, block SELL
+    has_ssl_pump = bool(recent_ssl and (c_last.get("close", 0) > c_last.get("open", 0) or (l_wick / c_rng) >= 0.35))
+    if has_ssl_pump or (c_last.get("close", 0) < c_last.get("open", 0) and (l_wick / c_rng) >= 0.40):
         bearish_entry_zones = []
         bearish_score = min(bearish_score, 30)
         bearish_factors.append("[LIQUIDITY TRAP GUARD] SELL blocked: Sell-Side Liquidity swept / Heavy lower rejection wick. Risk of institutional rally.")
 
     # Opposing Order Block Clearance (Room-to-Run Protection):
-    # Prohibit entering BUY directly into unmitigated Supply Block within 1.2x min risk distance
+    # Prohibit entering BUY directly into unmitigated Supply Block if ceiling is within immediate collision buffer
+    ob_collision_buffer = max(pip_size * 4, min_risk_dist * 0.25)
     if nearest_supply and nearest_supply["bottom"] > current_price:
         dist_to_supply = nearest_supply["bottom"] - current_price
-        if dist_to_supply < min_risk_dist * 1.2:
+        if dist_to_supply < ob_collision_buffer:
             bullish_entry_zones = []
             bullish_score = min(bullish_score, 40)
-            bullish_factors.append(f"[OB OBSTACLE] BUY blocked: Unmitigated Supply OB at {nearest_supply['bottom']} blocks path to target")
+            bullish_factors.append(f"[OB OBSTACLE] BUY blocked: Supply OB at {nearest_supply['bottom']} blocks immediate path")
 
-    # Prohibit entering SELL directly into unmitigated Demand Block within 1.2x min risk distance
+    # Prohibit entering SELL directly into unmitigated Demand Block if floor is within immediate collision buffer
     if nearest_demand and nearest_demand["top"] < current_price:
         dist_to_demand = current_price - nearest_demand["top"]
-        if dist_to_demand < min_risk_dist * 1.2:
+        if dist_to_demand < ob_collision_buffer:
             bearish_entry_zones = []
             bearish_score = min(bearish_score, 40)
-            bearish_factors.append(f"[OB OBSTACLE] SELL blocked: Unmitigated Demand OB at {nearest_demand['top']} blocks path to target")
+            bearish_factors.append(f"[OB OBSTACLE] SELL blocked: Demand OB at {nearest_demand['top']} blocks immediate path")
 
     # Candlestick Rejection & Quality Verification:
-    # Do not enter against active high-momentum thrust candles
-    last_candle = candles[-1] if candles else {}
-    c_open = last_candle.get("open", 0.0)
-    c_close = last_candle.get("close", 0.0)
-    c_high = last_candle.get("high", 0.0)
-    c_low = last_candle.get("low", 0.0)
-    c_range = max(0.0001, c_high - c_low)
-
-    # For BUY: If candle is a heavy red candle (> 75% body) with no bottom wick, wait for rejection
-    if c_close < c_open and (c_open - c_close) > (c_range * 0.75):
-        bullish_entry_zones = []
-
-    # For SELL: If candle is a heavy green candle (> 75% body) with no top wick, wait for rejection
-    if c_close > c_open and (c_close - c_open) > (c_range * 0.75):
-        bearish_entry_zones = []
+    # Protect against entering against massive high-velocity opposite spike bars (> 2.2x average range with > 90% body)
+    c_open = c_last.get("open", 0.0)
+    c_close = c_last.get("close", 0.0)
+    if avg_bar_range > 0 and c_rng > (avg_bar_range * 2.2):
+        if c_close < c_open and (c_open - c_close) > (c_rng * 0.90):
+            bullish_entry_zones = []
+            bullish_factors.append("[SPIKE GUARD] Waiting for high-velocity downward spike candle to exhaust")
+        if c_close > c_open and (c_close - c_open) > (c_rng * 0.90):
+            bearish_entry_zones = []
+            bearish_factors.append("[SPIKE GUARD] Waiting for high-velocity upward spike candle to exhaust")
 
     # Spread Guardrail: For XAU/USD, block automatic signal generation if live spread exceeds 4.5 pips
     is_gold = "XAU" in canon

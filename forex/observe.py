@@ -546,14 +546,21 @@ class SignalStateManager:
                         candidate_action = None
 
         # Strict Technical Bias & HTF Alignment Gate (Card 2 vs Card 3 Consistency)
-        # Never generate BUY when 15m HTF or 20-period Technical Bias is BEARISH
-        # Never generate SELL when 15m HTF or 20-period Technical Bias is BULLISH
+        # 15m HTF Trend is a HARD veto for both BUY and SELL.
+        # Card 2 Technical Bias vetoes candidate actions unless candidate is Elite A+ (score >= 80)
         scan_dir = (scan_info or {}).get("direction", "NEUTRAL") if scan_info else "NEUTRAL"
         htf_dir = (confluence_signal or {}).get("htf_trend", "NEUTRAL") if confluence_signal else "NEUTRAL"
-        if candidate_action == "BUY" and (scan_dir == "BEARISH" or htf_dir == "BEARISH"):
-            candidate_action = None
-        elif candidate_action == "SELL" and (scan_dir == "BULLISH" or htf_dir == "BULLISH"):
-            candidate_action = None
+        cand_score = candidate_score or (confluence_signal or {}).get("confluence_score", 0) or 0
+        if candidate_action == "BUY":
+            if htf_dir == "BEARISH":
+                candidate_action = None
+            elif scan_dir == "BEARISH" and cand_score < 80:
+                candidate_action = None
+        elif candidate_action == "SELL":
+            if htf_dir == "BULLISH":
+                candidate_action = None
+            elif scan_dir == "BULLISH" and cand_score < 80:
+                candidate_action = None
 
         if candidate_action in ("BUY", "SELL") and candle_is_closed:
             canon = normalize_symbol(canon)
