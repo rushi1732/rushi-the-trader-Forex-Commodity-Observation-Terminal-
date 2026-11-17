@@ -943,7 +943,6 @@ def observe_pair(
             "liquidity": confluence_sig.get("components", {}).get("liquidity"),
             "ict": confluence_sig.get("components", {}).get("ict"),
             "divergence": confluence_sig.get("components", {}).get("divergence"),
-            "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
         }
 
     if not is_fresh:
@@ -979,7 +978,6 @@ def observe_pair(
             "liquidity": confluence_sig.get("components", {}).get("liquidity"),
             "ict": confluence_sig.get("components", {}).get("ict"),
             "divergence": confluence_sig.get("components", {}).get("divergence"),
-            "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
         }
 
     if len(candles) < 15:
@@ -1229,7 +1227,6 @@ def observe_pair(
         "liquidity": confluence_sig.get("components", {}).get("liquidity"),
         "ict": confluence_sig.get("components", {}).get("ict"),
         "divergence": confluence_sig.get("components", {}).get("divergence"),
-        "smt": confluence_sig.get("components", {}).get("smt") or confluence_sig.get("smt"),
         "paper_simulation": paper_simulation,
         "auto_signal": auto_sig,
         "paper_mode": True,

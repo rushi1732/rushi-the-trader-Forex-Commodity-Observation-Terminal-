@@ -874,23 +874,17 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("localStorage.setItem('voiceAlertsEnabled'", html)
 
     def test_opening_welcome_animation_and_greeting(self):
-        """Verify the opening animation overlay, time-of-day greeting, and welcome voice engine."""
+        """Verify the opening welcome curtain animation and blockers are completely removed for instant open access."""
         url = f"http://127.0.0.1:{self.port}/"
         with urllib.request.urlopen(url, timeout=5) as resp:
             html = resp.read().decode("utf-8")
 
-        self.assertIn("welcomeFullPageOverlay", html)
-        self.assertIn("welcome-fullpage-card", html)
-        self.assertIn("welcomeGreetingText", html)
-        self.assertIn("getTimeOfDayGreeting", html)
-        self.assertIn("triggerWelcomeExperience", html)
-        self.assertIn("dismissCurtainScreen", html)
-        self.assertIn("Good Morning", html)
-        self.assertIn("Good Afternoon", html)
-        self.assertIn("Good Evening", html)
-        self.assertIn("welcome-voice-indicator", html)
-        self.assertIn("sound-wave-bars", html)
-        self.assertIn("Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal", html)
+        self.assertNotIn("welcomeFullPageOverlay", html)
+        self.assertNotIn("welcome-fullpage-card", html)
+        self.assertNotIn("triggerWelcomeExperience", html)
+        self.assertNotIn("dismissCurtainScreen", html)
+        self.assertNotIn("deviceLockOverlay", html)
+        self.assertNotIn("vipActivationModal", html)
 
 
     def test_google_site_verification(self):
@@ -981,7 +975,7 @@ class TestForexDashboard(unittest.TestCase):
         with urllib.request.urlopen(url_home, timeout=5) as resp:
             html = resp.read().decode("utf-8")
         self.assertIn("playRealAudio", html)
-        self.assertIn("/audio/welcome_morning.mp3", html)
+        self.assertIn("/audio/signal_buy_gold.mp3", html)
 
     def test_service_worker_and_mobile_notification_endpoints(self):
         """Verify Service Worker endpoint and Mobile Notification Bar features."""

@@ -27,7 +27,7 @@ from .smc import analyze_smc
 from .ict import analyze_ict
 from .liquidity import analyze_liquidity
 from .divergence import detect_divergence
-from .smt import analyze_institutional_triad_smt, aggregate_5m_to_15m
+from .smt import aggregate_5m_to_15m
 from .data import fetch_chart, MAJOR_PAIRS
 from .backtest import calculate_ema
 
@@ -351,27 +351,6 @@ def evaluate_confluence_signal(
             bearish_score += div_boost
             bearish_factors.append(f"[RSI DIVERGENCE] {div_desc}")
 
-    # Factor H: Institutional-Grade Multi-Factor Triad SMT & HTF Key Levels
-    smt_data = analyze_institutional_triad_smt(
-        primary_symbol=canon,
-        primary_candles_5m=candles,
-        primary_candles_15m=candles_15m,
-        live_spread_pips=live_spread_pips,
-        offline_data=offline_data,
-        now_ts=now_utc.timestamp(),
-    )
-    if smt_data.get("tier") in ("TRIAD SMT (A+)", "PAIR SMT (A)"):
-        smt_bias = smt_data.get("bias")
-        smt_bonus = smt_data.get("confluence_bonus", 0)
-        smt_desc = smt_data.get("summary_en", "")
-
-        if smt_bias == "BUY":
-            bullish_score += smt_bonus
-            bullish_factors.append(f"[TRIAD SMT] {smt_desc}")
-        elif smt_bias == "SELL":
-            bearish_score += smt_bonus
-            bearish_factors.append(f"[TRIAD SMT] {smt_desc}")
-
     # 2.5 Entry Zone Verification
     # Identify valid institutional entry zones from SMC, ICT, Fibonacci, and Liquidity
     bullish_entry_zones = []
@@ -423,15 +402,6 @@ def evaluate_confluence_signal(
             bullish_entry_zones.append(f"RSI Hidden Bullish Continuation Zone at {current_price:.{decimals}f}")
         elif div_data.get("type") == "HIDDEN_BEARISH" and not htf_bullish and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
             bearish_entry_zones.append(f"RSI Hidden Bearish Continuation Zone at {current_price:.{decimals}f}")
-
-    # F. Triad SMT CISD Displacement Zone (When 5m displacement candle close is confirmed with HTF Context & Premium/Discount Alignment)
-    if smt_data.get("tier") in ("TRIAD SMT (A+)", "PAIR SMT (A)") and smt_data.get("displacement", {}).get("displacement_confirmed"):
-        has_htf = smt_data.get("htf_context", {}).get("has_context", False)
-        # SMT CISD requires HTF context and dealing range alignment (Discount for BUY, Premium for SELL)
-        if smt_data.get("bias") == "BUY" and has_htf and not htf_bearish and (zone == "DISCOUNT" or in_ote or inside_ob or nearest_demand):
-            bullish_entry_zones.append(f"Triad SMT CISD Displacement Zone at {current_price:.{decimals}f}")
-        elif smt_data.get("bias") == "SELL" and has_htf and not htf_bullish and (zone == "PREMIUM" or in_ote or inside_ob or nearest_supply):
-            bearish_entry_zones.append(f"Triad SMT CISD Displacement Zone at {current_price:.{decimals}f}")
 
     # Hard Trend Filter & Veto check:
     # 1. HARD HTF MACRO TREND VETO:
@@ -564,9 +534,7 @@ def evaluate_confluence_signal(
         else:
             active_factors = base_factors
 
-    if confluence_score >= 90 and smt_data.get("is_sniper_grade"):
-        grade = "A+ (Sniper Institutional SMT)"
-    elif confluence_score >= 80:
+    if confluence_score >= 80:
         grade = "A+ (Elite Institutional)"
     elif confluence_score >= 65:
         grade = "A (High Probability)"
@@ -716,7 +684,7 @@ def evaluate_confluence_signal(
             "rr_ratio_tp1": rr_tp1,
             "rr_ratio_tp2": rr_tp2,
             "rr_ratio_tp3": rr_tp3,
-            "priority_target": "TP2 (3.5R+ Sniper Target Prioritized)" if (grade.startswith("A+ (Sniper") or smt_data.get("is_sniper_grade")) else "TP1 (2.0R Baseline)",
+            "priority_target": "TP1 (2.0R Baseline)",
         },
         "confluence_factors": active_factors,
         "components": {
@@ -725,9 +693,7 @@ def evaluate_confluence_signal(
             "liquidity": liq_data,
             "ict": ict_data,
             "divergence": div_data,
-            "smt": smt_data,
         },
-        "smt": smt_data,
         "timestamp_et": now_et.strftime("%Y-%m-%d %H:%M:%S ET"),
         "timestamp_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
     }

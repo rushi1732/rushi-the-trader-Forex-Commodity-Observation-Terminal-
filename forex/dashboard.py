@@ -1827,7 +1827,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             gap: 8px;
         }
 
-        .strategies-grid-9 {
+        .strategies-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
             gap: 10px;
@@ -1969,214 +1969,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             color: var(--text-primary);
         }
 
-        /* -------------------------------------------------------------
-           Full-Screen Welcome Curtain Screen & Slide-Up Reveal
-           ------------------------------------------------------------- */
-        .welcome-fullpage-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            width: 100%;
-            height: 100%;
-            height: 100dvh;
-            background: radial-gradient(circle at 50% 35%, #131c2e 0%, #080c14 75%, #04060a 100%);
-            z-index: 999999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            box-sizing: border-box;
-            transform: translateY(0%);
-            transition: transform 0.85s cubic-bezier(0.77, 0, 0.175, 1);
-            will-change: transform;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .welcome-fullpage-overlay.slide-up {
-            transform: translateY(-100%);
-            opacity: 0;
-            pointer-events: none !important;
-            transition: transform 0.75s cubic-bezier(0.77, 0, 0.175, 1), opacity 0.4s ease;
-        }
-
-        .welcome-fullpage-card {
-            background: rgba(17, 24, 39, 0.90);
-            border: 1px solid rgba(56, 189, 248, 0.4);
-            border-radius: 20px;
-            padding: 42px 48px;
-            max-width: 620px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.9), 0 0 60px rgba(56, 189, 248, 0.2);
-            position: relative;
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-        }
-
-        .welcome-fullpage-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #38bdf8, #ec4899, #10b981, #f59e0b, #38bdf8);
-            background-size: 200% 100%;
-            animation: welcomeBarShimmer 3s linear infinite;
-        }
-
-        @keyframes welcomeBarShimmer {
-            0% { background-position: 0% 50%; }
-            100% { background-position: 200% 50%; }
-        }
-
-        .welcome-logo-circle {
-            width: 86px;
-            height: 86px;
-            margin: 0 auto 18px auto;
-            border-radius: 50%;
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(236, 72, 153, 0.25));
-            border: 2.5px solid rgba(56, 189, 248, 0.85);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--accent-blue);
-            box-shadow: 0 0 35px rgba(56, 189, 248, 0.45);
-            animation: welcomePulse 2s ease-in-out infinite alternate;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .welcome-logo-circle img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 50%;
-            display: block;
-        }
-
-        @keyframes welcomePulse {
-            0% { transform: scale(1); box-shadow: 0 0 18px rgba(56, 189, 248, 0.25); }
-            100% { transform: scale(1.06); box-shadow: 0 0 40px rgba(236, 72, 153, 0.4); }
-        }
-
-        .welcome-brand-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(56, 189, 248, 0.12);
-            border: 1px solid rgba(56, 189, 248, 0.35);
-            color: #38bdf8;
-            padding: 6px 14px;
-            border-radius: 999px;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            margin-bottom: 16px;
-        }
-
-        .welcome-greeting-title {
-            font-size: 28px;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            color: #ffffff;
-            margin-bottom: 10px;
-            line-height: 1.25;
-        }
-
-        .welcome-greeting-title span.greeting-highlight {
-            background: linear-gradient(135deg, #38bdf8, #f472b6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .welcome-terminal-name {
-            font-size: 16px;
-            font-weight: 600;
-            color: #cbd5e1;
-            letter-spacing: 0.02em;
-            margin-bottom: 22px;
-            line-height: 1.5;
-        }
-
-        .welcome-terminal-name strong {
-            color: #38bdf8;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-        }
-
-        .welcome-voice-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            background: rgba(236, 72, 153, 0.15);
-            border: 1px solid rgba(236, 72, 153, 0.4);
-            padding: 10px 20px;
-            border-radius: 10px;
-            color: #f472b6;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 24px;
-        }
-
-        .sound-wave-bars {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            height: 16px;
-        }
-
-        .sound-wave-bars span {
-            width: 3px;
-            background: #f472b6;
-            border-radius: 2px;
-            animation: soundWaveAnim 1.2s ease-in-out infinite alternate;
-        }
-        .sound-wave-bars span:nth-child(1) { height: 6px; animation-delay: 0.1s; }
-        .sound-wave-bars span:nth-child(2) { height: 16px; animation-delay: 0.3s; }
-        .sound-wave-bars span:nth-child(3) { height: 10px; animation-delay: 0.2s; }
-        .sound-wave-bars span:nth-child(4) { height: 14px; animation-delay: 0.4s; }
-        .sound-wave-bars span:nth-child(5) { height: 8px; animation-delay: 0.25s; }
-
-        @keyframes soundWaveAnim {
-            0% { transform: scaleY(0.3); }
-            100% { transform: scaleY(1.3); }
-        }
-
-        .welcome-fullpage-hint {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 14px;
-            letter-spacing: 0.03em;
-        }
-
-        .welcome-enter-btn {
-            background: linear-gradient(135deg, #0284c7, #2563eb);
-            color: #ffffff;
-            border: 1px solid rgba(56, 189, 248, 0.5);
-            padding: 12px 28px;
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 20px rgba(2, 132, 199, 0.4);
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .welcome-enter-btn:hover {
-            background: linear-gradient(135deg, #0369a1, #1d4ed8);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 25px rgba(2, 132, 199, 0.5);
-        }
-
         /* Mobile Touch & High-Speed Responsive Styling */
         html {
             overflow-x: hidden;
@@ -2200,33 +1992,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         @media (max-width: 640px) {
             .container { padding: 10px 8px; }
-            .welcome-fullpage-overlay {
-                padding: 16px;
-            }
-            .welcome-fullpage-card {
-                padding: 28px 16px;
-                border-radius: 16px;
-                max-width: 360px;
-            }
-            .welcome-logo-circle {
-                width: 72px;
-                height: 72px;
-                margin-bottom: 12px;
-            }
-            .welcome-greeting-title {
-                font-size: 20px;
-                line-height: 1.3;
-            }
-            .welcome-terminal-name {
-                font-size: 12px;
-                margin-bottom: 14px;
-            }
-            .welcome-enter-btn {
-                width: 100%;
-                padding: 14px 18px;
-                font-size: 14px;
-                justify-content: center;
-            }
             .card {
                 padding: 14px 12px;
                 border-radius: 8px;
@@ -2269,52 +2034,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <audio id="audioSignalSellGold" src="/audio/signal_sell_gold.mp3" preload="auto" playsinline style="display:none;"></audio>
     <audio id="audioSignalBuyBtc" src="/audio/signal_buy_btc.mp3" preload="auto" playsinline style="display:none;"></audio>
     <audio id="audioSignalSellBtc" src="/audio/signal_sell_btc.mp3" preload="auto" playsinline style="display:none;"></audio>
-    <audio id="audioWelcomeMorning" src="/audio/welcome_morning.mp3" preload="auto" playsinline style="display:none;"></audio>
-    <audio id="audioWelcomeAfternoon" src="/audio/welcome_afternoon.mp3" preload="auto" playsinline style="display:none;"></audio>
-    <audio id="audioWelcomeEvening" src="/audio/welcome_evening.mp3" preload="auto" playsinline style="display:none;"></audio>
-    <audio id="audioWelcomeNight" src="/audio/welcome_night.mp3" preload="auto" playsinline style="display:none;"></audio>
     <audio id="audioTestVoice" src="/audio/test_voice.mp3" preload="auto" playsinline style="display:none;"></audio>
     <audio id="audioAlertsActive" src="/audio/voice_alerts_active.mp3" preload="auto" playsinline style="display:none;"></audio>
-
-    <!-- Full-Screen Welcome Curtain Screen -->
-    <div id="welcomeFullPageOverlay" class="welcome-fullpage-overlay" onclick="dismissCurtainScreen()">
-        <div class="welcome-fullpage-card" onclick="event.stopPropagation()">
-            <button onclick="event.stopPropagation(); dismissCurtainScreen();" style="position:absolute; top:16px; right:18px; background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:6px;" title="Skip and open terminal">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-            <div class="welcome-logo-circle">
-                <img src="/rushi_profile.jpg" alt="RUSHI THE TRADER" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <svg style="display:none;" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
-            </div>
-            <div class="welcome-brand-badge">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                <span>Institutional Market Terminal</span>
-            </div>
-            <div id="welcomeGreetingText" class="welcome-greeting-title">
-                Hello, <span class="greeting-highlight">Good Evening Sir!</span>
-            </div>
-            <div class="welcome-terminal-name">
-                Welcome to <strong>RUSHI THE TRADER</strong><br>
-                Forex & Commodity Observation Terminal
-            </div>
-            <div class="welcome-voice-indicator">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                <span id="welcomeSpeechLabel">Speaking Welcome Greeting...</span>
-                <div class="sound-wave-bars">
-                    <span></span><span></span><span></span><span></span><span></span>
-                </div>
-            </div>
-            <div>
-                <button id="welcomeEnterBtn" class="welcome-enter-btn" onclick="event.stopPropagation(); dismissCurtainScreen();">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    <span id="welcomeBtnText">Enter Terminal (डॅशबोर्ड सुरू करा)</span>
-                </button>
-            </div>
-            <div class="welcome-fullpage-hint">
-                Tap button or anywhere to open terminal immediately (टॅप करून लगेच सुरू करा)
-            </div>
-        </div>
-    </div>
 
     <div class="safety-ribbon">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -2323,7 +2044,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <div class="container">
         <header>
-            <div class="brand-block" onclick="replayWelcomeGreeting()" style="cursor:pointer;" title="Click to replay Welcome Greeting Voice">
+            <div class="brand-block">
                 <div class="brand-icon">
                     <img src="/rushi_profile.jpg" alt="RUSHI THE TRADER" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                     <svg style="display:none;" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 6 4 6h-8l4 6"/></svg>
@@ -2377,11 +2098,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <button id="btnSupabase" class="btn" onclick="openSupabaseModal()" title="Supabase PostgreSQL Cloud Database for Device Links, Signal Tracker & Journal" style="border-color:rgba(59,130,246,0.5); color:#60a5fa; display:inline-flex; align-items:center; gap:6px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
                     Supabase: <span id="supabaseStatusLabel" style="font-weight:700;">Connect</span>
-                </button>
-
-                <button id="btnAdminManager" class="btn" onclick="openLicenseModal()" title="VIP 1-Device Link Manager" style="border-color:rgba(245,158,11,0.6); color:#fbbf24; display:none; align-items:center; gap:6px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    <span>1-Device Links</span>
                 </button>
 
                 <button class="btn" onclick="fetchObservation(); fetchChart();">
@@ -2671,21 +2387,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         </div>
                     </div>
 
-                    <!-- 9-Strategy Institutional Signal Deep Dive Explanation Panel -->
+                    <!-- 7-Strategy Institutional Signal Deep Dive Explanation Panel -->
                     <div id="matrix9StrategiesPanel" class="matrix-strategies-panel panel-wait">
                         <div class="strategies-panel-header">
                             <span class="strategies-panel-title">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                                🎯 ९ संस्थात्मक स्ट्रॅटेजींचे सखोल विश्लेषण (9-Strategy Institutional Signal Deep Dive)
+                                🎯 ७ संस्थात्मक स्ट्रॅटेजींचे सखोल विश्लेषण (7-Strategy Institutional Signal Deep Dive)
                             </span>
                             <span id="matrixStrategiesSignalBadge" class="badge badge-amber">WAITING FOR CONFLUENCE</span>
                         </div>
-                        <div id="matrixStrategiesGrid" class="strategies-grid-9">
+                        <div id="matrixStrategiesGrid" class="strategies-grid">
                             <!-- Populated dynamically via updateStrategyMatrix() -->
                         </div>
                     </div>
 
-                    <!-- 9-Pillar Institutional Strategy Verification Checklist -->
+                    <!-- 7-Pillar Institutional Strategy Verification Checklist -->
                     <div class="checklist-grid">
                         <!-- Pillar 1: SMC Market Structure -->
                         <div class="check-card">
@@ -2784,34 +2500,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 Trend Continuation (Price HL / RSI LL or LH / HH)
                             </div>
                         </div>
-
-                        <!-- Pillar 8: Inter-Market Triad SMT (5M) -->
-                        <div class="check-card">
-                            <div class="check-card-header">
-                                <span class="check-card-title">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 12l-4-4-4 4M12 16V8"/></svg>
-                                    8. Inter-Market Triad SMT (5M)
-                                </span>
-                                <span id="chkSmtStatus" class="badge badge-blue">SCANNING</span>
-                            </div>
-                            <div id="chkSmtDetail" class="check-card-detail">
-                                Scanning XAU vs XAG + DXY or BTC vs ETH + QQQ
-                            </div>
-                        </div>
-
-                        <!-- Pillar 9: CISD + FVG Displacement & Spread Guard -->
-                        <div class="check-card">
-                            <div class="check-card-header">
-                                <span class="check-card-title">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-                                    9. CISD + FVG Displacement
-                                </span>
-                                <span id="chkDispStatus" class="badge badge-green">SAFE (<4.5p)</span>
-                            </div>
-                            <div id="chkDispDetail" class="check-card-detail">
-                                5M displacement body close & spread safety check
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Key Strategy Decision Levels -->
@@ -2866,10 +2554,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
                                 <strong style="color:var(--text-primary);">५. आरएसआय हिडन डायव्हर्जन्स (Trend Continuation):</strong>
                                 <p style="font-size:11px; margin-top:4px;">अपट्रेंडमध्ये किंमत <strong>Higher Low (HL)</strong> बनवते पण RSI <strong>Lower Low (LL)</strong> बनवतो, तेव्हा तो <strong>Hidden Bullish Divergence</strong> असतो (ट्रेंड चालू राहण्याचा मजबूत संकेत). डाऊनट्रेंडमध्ये किंमत <strong>Lower High (LH)</strong> आणि RSI <strong>Higher High (HH)</strong> बनवतो तेव्हा <strong>Hidden Bearish Divergence</strong> होतो.</p>
-                            </div>
-                            <div style="background:var(--bg-card); padding:10px 14px; border-radius:6px; border:1px solid var(--border-subtle);">
-                                <strong style="color:var(--text-primary);">६. इंटर-मार्केट ट्रायड SMT व CISD (Institutional SMT):</strong>
-                                <p style="font-size:11px; margin-top:4px;">गोल्ड (XAU), सिल्व्हर (XAG) आणि डॉलर इंडेक्स (DXY) यांच्यातील विसंगती <strong>SMT Divergence</strong> दर्शवते. सिल्व्हरने नवीन High बनवला पण गोल्डने बनवला नाही, तर स्मार्ट मनी विक्री करत आहे हे सिद्ध होते. <strong>5M CISD (Change in State of Delivery)</strong> व FVG डिस्प्लेसमेंटनंतर 90%+ A+ स्नायपर ट्रेड कन्फर्म होतो.</p>
                             </div>
                         </div>
                     </details>
@@ -3439,7 +3123,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
 
             <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px; line-height:1.5;">
-                Supabase मुळे तुमचे <strong>1-Device Link डेटा</strong>, <strong>Automatic Signal Engine ट्रेड्स</strong>, आणि <strong>Paper Observation Journal</strong> क्लाउडवर कायमचे सुरक्षित राहतात. Vercel रीस्टार्ट झाले तरी डेटा कधीही डिलीट होणार नाही.
+                Supabase मुळे तुमचे <strong>Automatic Signal Engine ट्रेड्स</strong>, आणि <strong>Paper Observation Journal</strong> क्लाउडवर कायमचे सुरक्षित राहतात. Vercel रीस्टार्ट झाले तरी डेटा कधीही डिलीट होणार नाही.
             </p>
 
             <div class="form-group" style="margin-bottom:12px;">
@@ -3468,10 +3152,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <span>क्लाउड स्थिती (Cloud Status):</span>
                     <span id="sbStatusText" style="font-weight:700; color:#fbbf24;">Checking...</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span>1-Device Links Sync:</span>
-                    <span id="sbSyncLicenses" style="color:var(--text-muted);">forex_licenses</span>
-                </div>
                 <div style="display:flex; justify-content:space-between;">
                     <span>Signal Tracker & Journal Sync:</span>
                     <span id="sbSyncJournal" style="color:var(--text-muted);">forex_journal</span>
@@ -3486,167 +3166,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div style="display:flex; gap:8px;">
                     <button class="btn" onclick="testSupabase()" style="font-size:11px;">Test Connection</button>
                     <button class="btn btn-primary" onclick="saveSupabaseConfigModal()" style="font-size:11px;">Save & Sync Cloud</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 1-Device Security Enforcement Fullscreen Lock Overlay -->
-    <div id="deviceLockOverlay" style="display:none; position:fixed; inset:0; z-index:999999; background:radial-gradient(circle at center, rgba(30,10,18,0.98) 0%, rgba(10,12,18,0.99) 100%); backdrop-filter:blur(14px); padding:20px; overflow-y:auto; align-items:center; justify-content:center;">
-        <div style="background:var(--bg-card); border:2px solid rgba(244,63,94,0.6); border-radius:12px; max-width:480px; width:100%; padding:28px; box-shadow:0 25px 60px rgba(244,63,94,0.25); text-align:center;">
-            <div style="width:64px; height:64px; margin:0 auto 16px; border-radius:50%; background:rgba(244,63,94,0.15); border:2px solid var(--accent-rose); display:flex; align-items:center; justify-content:center; color:var(--accent-rose);">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.5"/></svg>
-            </div>
-            
-            <h2 id="lockOverlayTitle" style="color:var(--accent-rose); font-size:20px; font-weight:800; margin-bottom:8px; letter-spacing:0.5px;">
-                डिव्हाइस लॉक: ॲक्सेस नाकारला!
-            </h2>
-            <div id="lockOverlaySubtitle" style="color:var(--text-secondary); font-size:13px; line-height:1.6; margin-bottom:18px;">
-                हा ॲक्सेस लिंक आधीच दुसऱ्या मोबाईलवर चालू आहे. सुरक्षेच्या कारणास्तव एका लिंकवर फक्त १ च मोबाईल वापरण्याची परवानगी आहे.
-            </div>
-
-            <div style="background:rgba(15,23,42,0.8); border:1px solid rgba(244,63,94,0.3); border-radius:8px; padding:14px; text-align:left; font-size:12px; margin-bottom:20px; line-height:1.7;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:6px;">
-                    <span style="color:var(--text-muted);">तुमची VIP Key:</span>
-                    <strong id="lockKeyDisplay" style="font-family:var(--font-mono); color:#fbbf24;">VIP-XXXX-XXXX</strong>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:6px;">
-                    <span style="color:var(--text-muted);">नोंदणीकृत फोन:</span>
-                    <span id="lockRegisteredDevice" style="font-weight:600; color:var(--accent-green);">Registered Phone</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:6px;">
-                    <span style="color:var(--text-muted);">सध्याचा फोन:</span>
-                    <span id="lockCurrentDevice" style="font-weight:600; color:var(--accent-rose);">Unregistered Phone</span>
-                </div>
-                <div style="display:flex; justify-content:space-between;">
-                    <span style="color:var(--text-muted);">सुरक्षा स्थिती:</span>
-                    <span id="lockReasonDisplay" style="color:var(--accent-rose); font-weight:700;">SINGLE-DEVICE ENFORCED</span>
-                </div>
-            </div>
-
-            <div style="display:flex; flex-direction:column; gap:10px;">
-                <a id="btnLockWhatsAppHelp" href="https://wa.me/919373024888" target="_blank" class="btn" style="background:#25D366; color:#000; font-weight:700; border:none; justify-content:center; padding:12px; display:inline-flex; align-items:center; gap:8px; text-decoration:none; border-radius:6px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                    <span>ॲडमिनशी संपर्क साधा (WhatsApp वर अनलॉक करा)</span>
-                </a>
-
-                <button class="btn" onclick="promptSwitchKey()" style="background:transparent; border-color:var(--border-color); color:var(--text-secondary); justify-content:center; padding:10px;">
-                    वेगळी VIP Key किंवा Admin Login वापरा
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- VIP Activation Modal (Prompt for Key if opened directly without key) -->
-    <div id="vipActivationModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 440px; text-align:center;">
-            <div style="width:52px; height:52px; margin:0 auto 12px; border-radius:50%; background:rgba(245,158,11,0.15); border:2px solid #fbbf24; display:flex; align-items:center; justify-content:center; color:#fbbf24;">
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            </div>
-            <h3 style="font-size:18px; margin-bottom:8px; font-weight:700;">VIP Trade Terminal ॲक्सेस</h3>
-            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px; line-height:1.5;">
-                कृपया तुमचा अधिकृत VIP ॲक्सेस की (Key) प्रविष्ट करा. प्रत्येक की फक्त एकाच मोबाईल किंवा कॉम्प्युटरवर लॉक होते.
-            </p>
-
-            <div class="form-group" style="margin-bottom:14px; text-align:left;">
-                <label style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">VIP License Key / Master Key</label>
-                <input id="vipKeyManualInput" type="text" class="form-control" placeholder="उदा. VIP-XXXX-XXXX किंवा RUSHI-ADMIN-777" style="font-family:var(--font-mono); font-size:13px; text-transform:uppercase; text-align:center;">
-                <div id="vipKeyInputError" style="color:var(--accent-rose); font-size:11px; margin-top:4px; display:none;"></div>
-            </div>
-
-            <button class="btn btn-primary" onclick="submitManualVipKey()" style="width:100%; justify-content:center; padding:12px; font-weight:700; margin-bottom:10px;">
-                ॲक्सेस अनलॉक करा (Verify & Lock Device)
-            </button>
-
-            <a href="https://wa.me/919373024888?text=Hello%20Rushi,%20I%20want%20to%20get%20access%20to%20VIP%20Trading%20Signals." target="_blank" style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#25D366; text-decoration:none; margin-top:6px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                <span>नवीन VIP Key मिळवण्यासाठी WhatsApp वर मेसेज करा</span>
-            </a>
-        </div>
-    </div>
-
-    <!-- Admin 1-Device License Manager Modal -->
-    <div id="licenseManagerModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 760px; max-height: 90vh; overflow-y: auto;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">
-                <h3 style="font-size:16px; display:flex; align-items:center; gap:8px; margin:0;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    <span>VIP 1-Device Link Manager (Admin Portal)</span>
-                </h3>
-                <button class="btn" onclick="closeLicenseModal()" style="padding:4px 8px;">✕</button>
-            </div>
-
-            <!-- Create New 1-Device Link Section -->
-            <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:20px;">
-                <h4 style="font-size:13px; color:var(--text-primary); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    नवीन १-डिव्हाइस लिंक तयार करा (Generate 1-Device Link)
-                </h4>
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px;">
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label>ग्राहकाचे नाव (Client Name)</label>
-                        <input id="licClientName" type="text" class="form-control" placeholder="उदा. Rahul Jadhav">
-                    </div>
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label>कालावधी दिवस (Days, 0 = Lifetime)</label>
-                        <input id="licDurationDays" type="number" class="form-control" value="30">
-                    </div>
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label>कस्टम की (वैकल्पिक / Optional Key)</label>
-                        <input id="licCustomKey" type="text" class="form-control" placeholder="उदा. RAHUL-VIP-77">
-                    </div>
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label>नोंद / मोबाईल (Note / Mobile No)</label>
-                        <input id="licNote" type="text" class="form-control" placeholder="उदा. Paid via PhonePe">
-                    </div>
-                </div>
-                <div style="display:flex; justify-content:flex-end; gap:8px;">
-                    <button class="btn btn-primary" onclick="generateClientLicense()" style="display:inline-flex; align-items:center; gap:6px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                        १-डिव्हाइस लिंक तयार करा (Generate Link)
-                    </button>
-                </div>
-
-                <!-- Generated Link Alert Box -->
-                <div id="newLicenseResultBox" style="display:none; margin-top:14px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.4); border-radius:6px; padding:12px;">
-                    <div style="font-size:12px; color:var(--accent-green); font-weight:700; margin-bottom:6px;">
-                        लिंक यशस्वीरित्या तयार झाली! (पहिल्यांदा ज्या मोबाईलवर उघडेल, तिथेच कायमची लॉक होईल)
-                    </div>
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <input id="generatedLinkInput" type="text" readonly class="form-control" style="font-family:var(--font-mono); font-size:12px; background:var(--bg-card);">
-                        <button class="btn" onclick="copyGeneratedLink()" style="white-space:nowrap;">Copy Link</button>
-                        <button class="btn" onclick="shareViaWhatsApp()" style="background:#25D366; color:#000; font-weight:700; border:none; white-space:nowrap;">WhatsApp</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Active Licenses Table -->
-            <div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h4 style="font-size:13px; color:var(--text-primary); margin:0;">सक्रिय ग्राहक आणि डिव्हाइस यादी (Active Clients & Bound Devices)</h4>
-                    <button class="btn" onclick="loadAdminLicenses()" style="padding:4px 8px; font-size:11px;">
-                        यादी रिफ्रेश करा (Refresh)
-                    </button>
-                </div>
-
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
-                        <thead>
-                            <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted);">
-                                <th style="padding:8px 6px;">ग्राहक (Client)</th>
-                                <th style="padding:8px 6px;">Key</th>
-                                <th style="padding:8px 6px;">स्थिती (Status)</th>
-                                <th style="padding:8px 6px;">लॉक डिव्हाइस (Bound Device)</th>
-                                <th style="padding:8px 6px;">कालबाह्य (Expires)</th>
-                                <th style="padding:8px 6px; text-align:right;">ॲक्शन (Actions)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="licenseTableBody">
-                            <tr>
-                                <td colspan="6" style="padding:16px; text-align:center; color:var(--text-muted);">लोड होत आहे...</td>
-                            </tr>
-                        </tbody>
-                    </table>
                 </div>
             </div>
         </div>
@@ -4395,7 +3914,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const box = document.getElementById('matrixDecisionBox');
             const actionEl = document.getElementById('matrixActionLabel');
             const summaryEl = document.getElementById('matrixDecisionSummary');
-            const smt = data.smt || (confSig.components && confSig.components.smt) || {};
 
             if (box && actionEl && summaryEl) {
                 const factorListHtml = factors.length ? ('<ul style="margin:6px 0 6px 18px; font-size:11px;">' + factors.map(f => `<li>${f}</li>`).join('') + '</ul>') : '';
@@ -4404,30 +3922,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     box.className = 'decision-box buy-active';
                     actionEl.innerHTML = `<span class="pulse-dot green"></span> BUY SIGNAL CONFIRMED (बाय सिग्नल सक्रिय)  -  ${score}% [${grade}]`;
                     actionEl.style.color = '#34d399';
-                    const smtNote = smt.summary_mr ? `<br>• <strong>इंटर-मार्केट ट्रायड SMT:</strong> ${smt.summary_mr}` : '';
                     summaryEl.innerHTML = `
-                        <strong>का BUY करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बुलिश असून किंमत Discount Zone मध्ये आहे. लिक्विडिटी हंट किंवा ऑर्डर ब्लॉक टेस्ट नंतर 5m कँडलने स्पष्ट कन्फर्मेशन दिले आहे.${smtNote}<br>
+                        <strong>का BUY करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बुलिश असून किंमत Discount Zone मध्ये आहे. लिक्विडिटी हंट किंवा ऑर्डर ब्लॉक टेस्ट नंतर 5m कँडलने स्पष्ट कन्फर्मेशन दिले आहे.<br>
                         ${factorListHtml}
                     `;
                 } else if (action === 'SELL') {
                     box.className = 'decision-box sell-active';
                     actionEl.innerHTML = `<span class="pulse-dot red"></span> SELL SIGNAL CONFIRMED (सेल सिग्नल सक्रिय)  -  ${score}% [${grade}]`;
                     actionEl.style.color = '#fb7185';
-                    const smtNote = smt.summary_mr ? `<br>• <strong>इंटर-मार्केट ट्रायड SMT:</strong> ${smt.summary_mr}` : '';
                     summaryEl.innerHTML = `
-                        <strong>का SELL करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बेअरिश असून किंमत Premium Zone मध्ये आहे. Buy-Side Liquidity (BSL) स्वीप किंवा Supply Order Block रिजेक्शन नंतर मजबूत सेल-ऑफ दिसत आहे.${smtNote}<br>
+                        <strong>का SELL करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बेअरिश असून किंमत Premium Zone मध्ये आहे. Buy-Side Liquidity (BSL) स्वीप किंवा Supply Order Block रिजेक्शन नंतर मजबूत सेल-ऑफ दिसत आहे.<br>
                         ${factorListHtml}
                     `;
                 } else {
                     box.className = 'decision-box wait-active';
                     actionEl.innerHTML = `<span class="pulse-dot amber"></span> NO SIGNAL (प्रतीक्षा करा - किंमत अद्याप एन्ट्री झोनमध्ये नाही)  -  Confluence: ${score}% [${grade}]`;
                     actionEl.style.color = '#fbbf24';
-                    const smtNote = smt.summary_mr ? `• <strong>इंटर-मार्केट ट्रायड SMT:</strong> ${smt.summary_mr}<br>` : `• <strong>इंटर-मार्केट ट्रायड SMT:</strong> 5M स्विंग्ज व 15M की-लेव्हल्स स्कॅन सुरू आहे.<br>`;
                     summaryEl.innerHTML = `
                         <strong>सध्या काय स्थिती आहे? (Current Status & Strategy Rationale):</strong> चालू भाव <strong>${curPrice ? curPrice.toFixed(decimals) : '--'}</strong> आहे. किंमत अद्याप स्ट्रॅटेजीनुसार व्हॅलिड एन्ट्री झोनमध्ये (Demand/Supply Order Block, FVG, OTE किंवा Breakout Level) पोहोचलेली नाही.<br>
                         • <strong>SMC स्ट्रक्चर:</strong> ${smc.trend || 'Ranging'} | <strong>झोन:</strong> ${(fib.zone) || 'Equilibrium'} (50% Eq: ${(fib.equilibrium || 0).toFixed(decimals)})<br>
                         • <strong>ऑर्डर ब्लॉक / FVG:</strong> डिमांड व सप्लाय झोनची चाचणी सुरू आहे.<br>
-                        ${smtNote}
                         • <strong>नियम:</strong> जोपर्यंत लाइव्ह मार्केट प्राईस अचूक एन्ट्री झोनमध्ये पोहोचत नाही, तोपर्यंत सिस्टम strictly 'NO SIGNAL' स्थितीत राहील.
                     `;
                 }
@@ -4474,10 +3988,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const bslTargetStr = liq.bsl_target ? Number(liq.bsl_target).toFixed(decimals) : '--';
                 const sslTargetStr = liq.ssl_target ? Number(liq.ssl_target).toFixed(decimals) : '--';
                 const curRsi = (div.rsi_current !== undefined) ? Number(div.rsi_current).toFixed(1) : (div.details && div.details.rsi_curr !== undefined ? Number(div.details.rsi_curr).toFixed(1) : '50.0');
-                const smtTier = smt.tier || 'SCANNING';
-                const smtBonus = smt.confluence_bonus || 0;
-                const disp = smt.displacement || {};
-                const liveSpread = (disp.live_spread_pips !== undefined) ? Number(disp.live_spread_pips).toFixed(1) : ((data.spread_pips !== undefined) ? Number(data.spread_pips).toFixed(1) : (isGold ? '2.5' : '1.8'));
                 const riskUsd = (autoSig.risk_usd !== undefined ? autoSig.risk_usd : 50.0).toFixed(2);
                 const slStr = autoSig.stop_loss ? Number(autoSig.stop_loss).toFixed(decimals) : '--';
                 const tp1Str = autoSig.target_tp1 ? Number(autoSig.target_tp1).toFixed(decimals) : '--';
@@ -4574,32 +4084,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             : (action === 'SELL'
                                 ? `चार्टवर किंमतीने लोअर हाय (LH) बनवला पण RSI वर गेला. हा <strong>Hidden Bearish Divergence</strong> सेलिंग प्रेशर टिकून असल्याचे आणि डाऊनट्रेंड चालू राहण्याचे स्पष्ट संकेत देतो.`
                                 : `RSI आणि प्राईस स्विंग्समधील छुपा डायव्हर्जन्स शोधण्याचे काम सुरू आहे. मोमेंटम आणि प्राईसमध्ये विसंगती येताच अलर्ट मिळेल.`)
-                    },
-                    // Strategy 8: Inter-Market Triad SMT
-                    {
-                        num: '८',
-                        title: 'Inter-Market Triad SMT Divergence (5M)',
-                        statusClass: action === 'BUY' ? 'status-buy' : (action === 'SELL' ? 'status-sell' : 'status-wait'),
-                        badgeHtml: action === 'BUY' ? `<span class="badge badge-green">${smtTier}</span>` : (action === 'SELL' ? `<span class="badge badge-rose">${smtTier}</span>` : `<span class="badge badge-blue">${smtTier}</span>`),
-                        metric: action === 'BUY' || action === 'SELL' ? `Triad Divergence | Bias: ${action} (+${smtBonus}%)` : 'Correlation Benchmark Scanning (XAU vs XAG/DXY | BTC vs ETH/QQQ)',
-                        expl: action === 'BUY'
-                            ? `गोल्ड vs सिल्व्हर (XAG) व डॉलर इंडेक्स (DXY) किंवा BTC vs ETH व QQQ यांच्यातील संस्थात्मक ट्रायड विसंगती: बेंचमार्कने नवा लो बनवला पण मुख्य ॲसेट तोडू शकला नाही. स्मार्ट मनी खरेदी करत असल्याने <strong>SMT A+ स्नायपर सिग्नल</strong> कन्फर्म झाला.`
-                            : (action === 'SELL'
-                                ? `इंटर-मार्केट बेअरिश SMT: बेंचमार्क ॲसेट नवीन हाय बनवत असताना मुख्य ॲसेट हायर हाय बनवण्यात अपयशी ठरला (Lower High). स्मार्ट मनी मोठ्या प्रमाणात विक्री करत असल्याचा हा अचूक पुरावा आहे.`
-                                : `5M स्विंग्ज आणि बेंचमार्क ॲसेट्स (XAG/USD, DXY, ETH, QQQ) यांचे रिअल-टाईम कोरिलेशन स्कॅन सुरू आहे. संस्थात्मक डायव्हर्जन्स येताच हा निकष सक्रिय होईल.`)
-                    },
-                    // Strategy 9: CISD + FVG Displacement & Spread Guard
-                    {
-                        num: '९',
-                        title: 'CISD + FVG Displacement & Spread Guard',
-                        statusClass: action === 'BUY' ? 'status-buy' : (action === 'SELL' ? 'status-sell' : 'status-wait'),
-                        badgeHtml: action === 'BUY' ? '<span class="badge badge-green">CISD CONFIRMED (SAFE)</span>' : (action === 'SELL' ? '<span class="badge badge-rose">CISD CONFIRMED (SAFE)</span>' : `<span class="badge badge-green">SAFE SPREAD (${liveSpread}p)</span>`),
-                        metric: action === 'BUY' || action === 'SELL' ? `5M Body Close Confirmed | Spread: ${liveSpread}p (< 4.5p)` : `Live Spread: ${liveSpread} pips | 5M Body Close Verification`,
-                        expl: action === 'BUY'
-                            ? `5M चेंज इन स्टेट ऑफ डिलिव्हरी (CISD) यशस्वी: बुलिश डिस्प्लेसमेंट कँडलच्या बॉडीने आधीच्या बेअरिश कँडलची बॉडी पूर्णपणे ओलांडून वर क्लोज दिला आहे (Wicks Ignored). लाइव्ह स्प्रेड <strong>${liveSpread} pips</strong> असून न्यूज स्पाइकची कोणतीही जोखीम नाही.`
-                            : (action === 'SELL'
-                                ? `5M बेअरिश CISD कन्फर्मेशन: बेअरिश कँडलने आधीच्या बुलिश कॅण्डलच्या बॉडीच्या खाली क्लोज दिली आहे. 3-कॅण्डल FVG डिस्प्लेसमेंट पूर्ण झाले असून स्प्रेड <strong>${liveSpread} pips</strong> वर सुरक्षित आहे.`
-                                : `5M कँडल बॉडी क्लोज आणि फेअर व्हॅल्यू गॅप (FVG) डिस्प्लेसमेंटची तपासणी सुरू आहे. विना-पुष्टीकरणाची (Blind Entry) कोणतीही घाई केली जात नाही.`)
                     }
                 ];
 
@@ -4764,64 +4248,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     chkDivDetail.textContent = `${div.type.replace('_', ' ')}: P(${pPrev}→${pCurr}) vs RSI(${rPrev}→${rCurr})${bAgo}`;
                 } else {
                     chkDivDetail.textContent = 'Scanning swings for Hidden HL/LL or LH/HH Trend Continuation';
-                }
-            }
-
-            // Pillar 8: Inter-Market Triad SMT (5M)
-            const chkSmtStatus = document.getElementById('chkSmtStatus');
-            const chkSmtDetail = document.getElementById('chkSmtDetail');
-            if (chkSmtStatus) {
-                const tier = smt.tier || 'SCANNING';
-                if (tier.includes('TRIAD SMT (A+)')) {
-                    chkSmtStatus.className = smt.bias === 'BUY' ? 'badge badge-green' : 'badge badge-rose';
-                    chkSmtStatus.textContent = 'TRIAD SMT (A+)';
-                } else if (tier.includes('PAIR SMT (A)')) {
-                    chkSmtStatus.className = smt.bias === 'BUY' ? 'badge badge-cyan' : 'badge badge-amber';
-                    chkSmtStatus.textContent = 'PAIR SMT (A)';
-                } else if (tier === 'INVALIDATED') {
-                    chkSmtStatus.className = 'badge';
-                    chkSmtStatus.textContent = 'INVALIDATED';
-                } else {
-                    chkSmtStatus.className = 'badge badge-blue';
-                    chkSmtStatus.textContent = 'SCANNING';
-                }
-            }
-            if (chkSmtDetail) {
-                if (smt.smt && smt.smt.description) {
-                    chkSmtDetail.textContent = smt.smt.description;
-                } else if (smt.summary_en) {
-                    chkSmtDetail.textContent = smt.summary_en;
-                } else {
-                    chkSmtDetail.textContent = 'Scanning 5M fractal pivots (XAU vs XAG/DXY | BTC vs ETH/QQQ)';
-                }
-            }
-
-            // Pillar 9: CISD + FVG Displacement & Spread Guard
-            const chkDispStatus = document.getElementById('chkDispStatus');
-            const chkDispDetail = document.getElementById('chkDispDetail');
-            const disp = smt.displacement || {};
-            if (chkDispStatus) {
-                if (disp.displacement_confirmed) {
-                    chkDispStatus.className = 'badge badge-green';
-                    chkDispStatus.textContent = 'CONFIRMED (SAFE)';
-                } else if (disp.is_spread_safe === false) {
-                    chkDispStatus.className = 'badge badge-rose';
-                    chkDispStatus.textContent = 'SPREAD LOCKED';
-                } else if (disp.status_badge) {
-                    chkDispStatus.className = 'badge badge-amber';
-                    chkDispStatus.textContent = disp.status_badge;
-                } else {
-                    const sp = data.spread_pips !== undefined ? data.spread_pips : (isGold ? 2.5 : 5.0);
-                    chkDispStatus.className = sp <= 4.5 ? 'badge badge-green' : 'badge badge-rose';
-                    chkDispStatus.textContent = sp <= 4.5 ? `SAFE (${sp.toFixed(1)}p)` : `LOCKED (${sp.toFixed(1)}p)`;
-                }
-            }
-            if (chkDispDetail) {
-                if (disp.description) {
-                    chkDispDetail.textContent = disp.description;
-                } else {
-                    const sp = data.spread_pips !== undefined ? data.spread_pips : (isGold ? 2.5 : 5.0);
-                    chkDispDetail.textContent = `Live Spread: ${sp.toFixed(1)} pips (News threshold < 4.5p) | 5M CISD Body Check`;
                 }
             }
 
@@ -6926,228 +6352,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         /* -------------------------------------------------------------
-           Full-Screen Welcome Curtain Screen & Indian Female Voice Greeting
-           ------------------------------------------------------------- */
-        function getTimeOfDayGreeting() {
-            const hour = new Date().getHours();
-            if (hour >= 4 && hour < 12) {
-                return "Good Morning";
-            } else if (hour >= 12 && hour < 17) {
-                return "Good Afternoon";
-            } else if (hour >= 17 && hour < 22) {
-                return "Good Evening";
-            } else {
-                return "Good Night";
-            }
-        }
-
-        let isCurtainDismissed = false;
-        let isWelcomeSpeaking = false;
-        let welcomeDismissTimer = null;
-
-        function dismissCurtainScreen() {
-            if (isCurtainDismissed) return;
-            isCurtainDismissed = true;
-            isWelcomeSpeaking = false;
-            try { unlockAudio(); } catch(e){}
-            if (welcomeDismissTimer) {
-                clearTimeout(welcomeDismissTimer);
-                welcomeDismissTimer = null;
-            }
-            if (window._curtainSafetyTimer) {
-                clearTimeout(window._curtainSafetyTimer);
-                window._curtainSafetyTimer = null;
-            }
-            if (window._curtainAutoDismiss) {
-                clearTimeout(window._curtainAutoDismiss);
-                window._curtainAutoDismiss = null;
-            }
-            const overlay = document.getElementById('welcomeFullPageOverlay');
-            if (overlay) {
-                overlay.classList.add('slide-up');
-                overlay.style.pointerEvents = 'none';
-                setTimeout(() => {
-                    overlay.style.display = 'none';
-                    document.body.style.overflow = 'auto';
-                    document.documentElement.style.overflow = 'auto';
-                }, 750);
-            }
-
-            // Immediately check for any active BUY/SELL signal once curtain opens!
-            setTimeout(() => {
-                if (currentObservation && currentObservation.auto_signal) {
-                    checkNotifications(currentObservation);
-                }
-            }, 800);
-        }
-
-        function playWelcomeCurtainVoice(isUserGesture = false) {
-            if (isCurtainDismissed) return;
-            const greeting = getTimeOfDayGreeting();
-            const welcomeText = `Hello, ${greeting} Sir! Welcome to RUSHI THE TRADER Forex & Commodity Observation Terminal.`;
-
-            let mp3File = '/audio/welcome_morning.mp3';
-            let welcomeAudioId = 'audioWelcomeMorning';
-            if (greeting === 'Good Afternoon') {
-                mp3File = '/audio/welcome_afternoon.mp3';
-                welcomeAudioId = 'audioWelcomeAfternoon';
-            } else if (greeting === 'Good Evening') {
-                mp3File = '/audio/welcome_evening.mp3';
-                welcomeAudioId = 'audioWelcomeEvening';
-            } else if (greeting === 'Good Night') {
-                mp3File = '/audio/welcome_night.mp3';
-                welcomeAudioId = 'audioWelcomeNight';
-            }
-
-            const greetingEl = document.getElementById('welcomeGreetingText');
-            const speechLabel = document.getElementById('welcomeSpeechLabel');
-            const btnText = document.getElementById('welcomeBtnText');
-            const enterBtn = document.getElementById('welcomeEnterBtn');
-
-            if (greetingEl) {
-                greetingEl.innerHTML = `Hello, <span class="greeting-highlight">${greeting} Sir!</span>`;
-            }
-
-            if (isUserGesture) {
-                unlockAudio(welcomeAudioId);
-            }
-
-            const onFinished = () => {
-                isWelcomeSpeaking = false;
-                if (window._curtainSafetyTimer) {
-                    clearTimeout(window._curtainSafetyTimer);
-                    window._curtainSafetyTimer = null;
-                }
-                if (speechLabel) speechLabel.textContent = "Welcome complete! Opening terminal...";
-                if (btnText) btnText.textContent = "Opening Terminal...";
-                if (welcomeDismissTimer) clearTimeout(welcomeDismissTimer);
-                welcomeDismissTimer = setTimeout(dismissCurtainScreen, 400);
-            };
-
-            const onBlocked = () => {
-                isWelcomeSpeaking = false;
-                if (window._curtainSafetyTimer) {
-                    clearTimeout(window._curtainSafetyTimer);
-                    window._curtainSafetyTimer = null;
-                }
-                if (speechLabel) speechLabel.textContent = "Opening live terminal...";
-                if (btnText) btnText.textContent = "Enter Terminal (डॅशबोर्ड सुरू करा)";
-                if (enterBtn) enterBtn.classList.add('pulse-ready');
-            };
-
-            isWelcomeSpeaking = true;
-            if (speechLabel) speechLabel.textContent = `Speaking: "${greeting} Sir..."`;
-            if (btnText) btnText.textContent = "Enter Terminal (डॅशबोर्ड सुरू करा)";
-
-            // Guaranteed safety timer: automatically slides UP after 3.0s so it NEVER gets stuck!
-            if (window._curtainSafetyTimer) clearTimeout(window._curtainSafetyTimer);
-            window._curtainSafetyTimer = setTimeout(() => {
-                if (!isCurtainDismissed) {
-                    console.log("Welcome curtain timer elapsed. Auto-revealing terminal.");
-                    onFinished();
-                }
-            }, 3000);
-
-            const targetEl = document.getElementById(welcomeAudioId);
-            if (targetEl) {
-                try {
-                    targetEl.currentTime = 0;
-                    targetEl.volume = 1.0;
-                    targetEl.onended = onFinished;
-                    const p = targetEl.play();
-                    if (p !== undefined) {
-                        p.catch((err) => {
-                            console.warn("Welcome element play error, trying fallback:", err);
-                            if (!isUserGesture && (err && (err.name === 'NotAllowedError' || String(err).includes('NotAllowedError')))) {
-                                onBlocked();
-                            } else {
-                                playRealAudio(mp3File, onFinished, () => {
-                                    speakFemaleVoice(welcomeText, onFinished);
-                                });
-                            }
-                        });
-                    }
-                } catch(err) {
-                    playRealAudio(mp3File, onFinished, () => {
-                        speakFemaleVoice(welcomeText, onFinished);
-                    });
-                }
-            } else {
-                playRealAudio(
-                    mp3File,
-                    onFinished,
-                    (err) => {
-                        console.warn("MP3 play error, checking fallback:", err);
-                        if (!isUserGesture && (err && (err.name === 'NotAllowedError' || String(err).includes('NotAllowedError')))) {
-                            onBlocked();
-                        } else {
-                            speakFemaleVoice(welcomeText, (speechErr) => {
-                                if (!speechErr) onFinished();
-                                else {
-                                    if (!isUserGesture) onBlocked();
-                                    else onFinished();
-                                }
-                            });
-                        }
-                    }
-                );
-            }
-        }
-
-        function triggerVoiceFromCurtainClick(e) {
-            // Immediately dismiss curtain and reveal live terminal!
-            dismissCurtainScreen();
-        }
-
-        function triggerWelcomeExperience(forceReplay = false) {
-            isCurtainDismissed = false;
-            isWelcomeSpeaking = false;
-            const overlay = document.getElementById('welcomeFullPageOverlay');
-            if (overlay) {
-                overlay.style.display = 'flex';
-                overlay.style.pointerEvents = 'auto';
-                void overlay.offsetWidth;
-                overlay.classList.remove('slide-up');
-            }
-
-            const greeting = getTimeOfDayGreeting();
-            const greetingEl = document.getElementById('welcomeGreetingText');
-            const enterBtn = document.getElementById('welcomeEnterBtn');
-
-            if (greetingEl) {
-                greetingEl.innerHTML = `Hello, <span class="greeting-highlight">${greeting} Sir!</span>`;
-            }
-
-            if (enterBtn) enterBtn.classList.remove('pulse-ready');
-
-            // Guaranteed auto-dismiss on page load: slides UP after 3 seconds unconditionally
-            if (window._curtainAutoDismiss) clearTimeout(window._curtainAutoDismiss);
-            window._curtainAutoDismiss = setTimeout(() => {
-                if (!isCurtainDismissed) {
-                    dismissCurtainScreen();
-                }
-            }, 3000);
-
-            try {
-                playWelcomeCurtainVoice(false);
-            } catch (e) {
-                console.warn("Welcome voice initial playback error:", e);
-            }
-        }
-
-        function replayWelcomeGreeting() {
-            triggerWelcomeExperience(true);
-        }
-
-        // Backward compatibility helpers
-        function enterTerminalFromWelcome() {
-            dismissCurtainScreen();
-        }
-        function closeWelcomeSplash() {
-            dismissCurtainScreen();
-        }
-
-        /* -------------------------------------------------------------
            Browser Notifications & Risk Controls
            ------------------------------------------------------------- */
         /* -------------------------------------------------------------
@@ -7335,11 +6539,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function checkNotifications(data) {
             if (!data || !data.auto_signal) return;
-            // Guard: Never consume or announce signal while welcome curtain is active!
-            if (!isCurtainDismissed) {
-                console.log("[Signal Guard] Curtain still active. Signal will announce after welcome.");
-                return;
-            }
             const sig = data.auto_signal;
             const sym = normalizeSym(sig.symbol || (document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD'));
             const now = Date.now();
@@ -7923,7 +7122,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         function updateSupabaseUI(status) {
             const btnLabel = document.getElementById('supabaseStatusLabel');
             const statusText = document.getElementById('sbStatusText');
-            const syncLic = document.getElementById('sbSyncLicenses');
             const syncJrn = document.getElementById('sbSyncJournal');
 
             if (status.configured && status.enabled) {
@@ -7935,7 +7133,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     statusText.textContent = 'Connected (Active PostgreSQL)';
                     statusText.style.color = 'var(--accent-green)';
                 }
-                if (syncLic) syncLic.innerHTML = '<span style="color:var(--accent-green); font-weight:700;">Synced (forex_licenses)</span>';
                 if (syncJrn) syncJrn.innerHTML = '<span style="color:var(--accent-green); font-weight:700;">Synced (forex_journal)</span>';
             } else if (status.url) {
                 if (btnLabel) {
@@ -7955,7 +7152,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     statusText.textContent = 'Not Connected (Local Storage Mode)';
                     statusText.style.color = 'var(--text-muted)';
                 }
-                if (syncLic) syncLic.textContent = 'Local /tmp fallback';
                 if (syncJrn) syncJrn.textContent = 'Local storage fallback';
             }
         }
@@ -8025,439 +7221,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
-        /* -------------------------------------------------------------
-           1-Device License & Anti-Piracy Security System
-           ------------------------------------------------------------- */
-        let currentVipKey = '';
-        let currentUserIsAdmin = false;
-        let isDeviceAuthorized = false;
-
-        function getOrCreateDeviceId() {
-            let devId = localStorage.getItem('rushi_device_uuid');
-            if (!devId) {
-                devId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('dev-' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36));
-                try { localStorage.setItem('rushi_device_uuid', devId); } catch(e){}
-            }
-            try {
-                document.cookie = "rushi_device_uuid=" + devId + "; path=/; max-age=315360000; SameSite=Lax";
-            } catch(e){}
-            return devId;
-        }
-
-        function getHardwareHash() {
-            try {
-                const parts = [
-                    navigator.userAgent || '',
-                    navigator.platform || '',
-                    navigator.language || '',
-                    screen.width + 'x' + screen.height + 'x' + (screen.colorDepth || 24),
-                    window.devicePixelRatio || 1,
-                    navigator.hardwareConcurrency || 2,
-                    Intl.DateTimeFormat().resolvedOptions().timeZone || ''
-                ];
-                const str = parts.join('###');
-                let hash = 0;
-                for (let i = 0; i < str.length; i++) {
-                    const char = str.charCodeAt(i);
-                    hash = ((hash << 5) - hash) + char;
-                    hash |= 0;
-                }
-                return 'hw_' + Math.abs(hash).toString(16);
-            } catch(e) {
-                return 'hw_generic';
-            }
-        }
-
-        function getDeviceModelName() {
-            try {
-                const ua = navigator.userAgent;
-                if (/iPhone/i.test(ua)) return 'Apple iPhone';
-                if (/iPad/i.test(ua)) return 'Apple iPad';
-                if (/Android/i.test(ua)) {
-                    const match = ua.match(/Android.*?; (.*?)(?:Build|\))/);
-                    return match && match[1] ? match[1].trim() : 'Android Device';
-                }
-                if (/Windows/i.test(ua)) return 'Windows PC';
-                if (/Mac/i.test(ua)) return 'Mac';
-                return 'Web Client';
-            } catch(e) {
-                return 'Unknown Device';
-            }
-        }
-
-        async function verifyLicenseWithBackend(key) {
-            if (!key) {
-                showVipActivationModal();
-                return false;
-            }
-            const devId = getOrCreateDeviceId();
-            const hwHash = getHardwareHash();
-            const devModel = getDeviceModelName();
-            const devToken = localStorage.getItem('rushi_dev_token_' + key) || '';
-
-            try {
-                const resp = await fetch('/api/license/verify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        key: key,
-                        device_id: devId,
-                        hw_hash: hwHash,
-                        device_model: devModel,
-                        device_token: devToken
-                    })
-                });
-                const data = await resp.json();
-                
-                if (data.status === 'GRANTED') {
-                    currentVipKey = key;
-                    currentUserIsAdmin = !!data.is_admin;
-                    isDeviceAuthorized = true;
-                    if (data.device_token) {
-                        try {
-                            localStorage.setItem('rushi_dev_token_' + key, data.device_token);
-                            document.cookie = "rushi_dev_token_" + key + "=" + data.device_token + "; path=/; max-age=315360000; SameSite=Lax";
-                        } catch(e){}
-                    }
-                    
-                    document.getElementById('deviceLockOverlay').style.display = 'none';
-                    document.getElementById('vipActivationModal').classList.remove('active');
-
-                    const adminBtn = document.getElementById('btnAdminManager');
-                    if (adminBtn) {
-                        adminBtn.style.display = currentUserIsAdmin ? 'inline-flex' : 'none';
-                    }
-                    return true;
-                } else if (data.reason === 'DEVICE_MISMATCH') {
-                    showDeviceLockScreen(data, key);
-                    return false;
-                } else if (data.reason === 'EXPIRED') {
-                    showDeviceLockScreen({
-                        title: 'VIP ॲक्सेस कालबाह्य (Expired)',
-                        reason: 'तुमचा सबस्क्रिप्शन कालावधी संपला आहे. कृपया नूतनीकरण करण्यासाठी ॲडमिनशी संपर्क साधा.',
-                        ...data
-                    }, key);
-                    return false;
-                } else if (data.reason === 'REVOKED') {
-                    showDeviceLockScreen({
-                        title: 'ॲक्सेस रद्द केला (Revoked)',
-                        reason: 'हा VIP ॲक्सेस ॲडमिनने ब्लॉक/रद्द केला आहे.',
-                        ...data
-                    }, key);
-                    return false;
-                } else {
-                    showVipActivationModal(data.message || 'अवैध की (Invalid Key). कृपया खरी VIP Key प्रविष्ट करा.');
-                    return false;
-                }
-            } catch (err) {
-                console.warn('License verification network fallback:', err);
-                if (key.toUpperCase() === 'RUSHI-ADMIN-777') {
-                    currentUserIsAdmin = true;
-                    const adminBtn = document.getElementById('btnAdminManager');
-                    if (adminBtn) adminBtn.style.display = 'inline-flex';
-                    return true;
-                }
-                return true;
-            }
-        }
-
-        function showDeviceLockScreen(data, key) {
-            const overlay = document.getElementById('deviceLockOverlay');
-            if (!overlay) return;
-
-            document.getElementById('vipActivationModal').classList.remove('active');
-            overlay.style.display = 'flex';
-
-            const keyEl = document.getElementById('lockKeyDisplay');
-            if (keyEl) keyEl.textContent = key || 'N/A';
-
-            const regDevEl = document.getElementById('lockRegisteredDevice');
-            if (regDevEl) regDevEl.textContent = data.bound_device_model || data.registered_device || 'Other Mobile Phone';
-
-            const currDevEl = document.getElementById('lockCurrentDevice');
-            if (currDevEl) currDevEl.textContent = getDeviceModelName() + ' (This Device)';
-
-            const reasonEl = document.getElementById('lockReasonDisplay');
-            if (reasonEl) reasonEl.textContent = data.reason || 'SINGLE-DEVICE LOCKED';
-
-            const titleEl = document.getElementById('lockOverlayTitle');
-            if (titleEl && data.title) titleEl.textContent = data.title;
-
-            const subEl = document.getElementById('lockOverlaySubtitle');
-            if (subEl && data.reason && data.reason !== 'DEVICE_MISMATCH') {
-                subEl.textContent = data.reason;
-            }
-
-            const waBtn = document.getElementById('btnLockWhatsAppHelp');
-            if (waBtn) {
-                const msg = encodeURIComponent(`Hello Rushi, my VIP Key (${key}) is locked to another phone. Please reset my device.`);
-                waBtn.href = `https://wa.me/919373024888?text=${msg}`;
-            }
-        }
-
-        function showVipActivationModal(errorMsg) {
-            const modal = document.getElementById('vipActivationModal');
-            if (!modal) return;
-            document.getElementById('deviceLockOverlay').style.display = 'none';
-            modal.classList.add('active');
-
-            const errEl = document.getElementById('vipKeyInputError');
-            if (errEl) {
-                if (errorMsg) {
-                    errEl.textContent = errorMsg;
-                    errEl.style.display = 'block';
-                } else {
-                    errEl.style.display = 'none';
-                }
-            }
-            const input = document.getElementById('vipKeyManualInput');
-            if (input) {
-                input.value = currentVipKey || localStorage.getItem('rushi_vip_key') || '';
-                setTimeout(() => input.focus(), 150);
-            }
-        }
-
-        async function submitManualVipKey() {
-            const input = document.getElementById('vipKeyManualInput');
-            const key = (input ? input.value : '').trim().toUpperCase();
-            if (!key) {
-                showVipActivationModal('कृपया तुमची VIP Key प्रविष्ट करा.');
-                return;
-            }
-            const ok = await verifyLicenseWithBackend(key);
-            if (ok) {
-                localStorage.setItem('rushi_vip_key', key);
-                document.getElementById('vipActivationModal').classList.remove('active');
-            }
-        }
-
-        function promptSwitchKey() {
-            localStorage.removeItem('rushi_vip_key');
-            currentVipKey = '';
-            showVipActivationModal();
-        }
-
-        function openLicenseModal() {
-            if (!currentUserIsAdmin) {
-                alert('Master Admin Access Required!');
-                return;
-            }
-            document.getElementById('licenseManagerModal').classList.add('active');
-            loadAdminLicenses();
-        }
-
-        function closeLicenseModal() {
-            document.getElementById('licenseManagerModal').classList.remove('active');
-        }
-
-        async function generateClientLicense() {
-            const clientName = document.getElementById('licClientName').value.trim() || 'VIP Client';
-            const durationDays = parseInt(document.getElementById('licDurationDays').value, 10) || 30;
-            const customKey = document.getElementById('licCustomKey').value.trim();
-            const note = document.getElementById('licNote').value.trim();
-
-            try {
-                const resp = await fetch('/api/license/create', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        admin_key: currentVipKey,
-                        client_name: clientName,
-                        duration_days: durationDays,
-                        custom_key: customKey,
-                        note: note
-                    })
-                });
-                const data = await resp.json();
-                if (data.success && data.license) {
-                    const origin = window.location.origin;
-                    const fullLink = `${origin}/?key=${data.license.key}`;
-                    const resultBox = document.getElementById('newLicenseResultBox');
-                    const linkInput = document.getElementById('generatedLinkInput');
-                    if (resultBox && linkInput) {
-                        linkInput.value = fullLink;
-                        resultBox.style.display = 'block';
-                    }
-                    loadAdminLicenses();
-                } else {
-                    alert('Error generating license: ' + (data.error || 'Unknown error'));
-                }
-            } catch (e) {
-                alert('Failed to connect to backend: ' + e.message);
-            }
-        }
-
-        function copyGeneratedLink() {
-            const linkInput = document.getElementById('generatedLinkInput');
-            if (!linkInput) return;
-            linkInput.select();
-            navigator.clipboard.writeText(linkInput.value).then(() => {
-                alert('1-Device Link Copied to Clipboard!');
-            }).catch(() => {
-                document.execCommand('copy');
-                alert('1-Device Link Copied!');
-            });
-        }
-
-        function shareViaWhatsApp() {
-            const linkInput = document.getElementById('generatedLinkInput');
-            if (!linkInput || !linkInput.value) return;
-            const msg = encodeURIComponent(`*RUSHI THE TRADER - VIP Signals Access*\n\nYour Exclusive 1-Device Access Link:\n${linkInput.value}\n\n*NOTE:* This link is locked to 1 mobile phone only. It will not work if forwarded to any other device.`);
-            window.open(`https://wa.me/?text=${msg}`, '_blank');
-        }
-
-        async function loadAdminLicenses() {
-            const tbody = document.getElementById('licenseTableBody');
-            if (!tbody) return;
-            tbody.innerHTML = '<tr><td colspan="6" style="padding:16px; text-align:center; color:var(--text-muted);">लोड होत आहे...</td></tr>';
-
-            try {
-                const resp = await fetch(`/api/license/list?admin_key=${encodeURIComponent(currentVipKey)}`);
-                const data = await resp.json();
-                if (!data.licenses || !data.licenses.length) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="padding:16px; text-align:center; color:var(--text-muted);">अजून कोणतीही VIP Links तयार केलेली नाहीत.</td></tr>';
-                    return;
-                }
-
-                let html = '';
-                data.licenses.forEach(lic => {
-                    const isMaster = lic.key === 'RUSHI-ADMIN-777';
-                    const status = lic.status || (lic.is_active === false ? 'REVOKED' : (lic.expires_at && new Date(lic.expires_at) < new Date() ? 'EXPIRED' : 'ACTIVE'));
-                    const statusColor = status === 'ACTIVE' ? 'var(--accent-green)' : (status === 'EXPIRED' ? '#fbbf24' : 'var(--accent-rose)');
-                    const deviceBadge = lic.bound_device_model ? `<span style="color:var(--text-primary); font-weight:600;">${lic.bound_device_model}</span><br><span style="color:var(--text-muted); font-size:10px;">ID: ${lic.bound_device_id.substring(0,8)}...</span>` : '<span style="color:#fbbf24; font-style:italic;">Pending 1st Open</span>';
-                    const expText = lic.expires_at ? lic.expires_at.split('T')[0] : 'Lifetime';
-                    const origin = window.location.origin;
-                    const fullLink = `${origin}/?key=${lic.key}`;
-
-                    html += `
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                            <td style="padding:8px 6px;">
-                                <strong>${lic.client_name || 'Client'}</strong>
-                                ${lic.note ? `<br><span style="color:var(--text-muted); font-size:10px;">${lic.note}</span>` : ''}
-                            </td>
-                            <td style="padding:8px 6px; font-family:var(--font-mono); color:#fbbf24;">${lic.key}</td>
-                            <td style="padding:8px 6px;"><span style="color:${statusColor}; font-weight:700;">${status}</span></td>
-                            <td style="padding:8px 6px;">${deviceBadge}</td>
-                            <td style="padding:8px 6px; color:var(--text-secondary);">${expText}</td>
-                            <td style="padding:8px 6px; text-align:right; white-space:nowrap;">
-                                ${!isMaster ? `
-                                    <button class="btn" onclick="resetClientDevice('${lic.key}')" title="Reset device lock so client can bind a new phone" style="padding:3px 6px; font-size:10px; margin-right:4px;">Reset Phone</button>
-                                    <button class="btn" onclick="revokeClientLicense('${lic.key}')" title="Block access" style="padding:3px 6px; font-size:10px; margin-right:4px; color:#fbbf24; border-color:rgba(251,191,36,0.3);">Revoke</button>
-                                    <button class="btn" onclick="deleteClientLicense('${lic.key}')" title="Permanently delete key" style="padding:3px 6px; font-size:10px; margin-right:4px; color:var(--accent-rose); border-color:rgba(244,63,94,0.3);">Delete</button>
-                                ` : '<span style="color:var(--text-muted); font-size:10px; margin-right:4px;">Master</span>'}
-                                <button class="btn" onclick="navigator.clipboard.writeText('${fullLink}'); alert('Link copied!');" style="padding:3px 6px; font-size:10px;">Copy</button>
-                            </td>
-                        </tr>
-                    `;
-                });
-                tbody.innerHTML = html;
-            } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="6" style="padding:16px; text-align:center; color:var(--accent-rose);">त्रुटी: ${e.message}</td></tr>`;
-            }
-        }
-
-        async function resetClientDevice(targetKey) {
-            if (!confirm(`Are you sure you want to reset the device binding for ${targetKey}? The client can then bind their new phone on their next link click.`)) {
-                return;
-            }
-            try {
-                const resp = await fetch('/api/license/reset', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ admin_key: currentVipKey, key: targetKey })
-                });
-                const data = await resp.json();
-                if (data.success) {
-                    alert(`Device lock reset successfully for ${targetKey}!`);
-                    loadAdminLicenses();
-                } else {
-                    alert(`Error: ${data.error || 'Failed to reset'}`);
-                }
-            } catch (e) {
-                alert('Network error: ' + e.message);
-            }
-        }
-
-        async function revokeClientLicense(targetKey) {
-            if (!confirm(`Are you sure you want to REVOKE/BLOCK access for ${targetKey}?`)) {
-                return;
-            }
-            try {
-                const resp = await fetch('/api/license/revoke', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ admin_key: currentVipKey, key: targetKey })
-                });
-                const data = await resp.json();
-                if (data.success) {
-                    alert(`Access revoked for ${targetKey}!`);
-                    loadAdminLicenses();
-                } else {
-                    alert(`Error: ${data.error || 'Failed to revoke'}`);
-                }
-            } catch (e) {
-                alert('Network error: ' + e.message);
-            }
-        }
-
-        async function deleteClientLicense(targetKey) {
-            if (!confirm(`Are you sure you want to permanently delete license key ${targetKey}? This action cannot be undone.`)) {
-                return;
-            }
-            try {
-                const resp = await fetch('/api/license/delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ admin_key: currentVipKey, key: targetKey })
-                });
-                const data = await resp.json();
-                if (data.success) {
-                    alert(`License ${targetKey} deleted successfully!`);
-                    loadAdminLicenses();
-                } else {
-                    alert(`Error: ${data.error || 'Failed to delete'}`);
-                }
-            } catch (e) {
-                alert('Network error: ' + e.message);
-            }
-        }
-
-        async function initLicenseSecurity() {
-            const urlParams = new URLSearchParams(window.location.search);
-            let activeKey = urlParams.get('key');
-            if (activeKey) {
-                activeKey = activeKey.trim().toUpperCase();
-                try {
-                    localStorage.setItem('rushi_vip_key', activeKey);
-                    document.cookie = "rushi_vip_key=" + activeKey + "; path=/; max-age=315360000; SameSite=Lax";
-                } catch(e){}
-            } else {
-                activeKey = localStorage.getItem('rushi_vip_key');
-                if (!activeKey) {
-                    const m = document.cookie.match(/rushi_vip_key=([^;]+)/);
-                    if (m) activeKey = m[1].trim().toUpperCase();
-                }
-            }
-            if (!activeKey) {
-                showVipActivationModal();
-                return;
-            }
-            await verifyLicenseWithBackend(activeKey);
-        }
-
         // Initialize on load
         window.addEventListener('DOMContentLoaded', () => {
-            // Enforce Single-Device License Security
-            initLicenseSecurity();
             loadSupabaseConfig();
-
-
-            // Trigger Opening Welcome Animation & Indian Female Voice Greeting immediately
-            try {
-                triggerWelcomeExperience();
-            } catch (e) {
-                console.error("Welcome experience error:", e);
-            }
 
             fetchHealth();
             fetchObservation();
@@ -8474,10 +7240,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             // Preload studio MP3 audio buffers in memory for zero-latency mobile playback
             const studioAudios = [
-                '/audio/welcome_morning.mp3',
-                '/audio/welcome_afternoon.mp3',
-                '/audio/welcome_evening.mp3',
-                '/audio/welcome_night.mp3',
                 '/audio/signal_buy_gold.mp3',
                 '/audio/signal_sell_gold.mp3',
                 '/audio/signal_buy_btc.mp3',
@@ -8535,7 +7297,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             });
 
-            ['riskModal', 'calibrateModal', 'twelveDataModal', 'licenseManagerModal', 'supabaseModal'].forEach(id => {
+            ['riskModal', 'calibrateModal', 'twelveDataModal', 'supabaseModal'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     el.addEventListener('click', (e) => {
