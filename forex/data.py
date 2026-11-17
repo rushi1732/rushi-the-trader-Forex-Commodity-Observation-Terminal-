@@ -446,3 +446,39 @@ def fetch_twelve_data_chart(
     if cached:
         return dict(cached[1])
     return parse_twelve_data_chart(data, canon, interval)
+
+
+def aggregate_5m_to_15m(candles_5m: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Synthesize 15-minute candles from 5-minute candles when native 15m feed is unavailable.
+    Groups every 3 consecutive completed 5m bars into a standard 15m OHLC bar.
+    """
+    if not candles_5m or len(candles_5m) < 3:
+        return []
+
+    candles_15m: List[Dict[str, Any]] = []
+    num_full_bars = len(candles_5m) // 3
+    start_idx = len(candles_5m) % 3
+
+    for b in range(num_full_bars):
+        slice_3 = candles_5m[start_idx + b * 3 : start_idx + (b + 1) * 3]
+        if len(slice_3) != 3:
+            continue
+        o = slice_3[0]["open"]
+        h = max(c["high"] for c in slice_3)
+        l = min(c["low"] for c in slice_3)
+        c = slice_3[-1]["close"]
+        vol = sum(c.get("volume", 0) for c in slice_3)
+        ts = slice_3[-1]["timestamp"]
+        dt_utc = slice_3[-1].get("datetime_utc", "")
+        candles_15m.append({
+            "timestamp": ts,
+            "datetime_utc": dt_utc,
+            "open": o,
+            "high": h,
+            "low": l,
+            "close": c,
+            "volume": vol,
+        })
+    return candles_15m
+

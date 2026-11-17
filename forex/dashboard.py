@@ -2388,7 +2388,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>
 
                     <!-- 7-Strategy Institutional Signal Deep Dive Explanation Panel -->
-                    <div id="matrix9StrategiesPanel" class="matrix-strategies-panel panel-wait">
+                    <div id="matrixStrategiesPanel" class="matrix-strategies-panel panel-wait">
                         <div class="strategies-panel-header">
                             <span class="strategies-panel-title">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -3947,8 +3947,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             }
 
-            // 🎯 Render 9-Strategy Institutional Signal Deep Dive
-            const stratPanel = document.getElementById('matrix9StrategiesPanel');
+            // 🎯 Render 7-Strategy Institutional Signal Deep Dive
+            const stratPanel = document.getElementById('matrixStrategiesPanel');
             const stratBadge = document.getElementById('matrixStrategiesSignalBadge');
             const stratGrid = document.getElementById('matrixStrategiesGrid');
 

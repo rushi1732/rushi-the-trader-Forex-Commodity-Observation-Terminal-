@@ -27,8 +27,7 @@ from .smc import analyze_smc
 from .ict import analyze_ict
 from .liquidity import analyze_liquidity
 from .divergence import detect_divergence
-from .smt import aggregate_5m_to_15m
-from .data import fetch_chart, MAJOR_PAIRS
+from .data import fetch_chart, MAJOR_PAIRS, aggregate_5m_to_15m
 from .backtest import calculate_ema
 
 

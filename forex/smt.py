@@ -118,7 +118,7 @@ def fetch_benchmark_candles(
 
     # 3. Live fetch via data.py
     try:
-        from .data import fetch_chart
+        from .data import fetch_chart, aggregate_5m_to_15m
         chart = fetch_chart(symbol=canon, interval=interval, range_period="2d")
         candles = chart.get("candles", [])
         if candles:

@@ -44,7 +44,7 @@ from .smc import analyze_smc
 from .fibonacci import analyze_fibonacci
 from .liquidity import analyze_liquidity
 from .ict import analyze_ict
-from .smt import aggregate_5m_to_15m
+from .data import aggregate_5m_to_15m
 
 BANNER_FOREX = """
 ========================================================================================

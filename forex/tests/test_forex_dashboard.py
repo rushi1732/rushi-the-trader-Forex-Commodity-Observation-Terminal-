@@ -599,7 +599,7 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("chkRiskStatus", html)
         self.assertIn("matrixLevelHigh", html)
         self.assertIn("matrixLevelLow", html)
-        self.assertIn("matrix9StrategiesPanel", html)
+        self.assertIn("matrixStrategiesPanel", html)
         self.assertIn("matrixStrategiesGrid", html)
         self.assertIn("updateStrategyMatrix", html)
 

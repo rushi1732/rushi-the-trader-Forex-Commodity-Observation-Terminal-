@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from forex.signals import evaluate_confluence_signal
 from forex.scanner import detect_asian_range_breakout
-from forex.smt import aggregate_5m_to_15m
+from forex.data import aggregate_5m_to_15m
 
 
 class TestHTFMacroVeto(unittest.TestCase):
