@@ -550,16 +550,15 @@ class SignalStateManager:
         # Card 2 Technical Bias vetoes candidate actions unless candidate is Elite A+ (score >= 80)
         scan_dir = (scan_info or {}).get("direction", "NEUTRAL") if scan_info else "NEUTRAL"
         htf_dir = (confluence_signal or {}).get("htf_trend", "NEUTRAL") if confluence_signal else "NEUTRAL"
-        cand_score = candidate_score or (confluence_signal or {}).get("confluence_score", 0) or 0
         if candidate_action == "BUY":
             if htf_dir == "BEARISH":
                 candidate_action = None
-            elif scan_dir == "BEARISH" and cand_score < 80:
+            elif scan_dir == "BEARISH" and htf_dir != "BULLISH":
                 candidate_action = None
         elif candidate_action == "SELL":
             if htf_dir == "BULLISH":
                 candidate_action = None
-            elif scan_dir == "BULLISH" and cand_score < 80:
+            elif scan_dir == "BULLISH" and htf_dir != "BEARISH":
                 candidate_action = None
 
         if candidate_action in ("BUY", "SELL") and candle_is_closed:
