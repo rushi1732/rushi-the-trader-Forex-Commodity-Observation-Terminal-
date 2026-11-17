@@ -3268,14 +3268,33 @@
             const curPrice = (liveTick && liveTick.last) ? liveTick.last : (data.indicative_mid || data.latest_price || 0);
             const autoSig = data.auto_signal || {};
             const confSig = data.confluence_signal || {};
-            const action = autoSig.action || 'NO SIGNAL';
             const smc = data.smc || (confSig.components && confSig.components.smc) || {};
             const fib = data.fibonacci || (confSig.components && confSig.components.fibonacci) || {};
             const liq = data.liquidity || (confSig.components && confSig.components.liquidity) || {};
             const ict = data.ict || (confSig.components && confSig.components.ict) || {};
-            const score = confSig.confluence_score !== undefined ? confSig.confluence_score : (autoSig.confluence_score || 0);
-            const grade = confSig.grade || autoSig.grade || 'Grade C';
-            const factors = confSig.confluence_factors || autoSig.confluence_factors || [];
+            const div = data.divergence || (confSig.components && confSig.components.divergence) || {};
+
+            let action = 'NO SIGNAL';
+            let score = 0;
+            let grade = 'Grade C (Consolidation / Wait)';
+            let factors = [];
+
+            if (confSig && confSig.action && confSig.action !== 'NEUTRAL') {
+                action = confSig.action;
+                score = confSig.confluence_score || 0;
+                grade = confSig.grade || (score >= 80 ? 'Grade A+' : (score >= 65 ? 'Grade A' : 'Grade B'));
+                factors = confSig.confluence_factors || [];
+            } else if (autoSig && (autoSig.action === 'BUY' || autoSig.action === 'SELL') && (autoSig.confluence_score >= 50)) {
+                action = autoSig.action;
+                score = autoSig.confluence_score || confSig.confluence_score || 0;
+                grade = autoSig.grade || confSig.grade || (score >= 80 ? 'Grade A+' : 'Grade B');
+                factors = autoSig.confluence_factors || confSig.confluence_factors || [];
+            } else {
+                action = 'NO SIGNAL';
+                score = confSig.confluence_score !== undefined ? confSig.confluence_score : (autoSig.confluence_score || 0);
+                grade = confSig.grade || 'Grade C (Consolidation / Wait)';
+                factors = confSig.confluence_factors || autoSig.confluence_factors || [];
+            }
 
             // Update Confluence Badges & Progress Bar
             const badgeEl = document.getElementById('matrixConfluenceBadge');
@@ -3592,7 +3611,6 @@
             // Pillar 7: RSI Hidden & Regular Divergence (Trend Continuation)
             const chkDivStatus = document.getElementById('chkDivStatus');
             const chkDivDetail = document.getElementById('chkDivDetail');
-            const div = data.divergence || (confSig.components && confSig.components.divergence) || {};
             if (chkDivStatus) {
                 if (div.detected) {
                     if (div.type === 'HIDDEN_BULLISH') {
