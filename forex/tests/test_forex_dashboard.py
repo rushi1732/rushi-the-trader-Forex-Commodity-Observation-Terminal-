@@ -1068,24 +1068,37 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn("clearJournalHistory", html)
         self.assertIn("closeJournalTrade", html)
 
-    def test_auto_signal_trade_tracker_in_card5(self):
-        """Verify Card 5 Automatic Signal Engine Live Trades List and Backtest integration."""
+    def test_card_5_historical_strategy_backtest(self):
+        """Verify Card 5 is standalone Historical Strategy Backtest and trade tracker is removed."""
         url_home = f"http://127.0.0.1:{self.port}/"
         with urllib.request.urlopen(url_home, timeout=5) as resp:
             html = resp.read().decode("utf-8")
-        # 1. Elements in Card 5
-        self.assertIn("tabContentAutoTrades", html)
-        self.assertIn("tabBtnAutoTrades", html)
-        self.assertIn("tabBtnBacktest", html)
-        self.assertIn("autoTradesBody", html)
-        self.assertIn("btnToggleMoreSigTrades", html)
-        self.assertIn("statNetPnlAutoTrades", html)
-        # 2. JavaScript functions
-        self.assertIn("switchCard5Tab", html)
-        self.assertIn("toggleMoreSigTrades", html)
-        self.assertIn("renderAutoTradesTable", html)
-        self.assertIn("checkAndAutoLogSignal", html)
-        self.assertIn("updateLiveTradesPnL", html)
+        # 1. Standalone Historical Strategy Backtest Card
+        self.assertIn("cardHistoricalBacktest", html)
+        self.assertIn("Historical Strategy Backtest (Range Breakout & 2R Exit)", html)
+        self.assertIn("backtestMetrics", html)
+        self.assertIn("btWinRate", html)
+        self.assertIn("btTotalTrades", html)
+        self.assertIn("btNetPnl", html)
+        self.assertIn("btProfitFactor", html)
+        self.assertIn("btMaxDrawdown", html)
+        self.assertIn("btAvgWinLoss", html)
+        self.assertIn("backtestBody", html)
+        self.assertIn("btnRunBacktest", html)
+        self.assertIn("runBacktest", html)
+        # 2. Verify Automatic Signal Engine Trade Tracker is completely removed
+        self.assertNotIn("cardAutoSignalTrades", html)
+        self.assertNotIn("Automatic Signal Engine - Trade Tracker", html)
+        self.assertNotIn("tabContentAutoTrades", html)
+        self.assertNotIn("tabBtnAutoTrades", html)
+        self.assertNotIn("autoTradesBody", html)
+        self.assertNotIn("btnToggleMoreSigTrades", html)
+        self.assertNotIn("statNetPnlAutoTrades", html)
+        self.assertNotIn("switchCard5Tab", html)
+        self.assertNotIn("toggleMoreSigTrades", html)
+        self.assertNotIn("renderAutoTradesTable", html)
+        self.assertNotIn("checkAndAutoLogSignal", html)
+        self.assertNotIn("updateLiveTradesPnL", html)
 
 
 if __name__ == "__main__":
