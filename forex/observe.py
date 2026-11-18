@@ -799,16 +799,16 @@ def observe_pair(
     is_open, open_reason = is_market_open_for_symbol(canon, now_et)
     active_sessions = get_active_sessions(now_et) if is_open else []
 
-    # 2. Fetch Market Data
+    # 2. Fetch Market Data (fetch 2d for sufficient HTF 15m and EMA history)
     try:
         chart = fetch_chart(
             symbol=canon,
             interval=interval,
-            range_period="1d",
+            range_period="2d",
             offline_file=offline_file,
             offline_data=offline_data,
         )
-        if not chart.get("candles") and offline_file is None and offline_data is None:
+        if (not chart.get("candles") or len(chart.get("candles", [])) < 25) and offline_file is None and offline_data is None:
             chart = fetch_chart(
                 symbol=canon,
                 interval=interval,
