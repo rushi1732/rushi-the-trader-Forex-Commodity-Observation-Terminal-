@@ -740,6 +740,34 @@ class TestSignalStability(unittest.TestCase):
             risk_dist = abs(plan["entry_price"] - plan["stop_loss"])
             self.assertGreaterEqual(risk_dist, 4.00)
 
+    def test_gold_stop_loss_strictly_between_100_and_150_pips(self):
+        """XAU/USD execution plan strictly clamps Stop Loss between 100 and 150 pips (never exceeds 150 pips)."""
+        from forex.signals import evaluate_confluence_signal
+        from forex.data import fetch_chart
+
+        chart = fetch_chart("XAU/USD", "5m", "2d")
+        candles = chart.get("candles", [])
+        if candles:
+            candles_test = [dict(c) for c in candles]
+            last_close = candles_test[-1]["close"]
+            candles_test.append({
+                "timestamp": candles_test[-1]["timestamp"] + 300,
+                "open": last_close,
+                "high": last_close + 0.50,
+                "low": last_close - 4.0,
+                "close": last_close - 3.8,
+                "volume": 1500,
+            })
+            sig = evaluate_confluence_signal("XAU/USD", candles_test, "5m")
+            plan = sig.get("execution_plan", {})
+            if plan.get("entry_price") and plan.get("stop_loss"):
+                risk_pips = plan.get("risk_pips", 0.0)
+                self.assertGreaterEqual(risk_pips, 100.0)
+                self.assertLessEqual(risk_pips, 150.0)
+                self.assertEqual(plan.get("rr_ratio_tp1"), 2.0)
+                self.assertGreaterEqual(plan.get("reward_pips_tp1"), 200.0)
+                self.assertLessEqual(plan.get("reward_pips_tp1"), 300.0)
+
 
 if __name__ == "__main__":
     unittest.main()

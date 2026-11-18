@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 import threading
 
-from .pairs import normalize_symbol, get_pair_info, to_pips
+from .pairs import normalize_symbol, get_pair_info, to_pips, from_pips
 from .pricing import calc_spread_prices, execution_price
 from .data import (
     fetch_chart,

@@ -86,23 +86,31 @@ def evaluate_confluence_signal(
     # Institutional Volatility Buffer (1.5x ATR-14)
     sl_buffer = avg_bar_range * 1.5
 
-    # Asset-Specific Minimum Safe Risk Distance (Prevents premature noise suffocation)
-    # XAU/USD (Gold): at least $7.50 (75 pips) at $3,900+ price level
+    # Asset-Specific Safe Risk Distance & User Constraints
+    # XAU/USD (Gold): Strictly 100 to 150 pips ($10.00 to $15.00) - Never exceeds 150 pips
     # BTC/USD: at least $650 (650 pips) at $68,000+ price level
     # JPY pairs: at least 22 pips
     # Forex pairs: at least 16 pips
     if "XAU" in canon:
-        min_risk_dist = max(7.50, current_price * 0.0020)
-        min_risk_pips = to_pips(canon, min_risk_dist)
+        min_risk_dist = from_pips(canon, 100.0)  # $10.00 (100 pips)
+        max_risk_dist = from_pips(canon, 150.0)  # $15.00 (150 pips)
+        min_risk_pips = 100.0
+        max_risk_pips = 150.0
     elif "BTC" in canon:
         min_risk_dist = max(650.0, current_price * 0.0085)
+        max_risk_dist = min_risk_dist * 2.0
         min_risk_pips = to_pips(canon, min_risk_dist)
+        max_risk_pips = to_pips(canon, max_risk_dist)
     elif "JPY" in canon:
         min_risk_pips = 22.0
+        max_risk_pips = 45.0
         min_risk_dist = from_pips(canon, 22.0)
+        max_risk_dist = from_pips(canon, 45.0)
     else:
         min_risk_pips = 16.0
+        max_risk_pips = 35.0
         min_risk_dist = from_pips(canon, 16.0)
+        max_risk_dist = from_pips(canon, 35.0)
 
     # Ensure 15m HTF candles are available (synthesizing from 5m if needed)
     if not candles_15m or len(candles_15m) < 10:
@@ -599,28 +607,23 @@ def evaluate_confluence_signal(
     if signal_side == "BUY":
         # Anchor Stop Loss strictly below structural low and Order Block base
         demand_anchor = nearest_demand["bottom"] if (nearest_demand and nearest_demand["bottom"] < current_price) else structural_low
-        invalidation = min(structural_low, demand_anchor) - sl_buffer
+        raw_invalidation = min(structural_low, demand_anchor) - sl_buffer
+        raw_risk = current_price - raw_invalidation
 
-        # Enforce minimum safe volatility distance so normal wicks do not stop out the trade
-        if (current_price - invalidation) < min_risk_dist:
-            invalidation = current_price - min_risk_dist
-
-        stop_loss = round(invalidation, decimals)
-        if stop_loss >= current_price:
-            stop_loss = round(current_price - min_risk_dist, decimals)
-
-        risk_dist = max(min_risk_dist, current_price - stop_loss)
+        # Clamp risk_dist strictly between min_risk_dist and max_risk_dist (Strict 100 - 150 pips rule for Gold)
+        risk_dist = max(min_risk_dist, min(max_risk_dist, raw_risk))
+        stop_loss = round(current_price - risk_dist, decimals)
         risk_pips = round(to_pips(canon, risk_dist), 1)
 
-        # TP1 = 1:2 R:R from actual entry reference
+        # TP1 = 1:2 R:R from actual entry reference (200 - 300 pips on Gold)
         tp1_dist = risk_dist * 2.0
         take_profit_1 = round(current_price + tp1_dist, decimals)
         reward_pips_tp1 = round(to_pips(canon, tp1_dist), 1)
         rr_tp1 = 2.0
 
-        # TP2 = 1:3.5 R:R or BSL liquidity pool (240 - 290 pips on Gold)
+        # TP2 = 1:3.5 R:R or BSL liquidity pool (350 - 525 pips on Gold)
         bsl_target = liq_data.get("bsl_target")
-        if bsl_target and bsl_target > current_price + risk_dist * 2.5:
+        if bsl_target and (bsl_target - current_price) >= (risk_dist * 2.5) and (bsl_target - current_price) <= (risk_dist * 4.0):
             take_profit_2 = round(bsl_target, decimals)
             tp2_dist = take_profit_2 - current_price
         else:
@@ -630,7 +633,7 @@ def evaluate_confluence_signal(
         reward_pips_tp2 = round(to_pips(canon, tp2_dist), 1)
         rr_tp2 = round(tp2_dist / risk_dist, 2)
 
-        # TP3 = 1:4.5 R:R Macro Swing Runner (300 - 380 pips on Gold)
+        # TP3 = 1:4.5 R:R Macro Swing Runner (450 - 675 pips on Gold)
         tp3_dist = risk_dist * 4.5
         take_profit_3 = round(current_price + tp3_dist, decimals)
         reward_pips_tp3 = round(to_pips(canon, tp3_dist), 1)
@@ -639,28 +642,23 @@ def evaluate_confluence_signal(
     elif signal_side == "SELL":
         # Anchor Stop Loss strictly above structural high and Supply Block top
         supply_anchor = nearest_supply["top"] if (nearest_supply and nearest_supply["top"] > current_price) else structural_high
-        invalidation = max(structural_high, supply_anchor) + sl_buffer
+        raw_invalidation = max(structural_high, supply_anchor) + sl_buffer
+        raw_risk = raw_invalidation - current_price
 
-        # Enforce minimum safe volatility distance so normal wicks do not stop out the trade
-        if (invalidation - current_price) < min_risk_dist:
-            invalidation = current_price + min_risk_dist
-
-        stop_loss = round(invalidation, decimals)
-        if stop_loss <= current_price:
-            stop_loss = round(current_price + min_risk_dist, decimals)
-
-        risk_dist = max(min_risk_dist, stop_loss - current_price)
+        # Clamp risk_dist strictly between min_risk_dist and max_risk_dist (Strict 100 - 150 pips rule for Gold)
+        risk_dist = max(min_risk_dist, min(max_risk_dist, raw_risk))
+        stop_loss = round(current_price + risk_dist, decimals)
         risk_pips = round(to_pips(canon, risk_dist), 1)
 
-        # TP1 = 1:2 R:R from actual entry reference (140 - 170 pips on Gold)
+        # TP1 = 1:2 R:R from actual entry reference (200 - 300 pips on Gold)
         tp1_dist = risk_dist * 2.0
         take_profit_1 = round(current_price - tp1_dist, decimals)
         reward_pips_tp1 = round(to_pips(canon, tp1_dist), 1)
         rr_tp1 = 2.0
 
-        # TP2 = 1:3.5 R:R or SSL liquidity pool (240 - 290 pips on Gold)
+        # TP2 = 1:3.5 R:R or SSL liquidity pool (350 - 525 pips on Gold)
         ssl_target = liq_data.get("ssl_target")
-        if ssl_target and ssl_target < current_price - risk_dist * 2.5:
+        if ssl_target and (current_price - ssl_target) >= (risk_dist * 2.5) and (current_price - ssl_target) <= (risk_dist * 4.0):
             take_profit_2 = round(ssl_target, decimals)
             tp2_dist = current_price - take_profit_2
         else:
@@ -670,7 +668,7 @@ def evaluate_confluence_signal(
         reward_pips_tp2 = round(to_pips(canon, tp2_dist), 1)
         rr_tp2 = round(tp2_dist / risk_dist, 2)
 
-        # TP3 = 1:4.5 R:R Macro Swing Runner (300 - 380 pips on Gold)
+        # TP3 = 1:4.5 R:R Macro Swing Runner (450 - 675 pips on Gold)
         tp3_dist = risk_dist * 4.5
         take_profit_3 = round(current_price - tp3_dist, decimals)
         reward_pips_tp3 = round(to_pips(canon, tp3_dist), 1)

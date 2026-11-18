@@ -3557,10 +3557,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
                 const activeEntry = (elEntry && elEntry.textContent !== '--') ? Number(elEntry.textContent) : (mid || 0);
 
-                const stopDist = isBtc ? 200.0 : (decimals === 2 ? 7.5 : 0.0025);
-                const tp1Dist = isBtc ? 400.0 : (decimals === 2 ? 15.0 : 0.0050);
-                const tp2Dist = isBtc ? 700.0 : (decimals === 2 ? 26.5 : 0.0087);
-                const tp3Dist = isBtc ? 900.0 : (decimals === 2 ? 34.0 : 0.0112);
+                const stopDist = isBtc ? 650.0 : (isGold ? 12.5 : (decimals === 2 ? 0.25 : 0.0020));
+                const tp1Dist = isBtc ? 1300.0 : (isGold ? 25.0 : (decimals === 2 ? 0.50 : 0.0040));
+                const tp2Dist = isBtc ? 2275.0 : (isGold ? 43.75 : (decimals === 2 ? 0.875 : 0.0070));
+                const tp3Dist = isBtc ? 2925.0 : (isGold ? 56.25 : (decimals === 2 ? 1.125 : 0.0090));
 
                 if (elStop) {
                     const fallbackStop = action === 'BUY' ? (Number(activeEntry) - stopDist) : (Number(activeEntry) + stopDist);
