@@ -586,9 +586,13 @@ class SignalStateManager:
             # If Technical Bias is actively BEARISH, only permit Elite A+ institutional reversal setups
             if scan_dir == "BEARISH" and not is_elite_setup:
                 candidate_action = None
+            elif htf_dir == "BEARISH" and scan_dir == "BEARISH":
+                candidate_action = None
         elif candidate_action == "SELL":
             # If Technical Bias is actively BULLISH, only permit Elite A+ institutional reversal setups
             if scan_dir == "BULLISH" and not is_elite_setup:
+                candidate_action = None
+            elif htf_dir == "BULLISH" and scan_dir == "BULLISH":
                 candidate_action = None
 
         if candidate_action in ("BUY", "SELL") and candle_is_closed:

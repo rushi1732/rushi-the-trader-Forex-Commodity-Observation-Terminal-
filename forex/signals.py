@@ -487,7 +487,6 @@ def evaluate_confluence_signal(
         inside_fvg and inside_fvg.get("type") == "BULLISH_FVG" or
         sweeps.get("has_bullish_sweep") or
         (latest_choch and latest_choch.get("direction") == "BULLISH" and choch_bars_ago <= 8) or
-        (latest_bos and latest_bos.get("direction") == "BULLISH" and bos_bars_ago <= 8) or
         (div_data.get("detected") and div_data.get("bias") == "BUY")
     )
 
@@ -502,7 +501,6 @@ def evaluate_confluence_signal(
         inside_fvg and inside_fvg.get("type") == "BEARISH_FVG" or
         sweeps.get("has_bearish_sweep") or
         (latest_choch and latest_choch.get("direction") == "BEARISH" and choch_bars_ago <= 8) or
-        (latest_bos and latest_bos.get("direction") == "BEARISH" and bos_bars_ago <= 8) or
         (div_data.get("detected") and div_data.get("bias") == "SELL")
     )
 
