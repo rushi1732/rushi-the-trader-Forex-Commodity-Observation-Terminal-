@@ -3096,21 +3096,19 @@
             const ict = data.ict || (confSig.components && confSig.components.ict) || {};
             const div = data.divergence || (confSig.components && confSig.components.divergence) || {};
 
-            let action = 'NO SIGNAL';
-            let score = 0;
-            let grade = 'Grade C (Consolidation / Wait)';
-            let factors = [];
-
-            if (confSig && confSig.action && confSig.action !== 'NEUTRAL') {
+            // Strict Synchronization: Decision Matrix and Card 3 must NEVER contradict each other!
+            const isTradeActive = Boolean(autoSig && (autoSig.action === 'BUY' || autoSig.action === 'SELL'));
+            if (isTradeActive) {
+                // If a trade is actively confirmed in Card 3, Decision Matrix mirrors it 100%!
+                action = autoSig.action;
+                score = autoSig.confluence_score || confSig.confluence_score || 0;
+                grade = autoSig.grade || confSig.grade || (score >= 80 ? 'Grade A+' : (score >= 65 ? 'Grade A' : 'Grade B'));
+                factors = (autoSig.confluence_factors && autoSig.confluence_factors.length) ? autoSig.confluence_factors : (confSig.confluence_factors || []);
+            } else if (confSig && confSig.action && confSig.action !== 'NEUTRAL') {
                 action = confSig.action;
                 score = confSig.confluence_score || 0;
                 grade = confSig.grade || (score >= 80 ? 'Grade A+' : (score >= 65 ? 'Grade A' : 'Grade B'));
                 factors = confSig.confluence_factors || [];
-            } else if (autoSig && (autoSig.action === 'BUY' || autoSig.action === 'SELL') && (autoSig.confluence_score >= 50)) {
-                action = autoSig.action;
-                score = autoSig.confluence_score || confSig.confluence_score || 0;
-                grade = autoSig.grade || confSig.grade || (score >= 80 ? 'Grade A+' : 'Grade B');
-                factors = autoSig.confluence_factors || confSig.confluence_factors || [];
             } else {
                 action = 'NO SIGNAL';
                 score = confSig.confluence_score !== undefined ? confSig.confluence_score : (autoSig.confluence_score || 0);
@@ -3139,21 +3137,41 @@
                 const factorListHtml = factors.length ? ('<ul style="margin:6px 0 6px 18px; font-size:11px;">' + factors.map(f => `<li>${f}</li>`).join('') + '</ul>') : '';
 
                 if (action === 'BUY') {
-                    box.className = 'decision-box buy-active';
-                    actionEl.innerHTML = `<span class="pulse-dot green"></span> BUY SIGNAL CONFIRMED (बाय सिग्नल सक्रिय)  -  ${score}% [${grade}]`;
-                    actionEl.style.color = '#34d399';
-                    summaryEl.innerHTML = `
-                        <strong>का BUY करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बुलिश असून किंमत Discount Zone मध्ये आहे. लिक्विडिटी हंट किंवा ऑर्डर ब्लॉक टेस्ट नंतर 5m कँडलने स्पष्ट कन्फर्मेशन दिले आहे.<br>
-                        ${factorListHtml}
-                    `;
+                    if (isTradeActive) {
+                        box.className = 'decision-box buy-active';
+                        actionEl.innerHTML = `<span class="pulse-dot green"></span> BUY SIGNAL CONFIRMED (बाय सिग्नल सक्रिय)  -  ${score}% [${grade}]`;
+                        actionEl.style.color = '#34d399';
+                        summaryEl.innerHTML = `
+                            <strong>का BUY करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बुलिश असून किंमत Discount Zone मध्ये आहे. लिक्विडिटी हंट किंवा ऑर्डर ब्लॉक टेस्ट नंतर 5m कँडलने स्पष्ट कन्फर्मेशन दिले आहे.<br>
+                            ${factorListHtml}
+                        `;
+                    } else {
+                        box.className = 'decision-box wait-active';
+                        actionEl.innerHTML = `<span class="pulse-dot amber"></span> BUY SETUP DETECTED (प्रतीक्षा करा - कँडल क्लोज कन्फर्मेशन बाकी)  -  ${score}% [${grade}]`;
+                        actionEl.style.color = '#fbbf24';
+                        summaryEl.innerHTML = `
+                            <strong>संभाव्य BUY सेटअप:</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) किंमत Discount Zone मध्ये आली आहे. 5m कँडल क्लोज कन्फर्मेशनची प्रतीक्षा सुरू आहे.<br>
+                            ${factorListHtml}
+                        `;
+                    }
                 } else if (action === 'SELL') {
-                    box.className = 'decision-box sell-active';
-                    actionEl.innerHTML = `<span class="pulse-dot red"></span> SELL SIGNAL CONFIRMED (सेल सिग्नल सक्रिय)  -  ${score}% [${grade}]`;
-                    actionEl.style.color = '#fb7185';
-                    summaryEl.innerHTML = `
-                        <strong>का SELL करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बेअरिश असून किंमत Premium Zone मध्ये आहे. Buy-Side Liquidity (BSL) स्वीप किंवा Supply Order Block रिजेक्शन नंतर मजबूत सेल-ऑफ दिसत आहे.<br>
-                        ${factorListHtml}
-                    `;
+                    if (isTradeActive) {
+                        box.className = 'decision-box sell-active';
+                        actionEl.innerHTML = `<span class="pulse-dot red"></span> SELL SIGNAL CONFIRMED (सेल सिग्नल सक्रिय)  -  ${score}% [${grade}]`;
+                        actionEl.style.color = '#fb7185';
+                        summaryEl.innerHTML = `
+                            <strong>का SELL करायचे (Institutional Confluence):</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) मार्केट स्ट्रक्चर बेअरिश असून किंमत Premium Zone मध्ये आहे. Buy-Side Liquidity (BSL) स्वीप किंवा Supply Order Block रिजेक्शन नंतर मजबूत सेल-ऑफ दिसत आहे.<br>
+                            ${factorListHtml}
+                        `;
+                    } else {
+                        box.className = 'decision-box wait-active';
+                        actionEl.innerHTML = `<span class="pulse-dot amber"></span> SELL SETUP DETECTED (प्रतीक्षा करा - कँडल क्लोज कन्फर्मेशन बाकी)  -  ${score}% [${grade}]`;
+                        actionEl.style.color = '#fbbf24';
+                        summaryEl.innerHTML = `
+                            <strong>संभाव्य SELL सेटअप:</strong> स्मार्ट मनी संकल्पनेनुसार (SMC) किंमत Premium Zone मध्ये आली आहे. 5m कँडल क्लोज कन्फर्मेशनची प्रतीक्षा सुरू आहे.<br>
+                            ${factorListHtml}
+                        `;
+                    }
                 } else {
                     box.className = 'decision-box wait-active';
                     actionEl.innerHTML = `<span class="pulse-dot amber"></span> NO SIGNAL (प्रतीक्षा करा - किंमत अद्याप एन्ट्री झोनमध्ये नाही)  -  Confluence: ${score}% [${grade}]`;
@@ -3174,16 +3192,32 @@
 
             if (stratPanel && stratGrid) {
                 if (action === 'BUY') {
-                    stratPanel.className = 'matrix-strategies-panel panel-buy';
-                    if (stratBadge) {
-                        stratBadge.className = 'badge badge-green';
-                        stratBadge.textContent = `BUY CONFIRMED (${score}% [${grade}])`;
+                    if (isTradeActive) {
+                        stratPanel.className = 'matrix-strategies-panel panel-buy';
+                        if (stratBadge) {
+                            stratBadge.className = 'badge badge-green';
+                            stratBadge.textContent = `BUY CONFIRMED (${score}% [${grade}])`;
+                        }
+                    } else {
+                        stratPanel.className = 'matrix-strategies-panel panel-wait';
+                        if (stratBadge) {
+                            stratBadge.className = 'badge badge-amber';
+                            stratBadge.textContent = `BUY SETUP DETECTED (${score}% [${grade}])`;
+                        }
                     }
                 } else if (action === 'SELL') {
-                    stratPanel.className = 'matrix-strategies-panel panel-sell';
-                    if (stratBadge) {
-                        stratBadge.className = 'badge badge-rose';
-                        stratBadge.textContent = `SELL CONFIRMED (${score}% [${grade}])`;
+                    if (isTradeActive) {
+                        stratPanel.className = 'matrix-strategies-panel panel-sell';
+                        if (stratBadge) {
+                            stratBadge.className = 'badge badge-rose';
+                            stratBadge.textContent = `SELL CONFIRMED (${score}% [${grade}])`;
+                        }
+                    } else {
+                        stratPanel.className = 'matrix-strategies-panel panel-wait';
+                        if (stratBadge) {
+                            stratBadge.className = 'badge badge-amber';
+                            stratBadge.textContent = `SELL SETUP DETECTED (${score}% [${grade}])`;
+                        }
                     }
                 } else {
                     stratPanel.className = 'matrix-strategies-panel panel-wait';

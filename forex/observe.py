@@ -293,12 +293,24 @@ class SignalStateManager:
             decimals = 2 if ("XAU" in canon or "BTC" in canon) else (2 if "JPY" in canon else 4)
             pip_size = 0.10 if "XAU" in canon else (1.0 if "BTC" in canon else (0.01 if "JPY" in canon else 0.0001))
 
+            # Inspect all candles since signal confirmation for historical high/low breaches
+            active_ts = active.get("confirmed_candle_ts") or active.get("created_timestamp") or 0
+            recent_candles = [c for c in candles if c.get("timestamp", 0) > active_ts] if (candles and active_ts > 0) else []
+            if entry_ref and entry_ref > 0:
+                # Sanity guard: discard mismatched candles deviating > 25% from entry (e.g. cross-asset test fixtures)
+                recent_candles = [c for c in recent_candles if abs(c.get("close", entry_ref) - entry_ref) / entry_ref <= 0.25]
+
+            candle_highs = [c.get("high", current_price) for c in recent_candles] + ([current_price] if current_price > 0 else [])
+            candle_lows = [c.get("low", current_price) for c in recent_candles] + ([current_price] if current_price > 0 else [])
+            period_high = max(candle_highs) if candle_highs else current_price
+            period_low = min(candle_lows) if candle_lows else current_price
+
             # Dynamic Breakeven & Trailing Stop Protection (Risk-Free Trade Logic)
             if entry_ref and initial_sl and current_price > 0.0:
                 risk_dist = abs(entry_ref - initial_sl)
                 if risk_dist > 0.0:
                     if side == "BUY":
-                        profit_dist = current_price - entry_ref
+                        profit_dist = max(current_price - entry_ref, period_high - entry_ref)
                         # 1. Breakeven Protection at 1R profit: lock in +1 pip buffer
                         if profit_dist >= risk_dist * 1.0:
                             be_level = round(entry_ref + (pip_size * 1.0), decimals)
@@ -309,7 +321,7 @@ class SignalStateManager:
                                 active["status_label"] = "BUY (BREAKEVEN PROTECTED / 1R REACHED)"
 
                         # 2. Lock 1R profit once TP1 (2R) is touched
-                        if tp1 and current_price >= tp1:
+                        if tp1 and (current_price >= tp1 or period_high >= tp1):
                             t1_level = round(entry_ref + (risk_dist * 1.0), decimals)
                             if sl is None or sl < t1_level:
                                 sl = t1_level
@@ -318,7 +330,7 @@ class SignalStateManager:
                                 active["status_label"] = "BUY (TP1 REACHED - TRAILED TO +1R)"
 
                     elif side == "SELL":
-                        profit_dist = entry_ref - current_price
+                        profit_dist = max(entry_ref - current_price, entry_ref - period_low)
                         # 1. Breakeven Protection at 1R profit: lock in -1 pip buffer
                         if profit_dist >= risk_dist * 1.0:
                             be_level = round(entry_ref - (pip_size * 1.0), decimals)
@@ -329,7 +341,7 @@ class SignalStateManager:
                                 active["status_label"] = "SELL (BREAKEVEN PROTECTED / 1R REACHED)"
 
                         # 2. Lock 1R profit once TP1 (2R) is touched
-                        if tp1 and current_price <= tp1:
+                        if tp1 and (current_price <= tp1 or period_low <= tp1):
                             t1_level = round(entry_ref - (risk_dist * 1.0), decimals)
                             if sl is None or sl > t1_level:
                                 sl = t1_level
@@ -347,14 +359,14 @@ class SignalStateManager:
                     is_price_insane = True
 
             if side == "BUY":
-                if sl is not None and current_price <= sl:
+                if sl is not None and (current_price <= sl or period_low <= sl):
                     is_sl_hit = True
-                if tp2 is not None and current_price >= tp2:
+                if tp2 is not None and (current_price >= tp2 or period_high >= tp2):
                     is_tp2_hit = True
             elif side == "SELL":
-                if sl is not None and current_price >= sl:
+                if sl is not None and (current_price >= sl or period_high >= sl):
                     is_sl_hit = True
-                if tp2 is not None and current_price <= tp2:
+                if tp2 is not None and (current_price <= tp2 or period_low <= tp2):
                     is_tp2_hit = True
 
             # Check market structure opposite break (BOS or CHoCH) that occurred AFTER signal was confirmed
@@ -395,6 +407,9 @@ class SignalStateManager:
                 curr_ts = candles[-1].get("timestamp", 0)
                 if curr_ts > 0 and (curr_ts - signal_ts) >= 5400:  # 90 minutes
                     is_time_expired = True
+            created_ts = active.get("created_timestamp", 0)
+            if created_ts > 0 and (now_utc.timestamp() - created_ts) >= 5400:
+                is_time_expired = True
 
             if is_sl_hit or is_tp2_hit or is_struct_break or is_price_insane or is_trend_reversed or is_time_expired:
                 # Signal is INVALIDATED! (Req 4: never switch directly from BUY to SELL. First invalidate, transition to waiting)
@@ -408,8 +423,8 @@ class SignalStateManager:
                     }
                 is_be_hit = bool(active.get("is_breakeven_protected") or active.get("tp1_hit"))
                 inv_text = "Cross-asset anomaly invalidated" if is_price_insane else (
-                    (f"Trailing Stop / Breakeven hit at {sl} (Capital protected)" if is_be_hit else f"Stop Loss hit at {sl}") if is_sl_hit else (
-                        f"Take Profit 2 target completed at {tp2}" if is_tp2_hit else (
+                    f"Take Profit 2 target completed at {tp2}" if is_tp2_hit else (
+                        (f"Trailing Stop / Breakeven hit at {sl} (Capital protected)" if is_be_hit else f"Stop Loss hit at {sl}") if is_sl_hit else (
                             f"Technical bias turned {scan_dir}" if is_trend_reversed else (
                                 "Intraday session expired (90m timeout)" if is_time_expired else "Market structure invalidated"
                             )

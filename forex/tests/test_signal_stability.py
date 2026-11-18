@@ -768,6 +768,62 @@ class TestSignalStability(unittest.TestCase):
                 self.assertGreaterEqual(plan.get("reward_pips_tp1"), 200.0)
                 self.assertLessEqual(plan.get("reward_pips_tp1"), 300.0)
 
+    def test_historical_candle_high_triggers_stop_loss_even_after_price_retraces(self):
+        """If price rallied past SL during a subsequent candle and retraced, SL hit must be detected."""
+        conf_sell = {
+            "action": "SELL",
+            "confluence_score": 85,
+            "grade": "Grade A+",
+            "is_in_entry_zone": True,
+            "confluence_factors": ["Supply Block", "Bearish BOS"],
+            "execution_plan": {
+                "entry_price": 3769.60,
+                "stop_loss": 3784.60,
+                "take_profit_1": 3739.60,
+                "take_profit_2": 3717.10,
+            },
+        }
+        entry_ts = 1794900000
+        candles = [
+            {"timestamp": entry_ts - (20 - i) * 300, "open": 3770.0, "high": 3771.0, "low": 3769.0, "close": 3769.60, "volume": 100}
+            for i in range(20)
+        ]
+
+        # 1. Establish confirmed SELL at 3769.60, SL 3784.60
+        sig1 = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=3769.60,
+            candles=candles,
+            confluence_signal=conf_sell,
+        )
+        self.assertEqual(sig1["action"], "SELL")
+        self.assertEqual(sig1["stop_loss"], 3784.60)
+
+        # 2. Subsequent candle spikes to 3789.0 (exceeding 3784.60 SL), then price retraces to 3769.89
+        candles_spike = list(candles) + [
+            {"timestamp": entry_ts + 300, "open": 3770.0, "high": 3789.0, "low": 3769.5, "close": 3769.89, "volume": 200}
+        ]
+        sig2 = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=3769.89,  # Note: current_price < SL, but candle high (3789.0) blew through SL!
+            candles=candles_spike,
+        )
+
+        # Must be invalidated because candle high hit Stop Loss!
+        self.assertEqual(sig2["action"], "NO SIGNAL")
+        self.assertEqual(sig2["status_label"], "WAITING FOR ENTRY ZONE")
+        self.assertIn("Stop Loss hit", sig2["reason"])
+
 
 if __name__ == "__main__":
     unittest.main()
