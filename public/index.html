@@ -2927,7 +2927,7 @@
                     let entryP = autoSig.entry_reference;
                     // Sanity check: ensure entry price is in range for this symbol and not leaked from another pair
                     if (isLiveStreaming && activeTick && activeTick.mid && normalizeSym(activeTick.symbol) === normSym) {
-                        if (!entryP || Math.abs(entryP - activeTick.mid) > (isBtc ? 1500.0 : 25.0)) {
+                        if (!entryP || Math.abs(entryP - activeTick.mid) / activeTick.mid > 0.25) {
                             entryP = activeTick.mid;
                         }
                     } else if (mid) {

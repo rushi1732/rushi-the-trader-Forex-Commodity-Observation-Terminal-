@@ -161,6 +161,8 @@ class SignalStateManager:
         is_offline_test: bool = False,
     ) -> Dict[str, Any]:
         canon = normalize_symbol(symbol)
+        decimals = 2 if ("XAU" in canon or "BTC" in canon) else (2 if "JPY" in canon else 4)
+        pip_size = 0.10 if "XAU" in canon else (1.0 if "BTC" in canon else (0.01 if "JPY" in canon else 0.0001))
         candles = candles or []
 
         # 1. Closed market enforcement (Req 8 & 10)
@@ -514,7 +516,7 @@ class SignalStateManager:
                 candidate_grade = confluence_signal.get("grade", "A")
                 candidate_factors = confluence_signal.get("confluence_factors", [])
                 candidate_strategy = f"SMC / ICT Institutional Flow ({candidate_grade} - {candidate_score}%) [trader-scanner + trader-entry + trader-exit]"
-                candidate_entry = current_price
+                candidate_entry = current_price if current_price > 0 else (plan.get("entry_price") or 0.0)
                 candidate_sl = plan["stop_loss"]
                 candidate_tp1 = plan["take_profit_1"]
                 candidate_tp2 = plan.get("take_profit_2")
@@ -526,6 +528,20 @@ class SignalStateManager:
                 candidate_reward_pips = plan.get("reward_pips_tp1")
                 candidate_reward_pips_tp2 = plan.get("reward_pips_tp2")
                 candidate_reward_pips_tp3 = plan.get("reward_pips_tp3")
+
+                # If live market price drifted since confluence evaluation, shift SL and TPs exactly with candidate_entry
+                plan_entry = plan.get("entry_price")
+                if plan_entry is not None and candidate_entry > 0 and abs(candidate_entry - plan_entry) > 0.00001:
+                    diff = round(candidate_entry - plan_entry, decimals)
+                    if candidate_sl is not None:
+                        candidate_sl = round(candidate_sl + diff, decimals)
+                    if candidate_tp1 is not None:
+                        candidate_tp1 = round(candidate_tp1 + diff, decimals)
+                    if candidate_tp2 is not None:
+                        candidate_tp2 = round(candidate_tp2 + diff, decimals)
+                    if candidate_tp3 is not None:
+                        candidate_tp3 = round(candidate_tp3 + diff, decimals)
+
                 factors_str = " | ".join(candidate_factors[:2]) if candidate_factors else "Institutional multi-factor alignment"
                 candidate_reason = f"Confirmed {c_action} Institutional Setup ({candidate_grade}, Score: {candidate_score}%): {factors_str}"
         elif is_offline_test and paper_simulation and isinstance(paper_simulation, dict) and "error" not in paper_simulation:
@@ -943,6 +959,7 @@ def observe_pair(
         candles_15m=candles_15m,
         live_spread_pips=spread_pips,
         offline_data=offline_data,
+        live_price=latest_close,
     )
 
     # 3. Market Closed or Stale Data Guard
@@ -1079,8 +1096,10 @@ def observe_pair(
         interval=interval,
         now_dt=now_et,
         asian_range=asian_setup,
+        candles_15m=candles_15m,
         live_spread_pips=spread_pips,
         offline_data=offline_data,
+        live_price=latest_close,
     )
 
     # 6. Paper Simulation (If setup is confirmed and price is in a valid entry zone)

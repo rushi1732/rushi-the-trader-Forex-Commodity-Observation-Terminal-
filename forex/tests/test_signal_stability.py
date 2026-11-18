@@ -4,6 +4,7 @@ import unittest
 from datetime import datetime, timezone
 
 from forex.observe import SignalStateManager, reset_signal_state
+from forex.signals import evaluate_confluence_signal
 
 
 class TestSignalStability(unittest.TestCase):
@@ -823,6 +824,59 @@ class TestSignalStability(unittest.TestCase):
         self.assertEqual(sig2["action"], "NO SIGNAL")
         self.assertEqual(sig2["status_label"], "WAITING FOR ENTRY ZONE")
         self.assertIn("Stop Loss hit", sig2["reason"])
+
+    def test_exact_live_price_entry_reference_zero_drift(self):
+        """Verify Entry Reference strictly matches live market price (0 pips drift) with strict Gold SL/TP R:R."""
+        entry_ts = 1794800000
+        candles = [
+            {"timestamp": entry_ts - (20 - i) * 300, "open": 3765.0, "high": 3772.0, "low": 3760.0, "close": 3765.0, "volume": 100}
+            for i in range(20)
+        ]
+        # Live market spot rate from Twelve Data is 3769.89 (while candles[-1]['close'] was 3765.00 - 48.9 pips away)
+        live_spot = 3769.89
+        conf_sig = evaluate_confluence_signal(
+            symbol="XAU/USD",
+            candles=candles,
+            interval="5m",
+            live_price=live_spot,
+            offline_data={"dummy": True},
+        )
+        # 1. evaluate_confluence_signal must anchor execution plan to live_spot
+        self.assertEqual(conf_sig["current_price"], live_spot)
+
+        # Force a valid SELL confirmation at live_spot
+        conf_sig["action"] = "SELL"
+        conf_sig["is_in_entry_zone"] = True
+        conf_sig["confluence_score"] = 80
+        conf_sig["grade"] = "A+ (Elite Institutional)"
+        conf_sig["execution_plan"]["entry_price"] = live_spot
+        conf_sig["execution_plan"]["stop_loss"] = round(live_spot + 15.00, 2)  # 150 pips SL
+        conf_sig["execution_plan"]["take_profit_1"] = round(live_spot - 30.00, 2)  # 300 pips (2R)
+        conf_sig["execution_plan"]["take_profit_2"] = round(live_spot - 52.50, 2)  # 525 pips (3.5R)
+        conf_sig["execution_plan"]["take_profit_3"] = round(live_spot - 67.50, 2)  # 675 pips (4.5R)
+
+        sig = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=live_spot,
+            candles=candles,
+            confluence_signal=conf_sig,
+        )
+
+        # Entry Reference MUST strictly equal 3769.89 (0 pips drift, NOT 3765.00)
+        self.assertEqual(sig["action"], "SELL")
+        self.assertEqual(sig["entry_reference"], 3769.89)
+        self.assertEqual(sig["stop_loss"], 3784.89)
+        self.assertEqual(sig["take_profit"], 3739.89)
+        self.assertEqual(sig["take_profit_2"], 3717.39)
+        self.assertEqual(sig["take_profit_3"], 3702.39)
+        # Risk is strictly 150 pips (within 100 - 150 pips Gold rule)
+        risk_dist = sig["stop_loss"] - sig["entry_reference"]
+        self.assertAlmostEqual(risk_dist, 15.00, places=2)
 
 
 if __name__ == "__main__":

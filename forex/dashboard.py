@@ -3548,7 +3548,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     let entryP = autoSig.entry_reference;
                     // Sanity check: ensure entry price is in range for this symbol and not leaked from another pair
                     if (isLiveStreaming && activeTick && activeTick.mid && normalizeSym(activeTick.symbol) === normSym) {
-                        if (!entryP || Math.abs(entryP - activeTick.mid) > (isBtc ? 1500.0 : 25.0)) {
+                        if (!entryP || Math.abs(entryP - activeTick.mid) / activeTick.mid > 0.25) {
                             entryP = activeTick.mid;
                         }
                     } else if (mid) {
@@ -7126,15 +7126,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                         auto = obs["auto_signal"]
                         auto["is_market_open"] = True
                         if auto.get("action") in ("BUY", "SELL"):
-                            if auto.get("entry_reference") and abs(auto["entry_reference"] - live["mid"]) > 10.0:
-                                diff = round(live["mid"] - auto["entry_reference"], 2 if "XAU" in canon else 4)
-                                auto["entry_reference"] = live["mid"]
-                                if auto.get("stop_loss"):
-                                    auto["stop_loss"] = round(auto["stop_loss"] + diff, 2 if "XAU" in canon else 4)
-                                if auto.get("take_profit"):
-                                    auto["take_profit"] = round(auto["take_profit"] + diff, 2 if "XAU" in canon else 4)
-                                if auto.get("take_profit_2"):
-                                    auto["take_profit_2"] = round(auto["take_profit_2"] + diff, 2 if "XAU" in canon else 4)
+                            # Sanity check: discard cross-asset corrupted entry (> 25% deviation from spot mid)
+                            if auto.get("entry_reference") and live.get("mid"):
+                                if abs(auto["entry_reference"] - live["mid"]) / live["mid"] > 0.25:
+                                    auto["entry_reference"] = live["mid"]
                 if "XAU" in canon and GOLD_CALIBRATION["offset"] != 0.0:
                     c_off = GOLD_CALIBRATION["offset"]
                     if obs.get("indicative_mid") is not None:

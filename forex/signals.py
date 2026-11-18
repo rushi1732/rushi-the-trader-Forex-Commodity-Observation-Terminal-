@@ -40,6 +40,7 @@ def evaluate_confluence_signal(
     candles_15m: Optional[List[Dict[str, Any]]] = None,
     live_spread_pips: float = 1.8,
     offline_data: Optional[Dict[str, Any]] = None,
+    live_price: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Evaluates multi-factor institutional confluence across SMC, ICT, Fib, and Liquidity.
@@ -64,7 +65,10 @@ def evaluate_confluence_signal(
         now_utc = now_dt if now_dt.tzinfo else now_dt.replace(tzinfo=timezone.utc)
     now_et = utc_to_et(now_utc)
 
-    current_price = candles[-1]["close"]
+    if live_price is not None and float(live_price) > 0:
+        current_price = round(float(live_price), decimals)
+    else:
+        current_price = round(candles[-1]["close"], decimals)
     latest_candle = candles[-1]
 
     # Volatility & ATR Buffer Calculation (14-period true range)
@@ -431,12 +435,13 @@ def evaluate_confluence_signal(
 
     # D. Liquidity Sweep & Stop-Loss Hunt (Turtle Soup Reversal Zone on latest/recent candle)
     recent_sweeps = liq_data.get("sweeps", {}).get("recent_sweeps", [])
+    sweep_entry_buffer = max(pip_size * 12, from_pips(canon, 15.0))
     recent_ssl = [s for s in recent_sweeps if s.get("sentiment") == "BULLISH" and s.get("candle_index", 0) >= len(candles) - 3]
-    if recent_ssl and current_price >= (recent_ssl[-1]["level_price"] - (pip_size * 5)):
+    if recent_ssl and abs(current_price - recent_ssl[-1]["level_price"]) <= sweep_entry_buffer:
         bullish_entry_zones.append(f"Turtle Soup SSL Sweep Zone at {recent_ssl[-1]['level_price']:.{decimals}f}")
 
     recent_bsl = [s for s in recent_sweeps if s.get("sentiment") == "BEARISH" and s.get("candle_index", 0) >= len(candles) - 3]
-    if recent_bsl and current_price <= (recent_bsl[-1]["level_price"] + (pip_size * 5)):
+    if recent_bsl and abs(current_price - recent_bsl[-1]["level_price"]) <= sweep_entry_buffer:
         bearish_entry_zones.append(f"Turtle Soup BSL Sweep Zone at {recent_bsl[-1]['level_price']:.{decimals}f}")
 
     # E. RSI Hidden & Regular Divergence Reversal / Continuation Zone
@@ -485,7 +490,6 @@ def evaluate_confluence_signal(
         inside_ob and inside_ob.get("type") == "BULLISH_OB" or
         (nearest_demand and abs(current_price - nearest_demand.get("top", 0)) <= max(pip_size * 8, from_pips(canon, 12.0))) or
         inside_fvg and inside_fvg.get("type") == "BULLISH_FVG" or
-        sweeps.get("has_bullish_sweep") or
         (latest_choch and latest_choch.get("direction") == "BULLISH" and choch_bars_ago <= 8) or
         (div_data.get("detected") and div_data.get("bias") == "BUY")
     )
@@ -493,13 +497,12 @@ def evaluate_confluence_signal(
     if htf_bearish and not has_bullish_reversal:
         bullish_entry_zones = []
         bullish_score = min(bullish_score, 25)
-        bullish_factors.append("[HTF TREND VETO] BUY prohibited: 15m Macro Trend is BEARISH (15m EMA-21 < EMA-50). Never buy into macro selloffs.")
+        bullish_factors.append("[HTF TREND VETO] BUY prohibited: 15m HTF Macro Trend is BEARISH (15m EMA-21 < EMA-50). Never buy into macro selloffs.")
 
     has_bearish_reversal = bool(
         inside_ob and inside_ob.get("type") == "BEARISH_OB" or
         (nearest_supply and abs(current_price - nearest_supply.get("bottom", 0)) <= max(pip_size * 8, from_pips(canon, 12.0))) or
         inside_fvg and inside_fvg.get("type") == "BEARISH_FVG" or
-        sweeps.get("has_bearish_sweep") or
         (latest_choch and latest_choch.get("direction") == "BEARISH" and choch_bars_ago <= 8) or
         (div_data.get("detected") and div_data.get("bias") == "SELL")
     )
@@ -507,7 +510,7 @@ def evaluate_confluence_signal(
     if htf_bullish and not has_bearish_reversal:
         bearish_entry_zones = []
         bearish_score = min(bearish_score, 25)
-        bearish_factors.append("[HTF TREND VETO] SELL prohibited: 15m Macro Trend is BULLISH (15m EMA-21 > EMA-50). Never short into macro rallies.")
+        bearish_factors.append("[HTF TREND VETO] SELL prohibited: 15m HTF Macro Trend is BULLISH (15m EMA-21 > EMA-50). Never short into macro rallies.")
 
     # 2. Local 5m Trend & Momentum Veto:
     # Counter-trend trades into a 5m cascade are prohibited unless confirmed institutional reversal / CHoCH is present
@@ -615,7 +618,12 @@ def evaluate_confluence_signal(
     else:
         signal_side = "NEUTRAL"
         confluence_score = max(bullish_score, bearish_score)
-        base_factors = bullish_factors if bullish_score >= bearish_score else bearish_factors
+        if htf_bearish and not htf_bullish:
+            base_factors = bearish_factors
+        elif htf_bullish and not htf_bearish:
+            base_factors = bullish_factors
+        else:
+            base_factors = bullish_factors if bullish_score >= bearish_score else bearish_factors
         if bullish_score >= 50 or bearish_score >= 50:
             active_factors = ["[OUTSIDE ENTRY ZONE] Price is outside valid entry zones (OB/FVG/OTE/Sweep). Waiting for entry zone."] + base_factors
         else:
@@ -754,6 +762,7 @@ def evaluate_confluence_signal(
             "take_profit_1": take_profit_1,
             "take_profit_2": take_profit_2,
             "take_profit_3": take_profit_3,
+            "risk_dist": risk_dist if signal_side in ("BUY", "SELL") else None,
             "risk_pips": risk_pips,
             "reward_pips_tp1": reward_pips_tp1,
             "reward_pips_tp2": reward_pips_tp2,
