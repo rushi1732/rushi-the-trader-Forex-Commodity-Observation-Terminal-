@@ -2100,54 +2100,6 @@
                 </div>
             </div>
 
-            <!-- Card 6: Paper Observation Journal (Table with CSV Export) -->
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
-                            Paper Observation Journal (Simulated Positions)
-                        </span>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span class="badge badge-amber">SIMULATED ONLY  -  NO REAL MONEY</span>
-                            <button id="btnClearJournal" class="btn" style="padding:4px 10px; font-size:11px; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.4); color:#fca5a5;" onclick="clearJournalHistory()">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                Clear Journal
-                            </button>
-                            <button id="btnExportCsv" class="btn" style="padding:4px 10px; font-size:11px;" onclick="exportJournalCSV()">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                                Export CSV
-                            </button>
-                        </div>
-                    </div>
-
-                    <div style="overflow-x:auto; width:100%;">
-                        <table class="journal-table" style="min-width:750px;">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Symbol</th>
-                                    <th>Side</th>
-                                    <th>Sim. Fill</th>
-                                    <th>Stop Loss</th>
-                                    <th>Take Profit</th>
-                                    <th>Paper Size</th>
-                                    <th>Max Risk</th>
-                                    <th>Sim. P/L</th>
-                                    <th>Strategy / Setup</th>
-                                    <th>Timestamp</th>
-                                    <th>Status</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="journalBody">
-                                <!-- Injected dynamically -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
             <!-- Card 7: 11 Trading Skills Suite (Paper Observation & Analysis) -->
             <div class="col-12">
                 <div class="skills-section-header">
@@ -2377,7 +2329,7 @@
             </div>
 
             <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px; line-height:1.5;">
-                Supabase मुळे तुमचे <strong>Automatic Signal Engine ट्रेड्स</strong>, आणि <strong>Paper Observation Journal</strong> क्लाउडवर कायमचे सुरक्षित राहतात. Vercel रीस्टार्ट झाले तरी डेटा कधीही डिलीट होणार नाही.
+                Supabase मुळे तुमचे सिग्नल्स आणि सिस्टिम डेटा क्लाउडवर सुरक्षित राहतात. Vercel रीस्टार्ट झाले तरी सेटिंग्ज कायम राहतील.
             </p>
 
             <div class="form-group" style="margin-bottom:12px;">

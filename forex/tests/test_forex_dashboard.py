@@ -392,9 +392,9 @@ class TestForexDashboard(unittest.TestCase):
         self.assertIn('class="health-bar"', html)
         self.assertIn('id="healthBenchmark"', html)
 
-        # Journal export & risk
-        self.assertIn('id="btnExportCsv"', html)
+        # Risk modal & paper journal removed check
         self.assertIn('id="riskModal"', html)
+        self.assertNotIn("Paper Observation Journal (Simulated Positions)", html)
 
     def test_api_chart_endpoint(self):
         """Verify /api/chart returns candles, EMA indicators, and benchmark notice."""
@@ -1058,15 +1058,16 @@ class TestForexDashboard(unittest.TestCase):
         self.assertEqual(len(PAPER_JOURNAL), 0)
 
     def test_multi_target_tp3_in_html(self):
-        """Verify Take Profit 3 and Clear Journal elements are present in HTML."""
+        """Verify Take Profit 3 is present and Paper Observation Journal is completely removed."""
         url_home = f"http://127.0.0.1:{self.port}/"
         with urllib.request.urlopen(url_home, timeout=5) as resp:
             html = resp.read().decode("utf-8")
         self.assertIn("autoSignalTarget3", html)
         self.assertIn("Take Profit 3", html)
-        self.assertIn("btnClearJournal", html)
-        self.assertIn("clearJournalHistory", html)
-        self.assertIn("closeJournalTrade", html)
+        self.assertNotIn("Paper Observation Journal (Simulated Positions)", html)
+        self.assertNotIn("btnClearJournal", html)
+        self.assertNotIn("btnExportCsv", html)
+        self.assertNotIn('id="journalBody"', html)
 
     def test_card_5_historical_strategy_backtest(self):
         """Verify Card 5 is standalone Historical Strategy Backtest and trade tracker is removed."""
