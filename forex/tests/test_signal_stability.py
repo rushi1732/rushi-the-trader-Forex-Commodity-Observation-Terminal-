@@ -533,7 +533,7 @@ class TestSignalStability(unittest.TestCase):
         self.assertIn(sig["action"], ("SELL", "NEUTRAL"))
 
     def test_technical_bias_vetoes_opposite_candidate_action(self):
-        """Card 2 Technical Bias: BEARISH strictly vetoes any BUY candidate in Card 3."""
+        """Card 2 Technical Bias: BEARISH strictly vetoes any BUY candidate in Card 3 (score < 80)."""
         conf_buy = {
             "action": "BUY",
             "confluence_score": 75,
@@ -561,6 +561,42 @@ class TestSignalStability(unittest.TestCase):
         )
         self.assertEqual(sig["action"], "NO SIGNAL")
         self.assertEqual(sig["status_label"], "WAITING FOR ENTRY ZONE")
+
+    def test_elite_aplus_institutional_reversal_allowed_against_technical_bias(self):
+        """Elite A+ institutional reversal setup (score >= 80) is permitted to confirm even when Technical Bias is opposing."""
+        conf_elite_buy = {
+            "action": "BUY",
+            "confluence_score": 85,
+            "grade": "Grade A+",
+            "is_in_entry_zone": True,
+            "confluence_factors": ["Demand Order Block in Discount", "Sell-Side Liquidity Swept", "Bullish BOS Confirmed"],
+            "execution_plan": {
+                "entry_price": 3769.60,
+                "stop_loss": 3759.60,
+                "take_profit_1": 3789.60,
+                "take_profit_2": 3804.60,
+            },
+        }
+        candles_gold = [
+            {"timestamp": 1794900000 - (20 - i) * 300, "open": 3770.0, "high": 3772.0, "low": 3768.0, "close": 3769.60, "volume": 100}
+            for i in range(20)
+        ]
+        scan_bearish = {"direction": "BEARISH", "status": "OK"}
+        sig = self.manager.process(
+            symbol="XAU/USD",
+            timeframe="5m",
+            is_open=True,
+            is_fresh=True,
+            now_et=self.now_et,
+            now_utc=self.now_utc,
+            current_price=3769.60,
+            candles=candles_gold,
+            scan_info=scan_bearish,
+            confluence_signal=conf_elite_buy,
+        )
+        self.assertEqual(sig["action"], "BUY")
+        self.assertEqual(sig["status_label"], "BUY CONFIRMED")
+        self.assertEqual(sig["stop_loss"], 3759.60)
 
     def test_circuit_breaker_prevents_consecutive_stop_outs(self):
         """After hitting Stop Loss, circuit breaker blocks consecutive entries in same direction for 3 bars."""
