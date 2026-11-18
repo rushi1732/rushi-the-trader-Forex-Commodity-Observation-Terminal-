@@ -498,7 +498,7 @@ class SignalStateManager:
                 candidate_score = confluence_signal.get("confluence_score", 0)
                 candidate_grade = confluence_signal.get("grade", "A")
                 candidate_factors = confluence_signal.get("confluence_factors", [])
-                candidate_strategy = f"SMC / ICT Institutional Flow ({candidate_grade} - {candidate_score}%)"
+                candidate_strategy = f"SMC / ICT Institutional Flow ({candidate_grade} - {candidate_score}%) [trader-scanner + trader-entry + trader-exit]"
                 candidate_entry = current_price
                 candidate_sl = plan["stop_loss"]
                 candidate_tp1 = plan["take_profit_1"]
@@ -561,19 +561,23 @@ class SignalStateManager:
                         candidate_action = None
 
         # Strict Technical Bias & HTF Alignment Gate (Card 2 vs Card 3 Consistency)
-        # 15m HTF Trend is a HARD veto for both BUY and SELL.
         # Card 2 Technical Bias vetoes candidate actions unless candidate is Elite A+ (score >= 80)
         scan_dir = (scan_info or {}).get("direction", "NEUTRAL") if scan_info else "NEUTRAL"
         htf_dir = (confluence_signal or {}).get("htf_trend", "NEUTRAL") if confluence_signal else "NEUTRAL"
+        cand_score = (confluence_signal or {}).get("confluence_score", 0) if confluence_signal else 0
+        is_elite_setup = (cand_score >= 80)
+
         if candidate_action == "BUY":
-            if htf_dir == "BEARISH":
+            # If Technical Bias is actively BEARISH, only permit Elite A+ institutional reversal setups
+            if scan_dir == "BEARISH" and not is_elite_setup:
                 candidate_action = None
-            elif scan_dir == "BEARISH" and htf_dir != "BULLISH":
+            elif htf_dir == "BEARISH" and scan_dir == "BEARISH":
                 candidate_action = None
         elif candidate_action == "SELL":
-            if htf_dir == "BULLISH":
+            # If Technical Bias is actively BULLISH, only permit Elite A+ institutional reversal setups
+            if scan_dir == "BULLISH" and not is_elite_setup:
                 candidate_action = None
-            elif scan_dir == "BULLISH" and htf_dir != "BEARISH":
+            elif htf_dir == "BULLISH" and scan_dir == "BULLISH":
                 candidate_action = None
 
         if candidate_action in ("BUY", "SELL") and candle_is_closed:
