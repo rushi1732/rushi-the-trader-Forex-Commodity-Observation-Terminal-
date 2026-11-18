@@ -179,6 +179,35 @@ def evaluate_confluence_signal(
             htf_trend = "BULLISH"
             bullish_score += 15
             bullish_factors.append("15m HTF Market Structure is BULLISH (Higher Highs & Higher Lows)")
+    elif candles_15m and len(candles_15m) >= 3:
+        closes_15m = [c["close"] for c in candles_15m]
+        ema_len = min(len(closes_15m), 9)
+        ema_short = calculate_ema(closes_15m, ema_len)
+        if ema_short and ema_short[-1] is not None:
+            if current_price < ema_short[-1]:
+                htf_bearish = True
+                htf_trend = "BEARISH"
+                bearish_score += 15
+                bearish_factors.append(f"15m HTF Macro Bias is BEARISH (Price {current_price:.2f} < 15m EMA-{ema_len} {ema_short[-1]:.2f})")
+            elif current_price > ema_short[-1]:
+                htf_bullish = True
+                htf_trend = "BULLISH"
+                bullish_score += 15
+                bullish_factors.append(f"15m HTF Macro Bias is BULLISH (Price {current_price:.2f} > 15m EMA-{ema_len} {ema_short[-1]:.2f})")
+    elif len(candles) >= 20:
+        closes_5m = [c["close"] for c in candles]
+        ema_gate = calculate_ema(closes_5m, 50) if len(closes_5m) >= 50 else calculate_ema(closes_5m, 21)
+        if ema_gate and ema_gate[-1] is not None:
+            if current_price < ema_gate[-1]:
+                htf_bearish = True
+                htf_trend = "BEARISH"
+                bearish_score += 15
+                bearish_factors.append(f"Macro Trend Bias is BEARISH (Price {current_price:.2f} < EMA {ema_gate[-1]:.2f})")
+            elif current_price > ema_gate[-1]:
+                htf_bullish = True
+                htf_trend = "BULLISH"
+                bullish_score += 15
+                bullish_factors.append(f"Macro Trend Bias is BULLISH (Price {current_price:.2f} > EMA {ema_gate[-1]:.2f})")
 
     # Factor 0B: Trend & Exponential Moving Average (EMA) Momentum (9, 21, 50)
     closes = [c["close"] for c in candles]

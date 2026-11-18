@@ -7,3 +7,4 @@ __pycache__/
 htmlcov/
 *.log
 .env
+forex/state/chart_cache/

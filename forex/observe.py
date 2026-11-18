@@ -71,15 +71,22 @@ def check_data_freshness(
     latest_timestamp: int,
     interval_str: str = "5m",
     now_utc: Optional[datetime] = None,
+    live_tick: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, float, str]:
     """
     Evaluate if candle data is fresh or stale.
     
-    interval: '5m' -> stale if > 20 mins old during open market
+    interval: '5m' -> stale if > 20 mins old during open market unless live spot tick is updating
     Returns: (is_fresh, age_minutes, reason)
     """
     if now_utc is None:
         now_utc = datetime.now(timezone.utc)
+
+    # If live spot tick is active (Twelve Data or WebSocket), data is fresh
+    if live_tick and isinstance(live_tick, dict):
+        rec_at = float(live_tick.get("received_at", 0) or 0)
+        if rec_at > 0 and (time.time() - rec_at < 300):
+            return True, round((time.time() - rec_at) / 60.0, 1), f"Live spot tick active ({int(time.time() - rec_at)}s ago)"
 
     candle_dt = datetime.fromtimestamp(latest_timestamp, tz=timezone.utc)
     age_seconds = (now_utc - candle_dt).total_seconds()
@@ -94,7 +101,7 @@ def check_data_freshness(
     elif interval_str == "1d":
         interval_minutes = 1440
 
-    stale_threshold = max(20.0, interval_minutes * 2.5)
+    stale_threshold = max(25.0, interval_minutes * 3.0)
 
     if age_minutes < 0:
         return True, 0.0, "Future candle timestamp (clock drift)"
@@ -194,37 +201,45 @@ class SignalStateManager:
         # 2. Stale data enforcement (Req 8 & 10)
         if not is_fresh:
             with self._lock:
-                self._active_signals.pop(canon, None)
-            return {
-                "action": "NO SIGNAL",
-                "status_label": "NO SIGNAL",
-                "strategy": "--",
-                "timeframe": "--",
-                "symbol": canon,
-                "entry_reference": None,
-                "stop_loss": None,
-                "take_profit": None,
-                "take_profit_2": None,
-                "take_profit_3": None,
-                "reward_risk": None,
-                "reward_risk_tp2": None,
-                "reward_risk_tp3": None,
-                "risk_pips": None,
-                "reward_pips": None,
-                "reward_pips_tp2": None,
-                "reward_pips_tp3": None,
-                "confluence_score": None,
-                "grade": None,
-                "confluence_factors": [],
-                "timestamp_et": "--",
-                "timestamp_utc": "--",
-                "is_market_open": True,
-                "is_fresh": False,
-                "reason": status_reason or "Market data feed is stale.",
-                "candle_close_confirmed": False,
-                "paper_mode": True,
-                "disclaimer": "SIMULATED PAPER OBSERVATION ONLY  -  ZERO BROKER CONNECTIONS",
-            }
+                active = self._active_signals.get(canon)
+            # Lifetime Active Trade Protection:
+            # If an active confirmed trade is currently underway, DO NOT kill it simply because of
+            # an inter-session lull or temporary candle pause, as long as trade is within 4 hours.
+            if active and active.get("action") in ("BUY", "SELL") and (time.time() - active.get("created_timestamp", 0) < 14400):
+                pass
+            else:
+                with self._lock:
+                    self._active_signals.pop(canon, None)
+                return {
+                    "action": "NO SIGNAL",
+                    "status_label": "NO SIGNAL",
+                    "strategy": "--",
+                    "timeframe": "--",
+                    "symbol": canon,
+                    "entry_reference": None,
+                    "stop_loss": None,
+                    "take_profit": None,
+                    "take_profit_2": None,
+                    "take_profit_3": None,
+                    "reward_risk": None,
+                    "reward_risk_tp2": None,
+                    "reward_risk_tp3": None,
+                    "risk_pips": None,
+                    "reward_pips": None,
+                    "reward_pips_tp2": None,
+                    "reward_pips_tp3": None,
+                    "confluence_score": None,
+                    "grade": None,
+                    "confluence_factors": [],
+                    "timestamp_et": "--",
+                    "timestamp_utc": "--",
+                    "is_market_open": True,
+                    "is_fresh": False,
+                    "reason": status_reason or "Market data feed is stale.",
+                    "candle_close_confirmed": False,
+                    "paper_mode": True,
+                    "disclaimer": "SIMULATED PAPER OBSERVATION ONLY  -  ZERO BROKER CONNECTIONS",
+                }
 
         # 3. Insufficient candles enforcement (< 15)
         if len(candles) < 15:
@@ -876,7 +891,7 @@ def observe_pair(
 
     latest_candle = candles[-1]
     is_fresh, age_min, freshness_reason = check_data_freshness(
-        latest_candle["timestamp"], interval_str=interval, now_utc=now_utc
+        latest_candle["timestamp"], interval_str=interval, now_utc=now_utc, live_tick=live_tick
     )
 
     # Compute technical and institutional confluence analysis from available candles
@@ -1220,6 +1235,7 @@ def observe_pair(
         "data_freshness": freshness_reason,
         "active_sessions": active_sessions,
         "indicative_mid": latest_close,
+        "latest_price": latest_close,
         "indicative_bid": bid,
         "indicative_ask": ask,
         "spread_pips": spread_pips,

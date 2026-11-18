@@ -164,10 +164,13 @@ def fetch_twelve_data_quote(symbol: str, api_key: str = "", timeout: int = 4) ->
         return None
 
 
+FALLBACK_CHART_CACHE_DIR = os.path.join(os.path.dirname(__file__), "state", "chart_cache")
+
+
 def fetch_chart(
     symbol: str,
     interval: str = "5m",
-    range_period: str = "1d",
+    range_period: str = "5d",
     cache_dir: Optional[str] = None,
     offline_file: Optional[str] = None,
     offline_data: Optional[Dict[str, Any]] = None,
@@ -176,7 +179,7 @@ def fetch_chart(
     Fetch OHLCV chart data for a currency pair with fallback and offline support.
     
     interval: '5m', '15m', '1h', '1d'
-    range_period: '1d', '5d', '1mo', '60d'
+    range_period: '1d', '2d', '5d', '1mo', '60d'
     """
     canon = normalize_symbol(symbol)
     ticker = pair_to_yahoo_ticker(canon)
@@ -249,6 +252,17 @@ def fetch_chart(
             break
 
     if not raw_text:
+        # Lifetime Fallback: Check persistent disk cache before failing
+        try:
+            clean_sym = canon.replace("/", "_")
+            fallback_file = os.path.join(FALLBACK_CHART_CACHE_DIR, f"{clean_sym}_{interval}.json")
+            if os.path.exists(fallback_file):
+                with open(fallback_file, "r", encoding="utf-8") as fh:
+                    cached_data = json.load(fh)
+                if cached_data.get("candles") and len(cached_data["candles"]) >= 15:
+                    return cached_data
+        except Exception:
+            pass
         raise RuntimeError(f"Could not fetch chart for {canon} ({ticker}): {last_err}")
 
     parsed_raw = json.loads(raw_text)
@@ -261,7 +275,36 @@ def fetch_chart(
         except OSError:
             pass
 
-    return parse_yahoo_chart(parsed_raw, canon)
+    res_chart = parse_yahoo_chart(parsed_raw, canon)
+
+    # Auto-resilience cascade: If fewer than 35 candles were returned for an intraday interval,
+    # auto-expand to 5d range so HTF and EMA depth are always fully populated.
+    if offline_data is None and offline_file is None:
+        if res_chart.get("candles_count", 0) < 35 and range_period in ("1d", "2d"):
+            try:
+                expanded_chart = fetch_chart(
+                    symbol=symbol,
+                    interval=interval,
+                    range_period="5d",
+                    cache_dir=cache_dir,
+                )
+                if expanded_chart.get("candles_count", 0) > res_chart.get("candles_count", 0):
+                    res_chart = expanded_chart
+            except Exception:
+                pass
+
+        # Write to persistent fallback cache for lifetime resilience
+        if res_chart.get("candles_count", 0) >= 20:
+            try:
+                os.makedirs(FALLBACK_CHART_CACHE_DIR, exist_ok=True)
+                clean_sym = canon.replace("/", "_")
+                fallback_file = os.path.join(FALLBACK_CHART_CACHE_DIR, f"{clean_sym}_{interval}.json")
+                with open(fallback_file, "w", encoding="utf-8") as fh:
+                    json.dump(res_chart, fh)
+            except Exception:
+                pass
+
+    return res_chart
 
 
 def parse_yahoo_chart(data: Dict[str, Any], symbol: str) -> Dict[str, Any]:

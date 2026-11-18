@@ -3332,12 +3332,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const sym = document.getElementById('pairSelect').value;
             try {
                 const res = await fetch('/api/observe?symbol=' + encodeURIComponent(sym) + '&interval=' + currentInterval);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 currentObservation = data;
                 renderDashboard(data);
                 checkNotifications(data);
             } catch (err) {
-                console.error("Fetch error:", err);
+                console.error("Fetch observation error:", err);
+                // Resilient Auto-Recovery: retry in 3.5s on network hiccups
+                setTimeout(fetchObservation, 3500);
             }
         }
 
@@ -6726,6 +6729,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     fetchObservation();
                     fetchChart();
                 }
+            });
+
+            // Auto-reconnect watchdog: instantly refresh feeds when connection is restored
+            window.addEventListener('online', () => {
+                fetchObservation();
+                fetchChart();
+                fetchScannerSignals();
             });
 
             // Audio state monitor to show unlock pill if browser suspended audio
