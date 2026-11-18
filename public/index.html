@@ -1650,8 +1650,8 @@
                         </div>
                     </div>
 
-                    <!-- Log to Journal Button -->
-                    <button id="btnLogAutoSignal" class="btn btn-primary" onclick="logAutoSignal()" style="width:100%; margin-bottom:8px;">
+                    <!-- Log to Journal Button (Hidden as Journal is removed) -->
+                    <button id="btnLogAutoSignal" class="btn btn-primary" onclick="logAutoSignal()" style="width:100%; margin-bottom:8px; display:none;">
                         Log Signal to Paper Journal
                     </button>
 
@@ -1661,8 +1661,8 @@
                         View Strategy Rationale & Checklist (ट्रेड विश्लेषण व कारणे)
                     </button>
 
-                    <!-- Optional Manual Simulation Calculator Drawer -->
-                    <details style="font-size:12px; color:var(--text-secondary); border-top:1px solid var(--border-color); padding-top:8px;">
+                    <!-- Optional Manual Simulation Calculator Drawer (Hidden) -->
+                    <details style="display:none; font-size:12px; color:var(--text-secondary); border-top:1px solid var(--border-color); padding-top:8px;">
                         <summary style="cursor:pointer; font-weight:600; color:var(--text-muted); margin-bottom:8px;">
                             Manual Simulation Calculator (Override)
                         </summary>
@@ -4038,71 +4038,13 @@
            Paper Journal & Position Auto-Resolution
            ------------------------------------------------------------- */
         async function fetchJournal() {
-            try {
-                const res = await fetch('/api/paper/journal');
-                let list = await res.json();
-                if (!Array.isArray(list)) list = [];
-                // Filter out any stale mock trades from Oct 2026
-                list = list.filter(it => !(it.id && (it.id === 'SIM-101' || it.id === 'SIM-102') && it.timestamp && it.timestamp.includes('2026-10-30')));
-
-                let localList = [];
-                try {
-                    localList = JSON.parse(localStorage.getItem('rushi_paper_journal') || '[]');
-                    localList = localList.filter(it => !(it.id && (it.id === 'SIM-101' || it.id === 'SIM-102') && it.timestamp && it.timestamp.includes('2026-10-30')));
-                } catch(e) {}
-
-                const map = new Map();
-                localList.forEach(it => { if (it && it.id) map.set(it.id, it); });
-                list.forEach(it => { if (it && it.id) map.set(it.id, it); });
-                const merged = Array.from(map.values());
-
-                cachedJournal = merged;
-                localStorage.setItem('rushi_paper_journal', JSON.stringify(merged));
-                renderJournalTable(merged);
-            } catch (e) {
-                console.error("Fetch journal error:", e);
-                try {
-                    let localList = JSON.parse(localStorage.getItem('rushi_paper_journal') || '[]');
-                    localList = localList.filter(it => !(it.id && (it.id === 'SIM-101' || it.id === 'SIM-102') && it.timestamp && it.timestamp.includes('2026-10-30')));
-                    cachedJournal = localList;
-                    renderJournalTable(localList);
-                } catch(err) {}
-            }
+            // Paper observation journal table removed from dashboard
+            return;
         }
 
         function renderJournalTable(list) {
-            const tbody = document.getElementById('journalBody');
-            if (!tbody) return;
-            tbody.innerHTML = '';
-            if (!list || list.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:18px; color:var(--text-secondary); font-size:12px;">No paper trades recorded yet. Log an active signal or simulate a trade above.</td></tr>';
-                return;
-            }
-            list.forEach(item => {
-                const tr = document.createElement('tr');
-                const pnl = item.pnl_usd !== undefined ? Number(item.pnl_usd) : 0.0;
-                const isResolved = item.status && item.status.includes('CLOSED');
-                const actionBtn = !isResolved
-                    ? `<button class="btn" style="padding:2px 8px; font-size:11px; background:rgba(239,68,68,0.15); color:#fca5a5; border-color:rgba(239,68,68,0.4);" onclick="closeJournalTrade('${item.id}')">Close</button>`
-                    : `<span style="color:var(--text-secondary); font-size:11px;">--</span>`;
-
-                tr.innerHTML = `
-                    <td style="color:var(--accent-blue); font-weight:600;">${item.id}</td>
-                    <td style="font-weight:600;">${item.symbol}</td>
-                    <td style="color:${item.side === 'BUY' ? 'var(--accent-green)' : 'var(--accent-rose)'}; font-weight:700;">${item.side}</td>
-                    <td>${item.simulated_fill}</td>
-                    <td>${item.stop_price}</td>
-                    <td>${item.target_price}</td>
-                    <td>${item.lot_size} Lots (${item.units} ${item.unit_label || 'units'})</td>
-                    <td style="color:var(--accent-rose);">$${Number(item.risk_usd).toFixed(2)}</td>
-                    <td style="color:${pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-rose)'}; font-weight:700;">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</td>
-                    <td style="font-size:11px; color:var(--text-secondary); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.note || ''}">${item.note || 'Observation'}</td>
-                    <td style="color:var(--text-secondary);">${item.timestamp}</td>
-                    <td><span class="badge ${item.status.includes('HIT TP') ? 'badge-green' : (item.status.includes('HIT SL') ? 'badge-rose' : 'badge-amber')}">${item.status}</span></td>
-                    <td style="text-align:center;">${actionBtn}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+            // Paper observation journal table removed from dashboard
+            return;
         }
 
         function checkLivePaperPositions(tick) {
@@ -6123,7 +6065,6 @@
             fetchHealth();
             fetchObservation();
             fetchChart();
-            fetchJournal();
             fetchSkills();
             fetchRiskConfig();
             fetchCalibration();
@@ -6208,7 +6149,6 @@
                 fetchHealth();
                 fetchObservation();
                 fetchChart();
-                fetchJournal();
             }, 12000);
         });
     </script>
