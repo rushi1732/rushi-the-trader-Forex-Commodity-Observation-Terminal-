@@ -3689,7 +3689,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             // Auto-fill simulator defaults if empty
             if (mid && !document.getElementById('simEntry').value) {
                 document.getElementById('simEntry').value = mid;
-                const offset = isGold ? 5.0 : 0.0020;
+                const offset = isBtc ? 500.0 : (isGold ? 5.0 : 0.0020);
                 document.getElementById('simStop').value = (mid - offset).toFixed(decimals);
                 document.getElementById('simTarget').value = (mid + (offset * 2)).toFixed(decimals);
                 recalcSimulation();
@@ -3707,15 +3707,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (!data) return;
             const sym = data.symbol || (document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD');
             const isGold = sym.includes('XAU');
-            const decimals = isGold ? 2 : 4;
+            const isBtc = sym.includes('BTC');
+            const isJpy = sym.includes('JPY');
+            const decimals = (isGold || isBtc) ? 2 : (isJpy ? 2 : 4);
             const curPrice = (liveTick && liveTick.last) ? liveTick.last : (data.indicative_mid || data.latest_price || 0);
-            const autoSig = data.auto_signal || {};
+            const normSym = normalizeSym(sym);
+            const autoSigRaw = data.auto_signal || {};
+            const autoSig = (autoSigRaw && autoSigRaw.symbol && normalizeSym(autoSigRaw.symbol) === normSym) ? autoSigRaw : {};
             const confSig = data.confluence_signal || {};
             const smc = data.smc || (confSig.components && confSig.components.smc) || {};
             const fib = data.fibonacci || (confSig.components && confSig.components.fibonacci) || {};
             const liq = data.liquidity || (confSig.components && confSig.components.liquidity) || {};
             const ict = data.ict || (confSig.components && confSig.components.ict) || {};
             const div = data.divergence || (confSig.components && confSig.components.divergence) || {};
+
+            let action = 'NO SIGNAL';
+            let score = 0;
+            let grade = 'Grade C (Consolidation / Wait)';
+            let factors = [];
 
             // Strict Synchronization: Decision Matrix and Card 3 must NEVER contradict each other!
             const isTradeActive = Boolean(autoSig && (autoSig.action === 'BUY' || autoSig.action === 'SELL'));
@@ -7224,13 +7233,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     spot_mid = float(live_c.get("mid") or live_c.get("last") or 0.0)
                     if spot_mid > 0:
                         last_c = candles[-1]["close"]
-                        basis_gap = round(spot_mid - last_c, 2 if "XAU" in canon else 4)
+                        basis_gap = round(spot_mid - last_c, 2 if ("XAU" in canon or "BTC" in canon) else 4)
                         if abs(basis_gap) > 0.05:
                             for c in candles:
-                                c["open"] = round(c["open"] + basis_gap, 2)
-                                c["high"] = round(c["high"] + basis_gap, 2)
-                                c["low"] = round(c["low"] + basis_gap, 2)
-                                c["close"] = round(c["close"] + basis_gap, 2)
+                                c["open"] = round(c["open"] + basis_gap, 2 if ("XAU" in canon or "BTC" in canon) else 4)
+                                c["high"] = round(c["high"] + basis_gap, 2 if ("XAU" in canon or "BTC" in canon) else 4)
+                                c["low"] = round(c["low"] + basis_gap, 2 if ("XAU" in canon or "BTC" in canon) else 4)
+                                c["close"] = round(c["close"] + basis_gap, 2 if ("XAU" in canon or "BTC" in canon) else 4)
                         candles[-1]["close"] = spot_mid
                         source_feed = "Twelve Data Real-Time (Retail Spot Feed)"
 
@@ -7275,6 +7284,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     "source": "Twelve Data Real-Time (Retail Spot Feed)" if is_twelve_data else obs.get("source", "Yahoo Finance Indicative"),
                     "provider": "twelvedata" if is_twelve_data else "yahoo",
                     "is_gold": "XAU" in canon,
+                    "is_btc": "BTC" in canon,
                     "calibrated_offset": GOLD_CALIBRATION["offset"] if "XAU" in canon else 0.0,
                     "benchmark_notice": (
                         "Twelve Data Direct Retail Spot (XAU/USD)  -  Authentic Broker Spot Benchmark"

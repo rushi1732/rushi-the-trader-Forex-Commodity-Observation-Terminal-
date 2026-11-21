@@ -18,13 +18,16 @@ from .pairs import to_pips, get_pair_info
 def find_equal_highs_and_lows(
     candles: List[Dict[str, Any]],
     symbol: str,
-    pip_tolerance: float = 3.0,
+    pip_tolerance: Optional[float] = None,
     lookback: int = 40,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Find Equal Highs (EQH) and Equal Lows (EQL) within pip_tolerance.
     These act as liquidity magnets for stop hunts.
     """
+    if pip_tolerance is None:
+        pip_tolerance = 40.0 if "BTC" in symbol else 3.0
+
     if len(candles) < 10:
         return {"eqh": [], "eql": []}
 

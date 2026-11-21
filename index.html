@@ -3068,7 +3068,7 @@
             // Auto-fill simulator defaults if empty
             if (mid && !document.getElementById('simEntry').value) {
                 document.getElementById('simEntry').value = mid;
-                const offset = isGold ? 5.0 : 0.0020;
+                const offset = isBtc ? 500.0 : (isGold ? 5.0 : 0.0020);
                 document.getElementById('simStop').value = (mid - offset).toFixed(decimals);
                 document.getElementById('simTarget').value = (mid + (offset * 2)).toFixed(decimals);
                 recalcSimulation();
@@ -3086,15 +3086,24 @@
             if (!data) return;
             const sym = data.symbol || (document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD');
             const isGold = sym.includes('XAU');
-            const decimals = isGold ? 2 : 4;
+            const isBtc = sym.includes('BTC');
+            const isJpy = sym.includes('JPY');
+            const decimals = (isGold || isBtc) ? 2 : (isJpy ? 2 : 4);
             const curPrice = (liveTick && liveTick.last) ? liveTick.last : (data.indicative_mid || data.latest_price || 0);
-            const autoSig = data.auto_signal || {};
+            const normSym = normalizeSym(sym);
+            const autoSigRaw = data.auto_signal || {};
+            const autoSig = (autoSigRaw && autoSigRaw.symbol && normalizeSym(autoSigRaw.symbol) === normSym) ? autoSigRaw : {};
             const confSig = data.confluence_signal || {};
             const smc = data.smc || (confSig.components && confSig.components.smc) || {};
             const fib = data.fibonacci || (confSig.components && confSig.components.fibonacci) || {};
             const liq = data.liquidity || (confSig.components && confSig.components.liquidity) || {};
             const ict = data.ict || (confSig.components && confSig.components.ict) || {};
             const div = data.divergence || (confSig.components && confSig.components.divergence) || {};
+
+            let action = 'NO SIGNAL';
+            let score = 0;
+            let grade = 'Grade C (Consolidation / Wait)';
+            let factors = [];
 
             // Strict Synchronization: Decision Matrix and Card 3 must NEVER contradict each other!
             const isTradeActive = Boolean(autoSig && (autoSig.action === 'BUY' || autoSig.action === 'SELL'));

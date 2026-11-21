@@ -287,11 +287,12 @@ def evaluate_confluence_signal(
             bearish_score += 20
             bearish_factors.append(f"Price currently mitigating Bearish Order Block ({inside_ob['bottom']} - {inside_ob['top']})")
     else:
-        # Check proximity to nearest demand/supply (within 5 pips)
-        if nearest_demand and to_pips(canon, abs(current_price - nearest_demand["top"])) <= 5.0:
+        # Check proximity to nearest demand/supply (within scaled institutional buffer)
+        ob_prox_pips = min(150.0, max(80.0, current_price * 0.0012)) if "BTC" in canon else 5.0
+        if nearest_demand and to_pips(canon, abs(current_price - nearest_demand["top"])) <= ob_prox_pips:
             bullish_score += 12
             bullish_factors.append(f"Price near active Bullish Demand OB at {nearest_demand['top']}")
-        if nearest_supply and to_pips(canon, abs(current_price - nearest_supply["bottom"])) <= 5.0:
+        if nearest_supply and to_pips(canon, abs(current_price - nearest_supply["bottom"])) <= ob_prox_pips:
             bearish_score += 12
             bearish_factors.append(f"Price near active Bearish Supply OB at {nearest_supply['bottom']}")
 
@@ -410,7 +411,7 @@ def evaluate_confluence_signal(
             bearish_entry_zones.append(f"Bearish Supply Zone ({nearest_supply['bottom']} - {nearest_supply['top']})")
 
     # Proximity & Mitigation to Active Order Block (Tapping outer boundary within institutional buffer)
-    ob_mitigation_buf = max(pip_size * 5, from_pips(canon, 6.0))
+    ob_mitigation_buf = max(80.0, current_price * 0.0012) if "BTC" in canon else max(pip_size * 5, from_pips(canon, 6.0))
     if nearest_demand and abs(current_price - nearest_demand["top"]) <= ob_mitigation_buf:
         bullish_entry_zones.append(f"Bullish Demand Mitigation Zone ({nearest_demand['bottom']:.{decimals}f} - {nearest_demand['top']:.{decimals}f})")
     if nearest_supply and abs(current_price - nearest_supply["bottom"]) <= ob_mitigation_buf:
@@ -435,7 +436,7 @@ def evaluate_confluence_signal(
 
     # D. Liquidity Sweep & Stop-Loss Hunt (Turtle Soup Reversal Zone on latest/recent candle)
     recent_sweeps = liq_data.get("sweeps", {}).get("recent_sweeps", [])
-    sweep_entry_buffer = max(pip_size * 12, from_pips(canon, 15.0))
+    sweep_entry_buffer = max(120.0, current_price * 0.0018) if "BTC" in canon else max(pip_size * 12, from_pips(canon, 15.0))
     recent_ssl = [s for s in recent_sweeps if s.get("sentiment") == "BULLISH" and s.get("candle_index", 0) >= len(candles) - 3]
     if recent_ssl and abs(current_price - recent_ssl[-1]["level_price"]) <= sweep_entry_buffer:
         bullish_entry_zones.append(f"Turtle Soup SSL Sweep Zone at {recent_ssl[-1]['level_price']:.{decimals}f}")
@@ -467,11 +468,12 @@ def evaluate_confluence_signal(
             bearish_entry_zones.append(f"Bearish CHoCH Reversal Zone at {latest_choch['price']:.{decimals}f}")
 
     # G. Dynamic Institutional Trend Support / EMA-9/21 Value Area
+    ema_val_buf = max(50.0, current_price * 0.0008) if "BTC" in canon else max(pip_size * 6, from_pips(canon, 8.0))
     if is_bullish_momentum and ema9 and ema21:
-        if current_price >= ema21 and abs(current_price - ema9) <= max(pip_size * 6, from_pips(canon, 8.0)):
+        if current_price >= ema21 and abs(current_price - ema9) <= ema_val_buf:
             bullish_entry_zones.append(f"Dynamic Institutional EMA-9/21 Support Zone ({ema9:.{decimals}f})")
     elif is_bearish_momentum and ema9 and ema21:
-        if current_price <= ema21 and abs(current_price - ema9) <= max(pip_size * 6, from_pips(canon, 8.0)):
+        if current_price <= ema21 and abs(current_price - ema9) <= ema_val_buf:
             bearish_entry_zones.append(f"Dynamic Institutional EMA-9/21 Resistance Zone ({ema9:.{decimals}f})")
 
     # H. Active Session Killzone Expansion (High-probability institutional volume window)
@@ -486,9 +488,10 @@ def evaluate_confluence_signal(
     # 1. HARD HTF MACRO TREND VETO:
     # Prohibit blind counter-trend entries when 15m HTF Trend is opposing, UNLESS a verified
     # Institutional Reversal setup forms (SSL/BSL Liquidity Sweep, Demand/Supply OB, Bullish/Bearish CHoCH, or Divergence).
+    rev_buf = max(80.0, current_price * 0.0012) if "BTC" in canon else max(pip_size * 8, from_pips(canon, 12.0))
     has_bullish_reversal = bool(
         inside_ob and inside_ob.get("type") == "BULLISH_OB" or
-        (nearest_demand and abs(current_price - nearest_demand.get("top", 0)) <= max(pip_size * 8, from_pips(canon, 12.0))) or
+        (nearest_demand and abs(current_price - nearest_demand.get("top", 0)) <= rev_buf) or
         inside_fvg and inside_fvg.get("type") == "BULLISH_FVG" or
         (latest_choch and latest_choch.get("direction") == "BULLISH" and choch_bars_ago <= 8) or
         (div_data.get("detected") and div_data.get("bias") == "BUY")
@@ -501,7 +504,7 @@ def evaluate_confluence_signal(
 
     has_bearish_reversal = bool(
         inside_ob and inside_ob.get("type") == "BEARISH_OB" or
-        (nearest_supply and abs(current_price - nearest_supply.get("bottom", 0)) <= max(pip_size * 8, from_pips(canon, 12.0))) or
+        (nearest_supply and abs(current_price - nearest_supply.get("bottom", 0)) <= rev_buf) or
         inside_fvg and inside_fvg.get("type") == "BEARISH_FVG" or
         (latest_choch and latest_choch.get("direction") == "BEARISH" and choch_bars_ago <= 8) or
         (div_data.get("detected") and div_data.get("bias") == "SELL")
@@ -582,14 +585,23 @@ def evaluate_confluence_signal(
             bearish_entry_zones = []
             bearish_factors.append("[SPIKE GUARD] Waiting for high-velocity upward spike candle to exhaust")
 
-    # Spread Guardrail: For XAU/USD, block automatic signal generation if live spread exceeds 4.5 pips
+    # Spread Guardrail: For XAU/USD, block automatic signal generation if live spread exceeds 4.5 pips. For BTC, block if > 50.0 pips.
     is_gold = "XAU" in canon
+    is_btc = "BTC" in canon
     if is_gold and live_spread_pips > 4.5:
         bullish_entry_zones = []
         bearish_entry_zones = []
         bullish_score = min(bullish_score, 40)
         bearish_score = min(bearish_score, 40)
         spread_block_msg = f"[SPREAD GUARD] Signal generation blocked: Live spread ({live_spread_pips:.1f} pips) exceeds 4.5 pips threshold (News Spike Protection)"
+        bullish_factors.append(spread_block_msg)
+        bearish_factors.append(spread_block_msg)
+    elif is_btc and live_spread_pips > 50.0:
+        bullish_entry_zones = []
+        bearish_entry_zones = []
+        bullish_score = min(bullish_score, 40)
+        bearish_score = min(bearish_score, 40)
+        spread_block_msg = f"[SPREAD GUARD] Signal generation blocked: Live spread ({live_spread_pips:.1f} pips) exceeds 50.0 pips threshold (Crypto Illiquidity Protection)"
         bullish_factors.append(spread_block_msg)
         bearish_factors.append(spread_block_msg)
 

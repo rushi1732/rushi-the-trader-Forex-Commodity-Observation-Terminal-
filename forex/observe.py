@@ -620,7 +620,7 @@ class SignalStateManager:
             if "XAU" in canon:
                 min_safe_dist = 4.00
             elif "BTC" in canon:
-                min_safe_dist = 300.0
+                min_safe_dist = max(650.0, current_price * 0.0085)
             elif "JPY" in canon:
                 min_safe_dist = 0.20
             else:
