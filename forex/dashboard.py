@@ -3493,7 +3493,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             // Automatic Signal Generation Engine Mapping (Synced with Institutional Strategy Matrix)
             const autoSigRaw = data.auto_signal || {};
             // Strict symbol isolation check: verify that auto_signal strictly belongs to the currently selected pair
-            const autoSig = (autoSigRaw && autoSigRaw.symbol && normalizeSym(autoSigRaw.symbol) === normSym) ? autoSigRaw : {};
+            const autoSig = (autoSigRaw && (!autoSigRaw.symbol || normalizeSym(autoSigRaw.symbol) === normSym)) ? autoSigRaw : {};
             const confSig = data.confluence_signal || {};
             const confPlan = (confSig && confSig.execution_plan) ? confSig.execution_plan : {};
             const autoBadge = document.getElementById('autoSignalBadge');
@@ -3713,7 +3713,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const curPrice = (liveTick && liveTick.last) ? liveTick.last : (data.indicative_mid || data.latest_price || 0);
             const normSym = normalizeSym(sym);
             const autoSigRaw = data.auto_signal || {};
-            const autoSig = (autoSigRaw && autoSigRaw.symbol && normalizeSym(autoSigRaw.symbol) === normSym) ? autoSigRaw : {};
+            const autoSig = (autoSigRaw && (!autoSigRaw.symbol || normalizeSym(autoSigRaw.symbol) === normSym)) ? autoSigRaw : {};
             const confSig = data.confluence_signal || {};
             const smc = data.smc || (confSig.components && confSig.components.smc) || {};
             const fib = data.fibonacci || (confSig.components && confSig.components.fibonacci) || {};
@@ -7162,6 +7162,38 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             auto["take_profit"] = round(auto["take_profit"] + c_off, 2)
                         if auto.get("take_profit_2"):
                             auto["take_profit_2"] = round(auto["take_profit_2"] + c_off, 2)
+                        if auto.get("take_profit_3"):
+                            auto["take_profit_3"] = round(auto["take_profit_3"] + c_off, 2)
+                    if obs.get("confluence_signal"):
+                        c_plan = obs["confluence_signal"].get("execution_plan")
+                        if c_plan:
+                            if c_plan.get("entry_price"):
+                                c_plan["entry_price"] = round(c_plan["entry_price"] + c_off, 2)
+                            if c_plan.get("stop_loss"):
+                                c_plan["stop_loss"] = round(c_plan["stop_loss"] + c_off, 2)
+                            if c_plan.get("take_profit_1"):
+                                c_plan["take_profit_1"] = round(c_plan["take_profit_1"] + c_off, 2)
+                            if c_plan.get("take_profit_2"):
+                                c_plan["take_profit_2"] = round(c_plan["take_profit_2"] + c_off, 2)
+                            if c_plan.get("take_profit_3"):
+                                c_plan["take_profit_3"] = round(c_plan["take_profit_3"] + c_off, 2)
+                if obs.get("auto_signal") and obs.get("confluence_signal"):
+                    auto = obs["auto_signal"]
+                    conf = obs["confluence_signal"]
+                    if auto.get("action") in ("BUY", "SELL"):
+                        conf["action"] = auto["action"]
+                        if auto.get("confluence_score"):
+                            conf["confluence_score"] = auto["confluence_score"]
+                        if auto.get("grade"):
+                            conf["grade"] = auto["grade"]
+                        if auto.get("confluence_factors"):
+                            conf["confluence_factors"] = auto["confluence_factors"]
+                        plan = conf.setdefault("execution_plan", {})
+                        plan["entry_price"] = auto.get("entry_reference")
+                        plan["stop_loss"] = auto.get("stop_loss")
+                        plan["take_profit_1"] = auto.get("take_profit")
+                        plan["take_profit_2"] = auto.get("take_profit_2")
+                        plan["take_profit_3"] = auto.get("take_profit_3")
                 current_mid = obs.get("indicative_mid") or obs.get("latest_price")
                 if current_mid is not None:
                     if obs.get("indicative_mid") is None:

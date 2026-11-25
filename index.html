@@ -2872,7 +2872,7 @@
             // Automatic Signal Generation Engine Mapping (Synced with Institutional Strategy Matrix)
             const autoSigRaw = data.auto_signal || {};
             // Strict symbol isolation check: verify that auto_signal strictly belongs to the currently selected pair
-            const autoSig = (autoSigRaw && autoSigRaw.symbol && normalizeSym(autoSigRaw.symbol) === normSym) ? autoSigRaw : {};
+            const autoSig = (autoSigRaw && (!autoSigRaw.symbol || normalizeSym(autoSigRaw.symbol) === normSym)) ? autoSigRaw : {};
             const confSig = data.confluence_signal || {};
             const confPlan = (confSig && confSig.execution_plan) ? confSig.execution_plan : {};
             const autoBadge = document.getElementById('autoSignalBadge');
@@ -3092,7 +3092,7 @@
             const curPrice = (liveTick && liveTick.last) ? liveTick.last : (data.indicative_mid || data.latest_price || 0);
             const normSym = normalizeSym(sym);
             const autoSigRaw = data.auto_signal || {};
-            const autoSig = (autoSigRaw && autoSigRaw.symbol && normalizeSym(autoSigRaw.symbol) === normSym) ? autoSigRaw : {};
+            const autoSig = (autoSigRaw && (!autoSigRaw.symbol || normalizeSym(autoSigRaw.symbol) === normSym)) ? autoSigRaw : {};
             const confSig = data.confluence_signal || {};
             const smc = data.smc || (confSig.components && confSig.components.smc) || {};
             const fib = data.fibonacci || (confSig.components && confSig.components.fibonacci) || {};

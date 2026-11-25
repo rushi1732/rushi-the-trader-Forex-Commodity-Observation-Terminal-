@@ -878,6 +878,58 @@ class TestSignalStability(unittest.TestCase):
         risk_dist = sig["stop_loss"] - sig["entry_reference"]
         self.assertAlmostEqual(risk_dist, 15.00, places=2)
 
+    def test_observe_pair_confluence_strict_synchronization_with_active_trade(self):
+        """When an active confirmed trade is underway, observe_pair MUST synchronize confluence_signal
+
+        with auto_signal so Card 3 and Decision Matrix can NEVER contradict each other.
+        """
+        from forex.observe import observe_pair, SIGNAL_STATE_MANAGER
+
+        base_ts = 1700000000
+        candle_end = base_ts + 24 * 300
+        now_dt = datetime.fromtimestamp(candle_end, tz=timezone.utc)
+        live_spot = 3769.89
+
+        new_sig = {
+            "action": "SELL",
+            "status_label": "SELL CONFIRMED",
+            "strategy": "SMC / ICT Institutional Flow (A+ [Elite Institutional] 88%)",
+            "timeframe": "5m",
+            "symbol": "XAU/USD",
+            "entry_reference": live_spot,
+            "stop_loss": 3784.89,
+            "take_profit": 3739.89,
+            "take_profit_2": 3717.39,
+            "take_profit_3": 3702.39,
+            "confluence_score": 88,
+            "grade": "A+ (Elite Institutional)",
+            "confluence_factors": ["Turtle Soup Sweep", "Supply OB Mitigated"],
+            "created_timestamp": candle_end,
+            "confirmed_candle_ts": candle_end,
+        }
+        with SIGNAL_STATE_MANAGER._lock:
+            SIGNAL_STATE_MANAGER._active_signals["XAU/USD"] = new_sig
+
+        candles = []
+        for i in range(25):
+            candles.append({
+                "timestamp": base_ts + i * 300,
+                "open": 3770.0,
+                "high": 3775.0,
+                "low": 3768.0,
+                "close": 3771.0,
+                "volume": 100,
+            })
+
+        obs = observe_pair("XAU/USD", interval="5m", offline_data={"candles": candles}, now_dt=now_dt, is_offline_test=False)
+        self.assertEqual(obs["auto_signal"]["action"], "SELL")
+        # Strict synchronization: confluence_signal MUST also be SELL!
+        self.assertEqual(obs["confluence_signal"]["action"], "SELL")
+        self.assertEqual(obs["confluence_signal"]["confluence_score"], 88)
+        self.assertEqual(obs["confluence_signal"]["grade"], "A+ (Elite Institutional)")
+        plan = obs["confluence_signal"].get("execution_plan", {})
+        self.assertEqual(plan.get("entry_price"), live_spot)
+
 
 if __name__ == "__main__":
     unittest.main()

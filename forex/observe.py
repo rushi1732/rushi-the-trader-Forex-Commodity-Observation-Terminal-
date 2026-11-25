@@ -805,6 +805,7 @@ def observe_pair(
     now_dt: Optional[datetime] = None,
     slippage_pips: float = 0.5,
     live_tick: Optional[Dict[str, Any]] = None,
+    is_offline_test: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Run full live-market observation analysis for a single pair in paper mode.
@@ -1244,7 +1245,10 @@ def observe_pair(
             except Exception:
                 pass
 
-    is_offline = (offline_data is not None or offline_file is not None)
+    if is_offline_test is None:
+        is_offline = (offline_data is not None or offline_file is not None)
+    else:
+        is_offline = is_offline_test
     auto_sig = build_auto_signal(
         symbol=canon,
         timeframe=interval,
@@ -1263,6 +1267,27 @@ def observe_pair(
     )
 
     is_confirmed = (auto_sig.get("action") in ("BUY", "SELL"))
+
+    # Strict Synchronization: If an active trade is in progress on auto_sig,
+    # confluence_signal MUST reflect that active position so no client or matrix can ever show an opposing signal!
+    if is_confirmed and auto_sig.get("action") in ("BUY", "SELL"):
+        active_action = auto_sig["action"]
+        if confluence_sig.get("action") != active_action:
+            confluence_sig["action"] = active_action
+            if auto_sig.get("confluence_score"):
+                confluence_sig["confluence_score"] = auto_sig["confluence_score"]
+            if auto_sig.get("grade"):
+                confluence_sig["grade"] = auto_sig["grade"]
+            if auto_sig.get("confluence_factors"):
+                confluence_sig["confluence_factors"] = auto_sig["confluence_factors"]
+            if auto_sig.get("strategy"):
+                confluence_sig["strategy"] = auto_sig["strategy"]
+            plan = confluence_sig.setdefault("execution_plan", {})
+            plan["entry_price"] = auto_sig.get("entry_reference")
+            plan["stop_loss"] = auto_sig.get("stop_loss")
+            plan["take_profit_1"] = auto_sig.get("take_profit")
+            plan["take_profit_2"] = auto_sig.get("take_profit_2")
+            plan["take_profit_3"] = auto_sig.get("take_profit_3")
 
     return {
         "symbol": canon,
