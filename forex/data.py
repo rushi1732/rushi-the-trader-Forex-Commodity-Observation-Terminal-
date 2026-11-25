@@ -109,10 +109,40 @@ _TD_CHART_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 
 
 def fetch_twelve_data_quote(symbol: str, api_key: str = "", timeout: int = 4) -> Optional[Dict[str, Any]]:
-    """Fetch live real-time spot quote for any symbol from Twelve Data API with caching."""
+    """Fetch live real-time spot quote for Gold or BTC using centralized Multi-API manager with failover."""
     canon = normalize_symbol(symbol)
     now_t = time.time()
-    
+
+    # Delegate to Centralized Multi-API Market Data Manager with automatic failover
+    try:
+        from .market_api import market_manager
+        q = market_manager.get_quote(canon, timeout=timeout)
+        if q and q.price > 0:
+            res = {
+                "symbol": canon,
+                "feed": f"{q.provider} Real-Time",
+                "bid": q.bid,
+                "ask": q.ask,
+                "mid": q.price,
+                "last": q.price,
+                "open": q.open,
+                "high": q.high,
+                "low": q.low,
+                "close": q.close,
+                "change": q.change,
+                "change_percent": q.change_percent,
+                "spread_pips": q.spread_pips,
+                "timestamp_utc": q.datetime_utc,
+                "timestamp": q.timestamp,
+                "is_live_24_7": True,
+                "provider": q.provider,
+                "is_failover": q.is_failover,
+            }
+            _TD_QUOTE_CACHE[canon] = (now_t, res)
+            return res
+    except Exception:
+        pass
+
     # Check fresh in-memory quote cache (15s validity to prevent 429 rate limit)
     cached = _TD_QUOTE_CACHE.get(canon)
     if cached and (now_t - cached[0] < 15):
@@ -210,8 +240,20 @@ def fetch_chart(
                 with open(cache_path, "r", encoding="utf-8") as fh:
                     return parse_yahoo_chart(json.load(fh), canon)
 
-    # 3b. Real-Time Twelve Data Feed (if enabled in twelvedata_config.json)
+    # 3b. Centralized Multi-API Market Data Feed (Twelve Data, Finnhub, EODHD, Alpha Vantage)
     if offline_data is None and offline_file is None:
+        try:
+            from .market_api import market_manager
+            multi_chart = market_manager.get_chart(
+                symbol=canon,
+                interval=interval,
+                limit=80,
+            )
+            if multi_chart and multi_chart.get("candles_count", 0) >= 15:
+                return multi_chart
+        except Exception:
+            pass
+        # Fallback to direct Twelve Data call if needed
         cfg = load_twelve_data_config()
         if cfg.get("enabled") and cfg.get("api_key"):
             try:
