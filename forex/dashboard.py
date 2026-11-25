@@ -1584,69 +1584,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             color: #0f172a;
         }
 
-        .market-overview-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 14px;
-            margin: 14px 0 16px;
-        }
-
-        .market-asset-card {
-            cursor: pointer;
-            border-radius: 8px;
-            padding: 16px;
-            background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
-            border: 1px solid var(--border-color);
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-        }
-
-        .market-asset-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-
-        .market-asset-card.active-asset {
-            box-shadow: 0 0 0 1.5px rgba(250, 204, 21, 0.65), 0 12px 28px -4px rgba(0, 0, 0, 0.6);
-            border-color: #eab308 !important;
-        }
-
-        .market-asset-card.active-asset.btc-active {
-            box-shadow: 0 0 0 1.5px rgba(56, 189, 248, 0.65), 0 12px 28px -4px rgba(0, 0, 0, 0.6);
-            border-color: #38bdf8 !important;
-        }
-
-        .quick-asset-btn {
-            background: transparent;
-            border: 1px solid var(--border-subtle);
-            color: var(--text-secondary);
-            padding: 5px 12px;
-            font-size: 11px;
-            font-weight: 700;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            letter-spacing: 0.05em;
-        }
-
-        .quick-asset-btn:hover {
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-primary);
-        }
-
-        .quick-asset-btn.active-gold {
-            background: rgba(234, 179, 8, 0.18) !important;
-            border-color: #eab308 !important;
-            color: #facc15 !important;
-        }
-
-        .quick-asset-btn.active-btc {
-            background: rgba(56, 189, 248, 0.18) !important;
-            border-color: #38bdf8 !important;
-            color: #38bdf8 !important;
-        }
-
 
         .chart-legend {
             display: flex;
@@ -2099,11 +2036,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
 
             <div class="controls-block">
-                <div class="quick-asset-group" style="display:inline-flex; align-items:center; gap:6px;">
-                    <button id="btnQuickGold" class="btn quick-asset-btn active-gold" onclick="selectAsset('XAU/USD')" title="Switch to Spot Gold (XAU/USD)">GOLD</button>
-                    <button id="btnQuickBtc" class="btn quick-asset-btn" onclick="selectAsset('BTC/USD')" title="Switch to Bitcoin (BTC/USD)">BTC</button>
-                </div>
-
                 <select id="pairSelect" class="pair-select" onchange="onPairChange()">
                     <option value="XAU/USD">XAU/USD (Spot Gold / US Dollar)</option>
                     <option value="BTC/USD">BTC/USD (Bitcoin / US Dollar)</option>
@@ -2134,11 +2066,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     Risk Settings
                 </button>
 
-                <button id="btnMarketApi" class="btn" onclick="openMarketApiModal()" title="Centralized Multi-API Market Data System (Twelve Data, Finnhub, Alpha Vantage, EODHD)" style="border-color:rgba(16,185,129,0.5); color:var(--accent-green); display:inline-flex; align-items:center; gap:6px;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
-                    Market APIs: <span id="marketApiStatusLabel" style="font-weight:700;">4 Configured</span>
+                <button id="btnTwelveData" class="btn" onclick="openTwelveDataModal()" title="Twelve Data Direct Retail Spot Gold, Crypto & Forex API" style="border-color:rgba(16,185,129,0.5); color:var(--accent-green); display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    Twelve Data Real-Time: <span id="tdStatusLabel" style="font-weight:700;">Connected</span>
                 </button>
-                <button id="btnTwelveData" style="display:none;" onclick="openTwelveDataModal()"></button>
 
                 <button id="btnSupabase" class="btn" onclick="openSupabaseModal()" title="Supabase PostgreSQL Cloud Database for Device Links, Signal Tracker & Journal" style="border-color:rgba(59,130,246,0.5); color:#60a5fa; display:inline-flex; align-items:center; gap:6px;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
@@ -2178,53 +2109,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             <div style="font-family:var(--font-mono); color:var(--text-muted); font-size:11px;">
                 <span id="healthTime">--:--:-- UTC</span>
-            </div>
-        </div>
-
-        <!-- Section: ONLY Two Market Cards (GOLD & BITCOIN - Requirement 10) -->
-        <div class="market-overview-row">
-            <!-- GOLD Card -->
-            <div id="cardGold" class="card market-asset-card active-asset" onclick="selectAsset('XAU/USD')" style="border-left:4px solid #eab308;" title="Click to select Spot Gold (XAU/USD)">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-                    <div>
-                        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); font-weight:700;">Precious Metal</div>
-                        <div style="font-size:18px; font-weight:800; color:#facc15; display:flex; align-items:center; gap:8px;">
-                            <span>GOLD</span>
-                            <span style="font-family:var(--font-mono); font-size:12px; color:var(--text-secondary); background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px;">XAU/USD</span>
-                        </div>
-                    </div>
-                    <span id="goldCardProvider" class="badge badge-green" style="font-size:10px; font-weight:700;">Twelve Data</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:baseline; margin:8px 0 6px;">
-                    <div id="goldCardPrice" style="font-size:26px; font-weight:800; font-family:var(--font-mono); color:var(--text-primary);">--.--</div>
-                    <div id="goldCardChange" style="font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--accent-green);">+0.00 (+0.00%)</div>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); padding-top:8px; border-top:1px solid var(--border-color);">
-                    <span>24h Range: <strong id="goldCardRange" style="color:var(--text-primary); font-family:var(--font-mono);">-- / --</strong></span>
-                    <span>Updated: <strong id="goldCardTime" style="color:var(--text-primary); font-family:var(--font-mono);">--:--:-- UTC</strong></span>
-                </div>
-            </div>
-
-            <!-- BITCOIN Card -->
-            <div id="cardBtc" class="card market-asset-card" onclick="selectAsset('BTC/USD')" style="border-left:4px solid #38bdf8;" title="Click to select Bitcoin (BTC/USD)">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-                    <div>
-                        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); font-weight:700;">Cryptocurrency</div>
-                        <div style="font-size:18px; font-weight:800; color:#38bdf8; display:flex; align-items:center; gap:8px;">
-                            <span>BITCOIN</span>
-                            <span style="font-family:var(--font-mono); font-size:12px; color:var(--text-secondary); background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px;">BTC/USD</span>
-                        </div>
-                    </div>
-                    <span id="btcCardProvider" class="badge badge-blue" style="font-size:10px; font-weight:700;">Twelve Data</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:baseline; margin:8px 0 6px;">
-                    <div id="btcCardPrice" style="font-size:26px; font-weight:800; font-family:var(--font-mono); color:var(--text-primary);">--.--</div>
-                    <div id="btcCardChange" style="font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--accent-green);">+0.00 (+0.00%)</div>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); padding-top:8px; border-top:1px solid var(--border-color);">
-                    <span>24h Range: <strong id="btcCardRange" style="color:var(--text-primary); font-family:var(--font-mono);">-- / --</strong></span>
-                    <span>Updated: <strong id="btcCardTime" style="color:var(--text-primary); font-family:var(--font-mono);">--:--:-- UTC</strong></span>
-                </div>
             </div>
         </div>
 
@@ -2665,11 +2549,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                 <button class="tf-btn" onclick="setChartInterval('1m')">1m</button>
                                 <button class="tf-btn active" onclick="setChartInterval('5m')">5m</button>
                                 <button class="tf-btn" onclick="setChartInterval('15m')">15m</button>
-                                <button class="tf-btn" onclick="setChartInterval('30m')">30m</button>
                                 <button class="tf-btn" onclick="setChartInterval('1h')">1h</button>
                                 <button class="tf-btn" onclick="setChartInterval('4h')">4h</button>
-                                <button class="tf-btn" onclick="setChartInterval('1d')">1d</button>
-                                <button class="tf-btn" onclick="setChartInterval('1w')">1w</button>
                             </div>
                         </div>
 
@@ -3018,162 +2899,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     <button class="btn" onclick="closeCalibrateModal()">Cancel</button>
                     <button class="btn btn-primary" onclick="saveCalibration()">Apply Calibration</button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Centralized Multi-API Market Providers Modal (Requirement 9) -->
-    <div id="marketApiModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
-                <h3 style="font-size:16px; margin:0; display:flex; align-items:center; gap:8px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
-                    Centralized Market Data Providers (4 APIs)
-                </h3>
-                <button class="btn" onclick="closeMarketApiModal()" style="padding:4px 8px; font-size:11px;">Close</button>
-            </div>
-
-            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px; line-height:1.5;">
-                Manage all 4 market data providers from one central location with automatic failover, rate-limit protection, and masked API keys for <strong>GOLD (XAU/USD)</strong> and <strong>BITCOIN (BTC/USD)</strong>.
-            </p>
-
-            <!-- Providers Status & Config Cards -->
-            <div id="providersListContainer" style="display:flex; flex-direction:column; gap:12px; margin-bottom:18px;">
-                <!-- Twelve Data Card -->
-                <div class="card" style="padding:12px; background:var(--bg-card); border:1px solid var(--border-color);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="chk_provider_twelvedata" checked style="cursor:pointer; width:16px; height:16px;">
-                            <strong style="color:var(--text-primary); font-size:14px;">1. Twelve Data</strong>
-                            <span class="badge badge-green" style="font-size:10px;">Primary Spot</span>
-                        </div>
-                        <span id="badge_status_twelvedata" class="badge badge-green">Connected</span>
-                    </div>
-                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">
-                        Supported: <strong>XAU/USD, BTC/USD</strong> | Timeframes: 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w | Quota: 800 req/day
-                    </div>
-                    <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
-                        <input id="key_provider_twelvedata" type="text" class="form-control" placeholder="Twelve Data API Key (leave blank to keep current)" style="font-family:var(--font-mono); font-size:11px; padding:6px 10px;">
-                        <button id="btnTest_twelvedata" class="btn" onclick="testProviderConnection('twelvedata')" style="font-size:11px; padding:6px 10px;">Test Connection</button>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:11px; color:var(--text-secondary);">
-                        <span id="testResult_twelvedata">Active Key: <code id="masked_twelvedata">7334...676d2</code></span>
-                        <span id="lastUpdate_twelvedata">Last Update: Live</span>
-                    </div>
-                </div>
-
-                <!-- Finnhub Card -->
-                <div class="card" style="padding:12px; background:var(--bg-card); border:1px solid var(--border-color);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="chk_provider_finnhub" checked style="cursor:pointer; width:16px; height:16px;">
-                            <strong style="color:var(--text-primary); font-size:14px;">2. Finnhub</strong>
-                            <span class="badge badge-blue" style="font-size:10px;">Backup BTC Spot</span>
-                        </div>
-                        <span id="badge_status_finnhub" class="badge badge-blue">Ready</span>
-                    </div>
-                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">
-                        Supported: <strong>BTC/USD (Binance/Coinbase Spot)</strong> | Timeframes: 1m, 5m, 15m, 1h, 1d | Quota: 60 req/min
-                    </div>
-                    <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
-                        <input id="key_provider_finnhub" type="text" class="form-control" placeholder="Finnhub API Key (leave blank to keep current)" style="font-family:var(--font-mono); font-size:11px; padding:6px 10px;">
-                        <button id="btnTest_finnhub" class="btn" onclick="testProviderConnection('finnhub')" style="font-size:11px; padding:6px 10px;">Test Connection</button>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:11px; color:var(--text-secondary);">
-                        <span id="testResult_finnhub">Active Key: <code id="masked_finnhub">dc36...9870</code></span>
-                        <span id="lastUpdate_finnhub">Last Update: Ready</span>
-                    </div>
-                </div>
-
-                <!-- Alpha Vantage Card -->
-                <div class="card" style="padding:12px; background:var(--bg-card); border:1px solid var(--border-color);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="chk_provider_alphavantage" checked style="cursor:pointer; width:16px; height:16px;">
-                            <strong style="color:var(--text-primary); font-size:14px;">3. Alpha Vantage</strong>
-                            <span class="badge badge-amber" style="font-size:10px;">Historical Backup</span>
-                        </div>
-                        <span id="badge_status_alphavantage" class="badge badge-amber">Ready</span>
-                    </div>
-                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">
-                        Supported: <strong>BTC/USD (Crypto Daily Bars)</strong> | Timeframes: 1d, 1w | Quota: 25 req/day
-                    </div>
-                    <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
-                        <input id="key_provider_alphavantage" type="text" class="form-control" placeholder="Alpha Vantage API Key (leave blank to keep current)" style="font-family:var(--font-mono); font-size:11px; padding:6px 10px;">
-                        <button id="btnTest_alphavantage" class="btn" onclick="testProviderConnection('alphavantage')" style="font-size:11px; padding:6px 10px;">Test Connection</button>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:11px; color:var(--text-secondary);">
-                        <span id="testResult_alphavantage">Active Key: <code id="masked_alphavantage">XA2Y...WX5</code></span>
-                        <span id="lastUpdate_alphavantage">Last Update: Ready</span>
-                    </div>
-                </div>
-
-                <!-- EODHD Card -->
-                <div class="card" style="padding:12px; background:var(--bg-card); border:1px solid var(--border-color);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="chk_provider_eodhd" checked style="cursor:pointer; width:16px; height:16px;">
-                            <strong style="color:var(--text-primary); font-size:14px;">4. EODHD</strong>
-                            <span class="badge badge-purple" style="font-size:10px;">EOD & BTC Live Backup</span>
-                        </div>
-                        <span id="badge_status_eodhd" class="badge badge-purple">Ready</span>
-                    </div>
-                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">
-                        Supported: <strong>BTC/USD (Real-time quote), XAU/USD (EOD daily candles)</strong> | Timeframes: 1d, 1w | Quota: 20 req/day
-                    </div>
-                    <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center;">
-                        <input id="key_provider_eodhd" type="text" class="form-control" placeholder="EODHD API Key (leave blank to keep current)" style="font-family:var(--font-mono); font-size:11px; padding:6px 10px;">
-                        <button id="btnTest_eodhd" class="btn" onclick="testProviderConnection('eodhd')" style="font-size:11px; padding:6px 10px;">Test Connection</button>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:11px; color:var(--text-secondary);">
-                        <span id="testResult_eodhd">Active Key: <code id="masked_eodhd">6b06...99311154</code></span>
-                        <span id="lastUpdate_eodhd">Last Update: Ready</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Asset Routing Preferences (Requirement 3) -->
-            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:6px; padding:12px; margin-bottom:16px;">
-                <h4 style="font-size:13px; margin:0 0 10px; color:var(--text-primary);">Asset Failover Routing Preferences</h4>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div>
-                        <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px;">GOLD (XAU/USD) Primary Provider</label>
-                        <select id="pref_gold_primary" class="form-control" style="font-size:12px; padding:6px 8px;">
-                            <option value="twelvedata" selected>Twelve Data (Spot Live Feed)</option>
-                            <option value="finnhub">Finnhub</option>
-                            <option value="eodhd">EODHD (EOD Daily)</option>
-                            <option value="alphavantage">Alpha Vantage</option>
-                        </select>
-                        <label style="font-size:11px; color:var(--text-muted); display:block; margin:6px 0 4px;">GOLD (XAU/USD) Backup Provider</label>
-                        <select id="pref_gold_backup" class="form-control" style="font-size:12px; padding:6px 8px;">
-                            <option value="finnhub" selected>Finnhub</option>
-                            <option value="eodhd">EODHD</option>
-                            <option value="alphavantage">Alpha Vantage</option>
-                            <option value="twelvedata">Twelve Data</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="font-size:11px; color:var(--text-muted); display:block; margin-bottom:4px;">BITCOIN (BTC/USD) Primary Provider</label>
-                        <select id="pref_btc_primary" class="form-control" style="font-size:12px; padding:6px 8px;">
-                            <option value="twelvedata" selected>Twelve Data (Spot Live Feed)</option>
-                            <option value="finnhub">Finnhub (Binance/Coinbase Spot)</option>
-                            <option value="eodhd">EODHD (Crypto CC Spot)</option>
-                            <option value="alphavantage">Alpha Vantage</option>
-                        </select>
-                        <label style="font-size:11px; color:var(--text-muted); display:block; margin:6px 0 4px;">BITCOIN (BTC/USD) Backup Provider</label>
-                        <select id="pref_btc_backup" class="form-control" style="font-size:12px; padding:6px 8px;">
-                            <option value="finnhub" selected>Finnhub (Binance/Coinbase Spot)</option>
-                            <option value="eodhd">EODHD (Crypto CC Spot)</option>
-                            <option value="alphavantage">Alpha Vantage</option>
-                            <option value="twelvedata">Twelve Data</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:10px;">
-                <button class="btn" onclick="closeMarketApiModal()">Cancel</button>
-                <button id="btnSaveMarketApi" class="btn btn-primary" onclick="saveMarketApiConfig()">Save Provider Configuration</button>
             </div>
         </div>
     </div>
@@ -3563,39 +3288,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             renderCanvasChart();
         }
 
-        function selectAsset(sym) {
-            const pairSelect = document.getElementById('pairSelect');
-            if (pairSelect) {
-                pairSelect.value = sym;
-            }
-            updateActiveAssetUI(sym);
-            onPairChange();
-        }
-
-        function updateActiveAssetUI(sym) {
-            const isGold = (sym || '').includes('XAU');
-            const btnGold = document.getElementById('btnQuickGold');
-            const btnBtc = document.getElementById('btnQuickBtc');
-            const cardGold = document.getElementById('cardGold');
-            const cardBtc = document.getElementById('cardBtc');
-
-            if (btnGold) {
-                btnGold.className = isGold ? 'btn quick-asset-btn active-gold' : 'btn quick-asset-btn';
-            }
-            if (btnBtc) {
-                btnBtc.className = !isGold ? 'btn quick-asset-btn active-btc' : 'btn quick-asset-btn';
-            }
-            if (cardGold) {
-                cardGold.className = isGold ? 'card market-asset-card active-asset' : 'card market-asset-card';
-            }
-            if (cardBtc) {
-                cardBtc.className = !isGold ? 'card market-asset-card active-asset btc-active' : 'card market-asset-card';
-            }
-        }
-
         function onPairChange() {
             const sym = document.getElementById('pairSelect').value;
-            updateActiveAssetUI(sym);
             const normSym = normalizeSym(sym);
             tdLiveTick = tdLiveTicks[normSym] || null;
             if (tdLiveTick) {
@@ -6586,221 +6280,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         /* -------------------------------------------------------------
-           Centralized Multi-API Market Data Engine (Twelve Data, Finnhub, Alpha Vantage, EODHD)
-           ------------------------------------------------------------- */
-        let marketProvidersData = null;
-
-        async function fetchMarketCards() {
-            try {
-                const res = await fetch('/api/market-cards');
-                if (!res.ok) return;
-                const data = await res.json();
-                const gold = data['XAU/USD'];
-                const btc = data['BTC/USD'];
-
-                if (gold) {
-                    const priceEl = document.getElementById('goldCardPrice');
-                    const changeEl = document.getElementById('goldCardChange');
-                    const rangeEl = document.getElementById('goldCardRange');
-                    const providerEl = document.getElementById('goldCardProvider');
-                    const timeEl = document.getElementById('goldCardTime');
-
-                    if (priceEl && gold.price) priceEl.textContent = Number(gold.price).toFixed(2);
-                    if (changeEl) {
-                        const chg = gold.change !== null && gold.change !== undefined ? Number(gold.change).toFixed(2) : '0.00';
-                        const pct = gold.change_percent !== null && gold.change_percent !== undefined ? Number(gold.change_percent).toFixed(2) : '0.00';
-                        const isPos = (gold.change || 0) >= 0;
-                        changeEl.textContent = `${isPos ? '+' : ''}${chg} (${isPos ? '+' : ''}${pct}%)`;
-                        changeEl.style.color = isPos ? 'var(--accent-green)' : 'var(--accent-rose)';
-                    }
-                    if (rangeEl && gold.high !== null && gold.low !== null) {
-                        rangeEl.textContent = `${Number(gold.low).toFixed(2)} / ${Number(gold.high).toFixed(2)}`;
-                    }
-                    if (providerEl) {
-                        providerEl.textContent = gold.provider || 'Twelve Data';
-                    }
-                    if (timeEl) {
-                        const t = gold.timestamp_utc || '';
-                        timeEl.textContent = t.includes(' ') ? t.split(' ')[1] : (t || '--:--:--');
-                    }
-                }
-
-                if (btc) {
-                    const priceEl = document.getElementById('btcCardPrice');
-                    const changeEl = document.getElementById('btcCardChange');
-                    const rangeEl = document.getElementById('btcCardRange');
-                    const providerEl = document.getElementById('btcCardProvider');
-                    const timeEl = document.getElementById('btcCardTime');
-
-                    if (priceEl && btc.price) priceEl.textContent = Number(btc.price).toFixed(2);
-                    if (changeEl) {
-                        const chg = btc.change !== null && btc.change !== undefined ? Number(btc.change).toFixed(2) : '0.00';
-                        const pct = btc.change_percent !== null && btc.change_percent !== undefined ? Number(btc.change_percent).toFixed(2) : '0.00';
-                        const isPos = (btc.change || 0) >= 0;
-                        changeEl.textContent = `${isPos ? '+' : ''}${chg} (${isPos ? '+' : ''}${pct}%)`;
-                        changeEl.style.color = isPos ? 'var(--accent-green)' : 'var(--accent-rose)';
-                    }
-                    if (rangeEl && btc.high !== null && btc.low !== null) {
-                        rangeEl.textContent = `${Number(btc.low).toFixed(2)} / ${Number(btc.high).toFixed(2)}`;
-                    }
-                    if (providerEl) {
-                        providerEl.textContent = btc.provider || 'Twelve Data';
-                    }
-                    if (timeEl) {
-                        const t = btc.timestamp_utc || '';
-                        timeEl.textContent = t.includes(' ') ? t.split(' ')[1] : (t || '--:--:--');
-                    }
-                }
-            } catch (err) {
-                console.warn('[Market Cards] Error fetching quotes:', err);
-            }
-        }
-
-        async function fetchMarketProviders() {
-            try {
-                const res = await fetch('/api/providers');
-                if (!res.ok) return;
-                marketProvidersData = await res.json();
-                updateMarketApiModalUI(marketProvidersData);
-            } catch (err) {
-                console.warn('[Market Providers] Error fetching status:', err);
-            }
-        }
-
-        function updateMarketApiModalUI(data) {
-            if (!data) return;
-            const providers = data.providers || [];
-            const prefs = data.preferences || {};
-
-            providers.forEach(p => {
-                const chk = document.getElementById(`chk_provider_${p.id}`);
-                const badge = document.getElementById(`badge_status_${p.id}`);
-                const masked = document.getElementById(`masked_${p.id}`);
-                const updateEl = document.getElementById(`lastUpdate_${p.id}`);
-
-                if (chk) chk.checked = p.enabled;
-                if (badge) {
-                    badge.textContent = p.status ? p.status.toUpperCase() : 'READY';
-                    badge.className = p.enabled ? (p.status === 'connected' ? 'badge badge-green' : 'badge badge-blue') : 'badge badge-rose';
-                }
-                if (masked) masked.textContent = p.api_key_masked || 'Not Configured';
-                if (updateEl && p.last_update) {
-                    const lu = p.last_update;
-                    updateEl.textContent = `Last: ${lu.includes('T') ? lu.split('T')[1].split('.')[0] : lu}`;
-                }
-            });
-
-            if (prefs.gold) {
-                const gp = document.getElementById('pref_gold_primary');
-                const gb = document.getElementById('pref_gold_backup');
-                if (gp && prefs.gold.primary) gp.value = prefs.gold.primary;
-                if (gb && prefs.gold.backup) gb.value = prefs.gold.backup;
-            }
-            if (prefs.btc) {
-                const bp = document.getElementById('pref_btc_primary');
-                const bb = document.getElementById('pref_btc_backup');
-                if (bp && prefs.btc.primary) bp.value = prefs.btc.primary;
-                if (bb && prefs.btc.backup) bb.value = prefs.btc.backup;
-            }
-
-            const activeCount = providers.filter(p => p.enabled).length;
-            const statusLabel = document.getElementById('marketApiStatusLabel');
-            if (statusLabel) {
-                statusLabel.textContent = `${activeCount} Configured`;
-            }
-        }
-
-        function openMarketApiModal() {
-            fetchMarketProviders();
-            const modal = document.getElementById('marketApiModal');
-            if (modal) modal.classList.add('active');
-        }
-
-        function closeMarketApiModal() {
-            const modal = document.getElementById('marketApiModal');
-            if (modal) modal.classList.remove('active');
-        }
-
-        async function testProviderConnection(providerId) {
-            const btn = document.getElementById(`btnTest_${providerId}`);
-            const resEl = document.getElementById(`testResult_${providerId}`);
-            if (btn) btn.textContent = 'Testing...';
-            try {
-                const res = await fetch('/api/providers/test', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ provider: providerId })
-                });
-                const data = await res.json();
-                if (btn) btn.textContent = 'Test Connection';
-                if (resEl) {
-                    if (data.success) {
-                        resEl.innerHTML = `<span style="color:var(--accent-green); font-weight:700;">Success (${data.latency_ms}ms)</span>`;
-                    } else {
-                        resEl.innerHTML = `<span style="color:var(--accent-rose);">Failed: ${data.error || 'Connection error'}</span>`;
-                    }
-                }
-            } catch (err) {
-                if (btn) btn.textContent = 'Test Connection';
-                if (resEl) resEl.innerHTML = `<span style="color:var(--accent-rose);">Error: ${err.message}</span>`;
-            }
-        }
-
-        async function saveMarketApiConfig() {
-            const saveBtn = document.getElementById('btnSaveMarketApi');
-            if (saveBtn) saveBtn.textContent = 'Saving...';
-
-            const payload = {
-                providers: {
-                    twelvedata: {
-                        enabled: document.getElementById('chk_provider_twelvedata') ? document.getElementById('chk_provider_twelvedata').checked : true,
-                        api_key: document.getElementById('key_provider_twelvedata') ? document.getElementById('key_provider_twelvedata').value.trim() : ''
-                    },
-                    finnhub: {
-                        enabled: document.getElementById('chk_provider_finnhub') ? document.getElementById('chk_provider_finnhub').checked : true,
-                        api_key: document.getElementById('key_provider_finnhub') ? document.getElementById('key_provider_finnhub').value.trim() : ''
-                    },
-                    alphavantage: {
-                        enabled: document.getElementById('chk_provider_alphavantage') ? document.getElementById('chk_provider_alphavantage').checked : true,
-                        api_key: document.getElementById('key_provider_alphavantage') ? document.getElementById('key_provider_alphavantage').value.trim() : ''
-                    },
-                    eodhd: {
-                        enabled: document.getElementById('chk_provider_eodhd') ? document.getElementById('chk_provider_eodhd').checked : true,
-                        api_key: document.getElementById('key_provider_eodhd') ? document.getElementById('key_provider_eodhd').value.trim() : ''
-                    }
-                },
-                preferences: {
-                    gold: {
-                        primary: document.getElementById('pref_gold_primary') ? document.getElementById('pref_gold_primary').value : 'twelvedata',
-                        backup: document.getElementById('pref_gold_backup') ? document.getElementById('pref_gold_backup').value : 'finnhub'
-                    },
-                    btc: {
-                        primary: document.getElementById('pref_btc_primary') ? document.getElementById('pref_btc_primary').value : 'twelvedata',
-                        backup: document.getElementById('pref_btc_backup') ? document.getElementById('pref_btc_backup').value : 'finnhub'
-                    }
-                }
-            };
-
-            try {
-                const res = await fetch('/api/providers/config', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (saveBtn) saveBtn.textContent = 'Saved!';
-                setTimeout(() => { if (saveBtn) saveBtn.textContent = 'Save Provider Configuration'; }, 2000);
-                fetchMarketCards();
-                fetchMarketProviders();
-                fetchObservation();
-                fetchChart();
-            } catch (err) {
-                if (saveBtn) saveBtn.textContent = 'Error saving';
-                console.error('[Market API] Save config error:', err);
-            }
-        }
-
-        /* -------------------------------------------------------------
            Twelve Data Direct Spot Gold & Forex Real-Time Engine
            ------------------------------------------------------------- */
         function openTwelveDataModal() {
@@ -7257,15 +6736,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             fetchRiskConfig();
             fetchCalibration();
             fetchTwelveDataConfig();
-            fetchMarketCards();
-            fetchMarketProviders();
             initTwelveDataWebSocket();
             fetchScannerSignals();
             updateVoiceAlertsUI();
             updateNotificationsUI();
-
-            // Periodic 10s Market Cards updater (Requirement 10)
-            setInterval(fetchMarketCards, 10000);
 
             // Preload studio MP3 audio buffers in memory for zero-latency mobile playback
             const studioAudios = [
@@ -7330,11 +6804,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     closeRiskModal();
                     closeCalibrateModal();
                     closeTwelveDataModal();
-                    closeMarketApiModal();
                 }
             });
 
-            ['riskModal', 'calibrateModal', 'twelveDataModal', 'marketApiModal', 'supabaseModal'].forEach(id => {
+            ['riskModal', 'calibrateModal', 'twelveDataModal', 'supabaseModal'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     el.addEventListener('click', (e) => {
@@ -7633,8 +7106,6 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                                 "last": td_quote["last"],
                                 "event_time": int(time.time() * 1000),
                                 "received_at": time.time(),
-                                "provider": td_quote.get("provider", "Twelve Data"),
-                                "feed": td_quote.get("feed", "Twelve Data Real-Time (Retail Spot Feed)"),
                             }
                             LIVE_TICKS[canon] = live
                             save_cached_live_tick(canon, live)
@@ -7653,16 +7124,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     pip_div = 0.10 if "XAU" in canon else (1.0 if "BTC" in canon else (0.01 if "JPY" in canon else 0.0001))
                     obs["spread_pips"] = round(max(0.0, live["ask"] - live["bid"]) / pip_div, 1)
                     obs["data_freshness"] = "LIVE (0s ago)"
-                    provider_name = live.get("provider", "Twelve Data")
-                    source_label = live.get("feed", f"{provider_name} Real-Time (Retail Spot Feed)")
-                    obs["source"] = source_label
-                    obs["provider"] = provider_name
-                    obs["status"] = f"LIVE / ACTIVE ({provider_name} Spot Feed)"
-                    obs["market_state"] = "ACTIVE (24/7 Spot)" if ("XAU" in canon or "BTC" in canon) else f"ACTIVE ({provider_name} Real-Time)"
+                    obs["source"] = "Twelve Data Real-Time (Retail Spot Feed)"
+                    obs["status"] = "LIVE / ACTIVE (Twelve Data Spot Feed)"
+                    obs["market_state"] = "ACTIVE (24/7 Spot)" if ("XAU" in canon or "BTC" in canon) else "ACTIVE (Twelve Data Real-Time)"
                     obs["is_market_open"] = True
                     obs["is_live_24_7"] = ("XAU" in canon or "BTC" in canon)
                     obs["active_sessions"] = ["24/7 Spot Benchmark"] if ("XAU" in canon or "BTC" in canon) else obs.get("active_sessions", ["Open Session"])
-                    obs["reason"] = f"{source_label} active for {canon}. Direct institutional spot rates."
+                    obs["reason"] = f"Twelve Data Real-Time spot feed active for {canon}. Direct institutional spot rates."
                     if obs.get("auto_signal"):
                         auto = obs["auto_signal"]
                         auto["is_market_open"] = True
@@ -7722,33 +7190,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if path == "/api/chart":
             sym = params.get("symbol", ["XAU/USD"])[0]
             interval = params.get("interval", ["5m"])[0]
-            range_period = "5d" if interval in ("1m", "5m", "15m", "30m", "1h") else "1mo"
+            range_period = "5d" if interval in ("1m", "5m", "15m", "1h") else "1mo"
             canon = normalize_symbol(sym)
             try:
                 chart = None
-                source_feed = "Twelve Data Real-Time (Retail Spot Feed)"
-                active_provider = "Twelve Data"
-                min_bars = 10 if self.OFFLINE_DATA is not None else 15
-
-                # 4a. Multi-Provider Market Manager (Twelve Data, Finnhub, EODHD, Alpha Vantage)
-                if self.OFFLINE_DATA is None:
-                    try:
-                        from .market_api import market_manager
-                        chart = market_manager.get_chart(
-                            symbol=canon,
-                            interval=interval,
-                            limit=80,
-                        )
-                        if chart and len(chart.get("candles", [])) >= min_bars:
-                            active_provider = chart.get("provider", "Twelve Data")
-                            source_feed = f"{active_provider} Spot Feed"
-                        else:
-                            chart = None
-                    except Exception:
-                        chart = None
-
-                # 4b. Twelve Data Direct Fallback
-                if chart is None and TWELVE_DATA_CONFIG.get("enabled") and TWELVE_DATA_CONFIG.get("api_key") and self.OFFLINE_DATA is None:
+                source_feed = "Yahoo Finance Indicative"
+                min_bars = 10 if self.OFFLINE_DATA is not None else 30
+                if TWELVE_DATA_CONFIG.get("enabled") and TWELVE_DATA_CONFIG.get("api_key") and self.OFFLINE_DATA is None:
                     try:
                         chart = fetch_twelve_data_chart(
                             symbol=canon,
@@ -7757,14 +7205,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                             offline_data=self.OFFLINE_DATA,
                         )
                         if chart and len(chart.get("candles", [])) >= min_bars:
-                            active_provider = "Twelve Data"
                             source_feed = "Twelve Data (Retail Spot Live Feed)"
                         else:
                             chart = None
                     except Exception:
                         chart = None
 
-                # 4c. Indicative / Offline fallback
                 if chart is None or len(chart.get("candles", [])) < min_bars:
                     y_chart = fetch_chart(
                         symbol=canon,
@@ -7774,8 +7220,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     )
                     if y_chart and len(y_chart.get("candles", [])) > 0:
                         chart = y_chart
-                        active_provider = chart.get("provider", "Indicative Benchmark")
-                        source_feed = f"{active_provider} Feed"
+                        if "Twelve Data" not in source_feed:
+                            source_feed = "Yahoo Finance Indicative"
 
                 candles = chart.get("candles", []) if chart else []
                 if len(candles) > 80:
@@ -7831,20 +7277,20 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     ema9 = [round(v + c_offset, 2) if v is not None else None for v in ema9]
                     ema21 = [round(v + c_offset, 2) if v is not None else None for v in ema21]
 
-                is_twelve_data = "Twelve Data" in source_feed or active_provider == "Twelve Data"
+                is_twelve_data = "Twelve Data" in source_feed or (TWELVE_DATA_CONFIG.get("enabled", False) and self.OFFLINE_DATA is None)
                 res = {
                     "symbol": canon,
                     "interval": interval,
-                    "source": source_feed,
-                    "provider": active_provider,
+                    "source": "Twelve Data Real-Time (Retail Spot Feed)" if is_twelve_data else obs.get("source", "Yahoo Finance Indicative"),
+                    "provider": "twelvedata" if is_twelve_data else "yahoo",
                     "is_gold": "XAU" in canon,
                     "is_btc": "BTC" in canon,
                     "calibrated_offset": GOLD_CALIBRATION["offset"] if "XAU" in canon else 0.0,
                     "benchmark_notice": (
-                        f"{active_provider} Direct Spot ({canon}) - Authentic Multi-API Spot Benchmark"
-                        if active_provider not in ("Yahoo", "Indicative Benchmark")
+                        "Twelve Data Direct Retail Spot (XAU/USD)  -  Authentic Broker Spot Benchmark"
+                        if is_twelve_data
                         else (
-                            "COMEX Gold Futures benchmark (GC=F) - not OTC spot XAU/USD"
+                            "COMEX Gold Futures benchmark (GC=F)  -  not OTC spot XAU/USD"
                             if "XAU" in canon
                             else "Yahoo Finance FX (query2 indicative aggregate)"
                         )
@@ -8087,47 +7533,6 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.send_header("X-Paper-Trading-Only", "true")
             self.end_headers()
             self.wfile.write(json.dumps(TWELVE_DATA_CONFIG).encode("utf-8"))
-            return
-
-        # 12b. API: Multi-Provider Market Cards (Gold & BTC live quotes)
-        if path == "/api/market-cards":
-            try:
-                from .market_api import market_manager
-                cards = market_manager.get_market_cards()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("X-Paper-Trading-Only", "true")
-                self.end_headers()
-                self.wfile.write(json.dumps(cards).encode("utf-8"))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
-            return
-
-        # 12c. API: Providers Health & Management Status
-        if path == "/api/providers":
-            try:
-                from .market_api import market_manager
-                status_list = market_manager.get_providers_status()
-                pref = market_manager.config.get("preferences", {})
-                payload = {
-                    "providers": status_list,
-                    "preferences": pref,
-                    "supported_assets": ["XAU/USD", "BTC/USD"],
-                    "supported_timeframes": ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"],
-                }
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("X-Paper-Trading-Only", "true")
-                self.end_headers()
-                self.wfile.write(json.dumps(payload).encode("utf-8"))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
             return
 
         # 14. API: Supabase Cloud Database Config & Status
@@ -8494,41 +7899,6 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self.send_header("X-Paper-Trading-Only", "true")
             self.end_headers()
             self.wfile.write(json.dumps({"success": True, "config": TWELVE_DATA_CONFIG}).encode("utf-8"))
-            return
-
-        # 5b. API: Save Market Providers Configuration
-        if path == "/api/providers/config":
-            try:
-                from .market_api import market_manager
-                res = market_manager.update_config(payload)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("X-Paper-Trading-Only", "true")
-                self.end_headers()
-                self.wfile.write(json.dumps(res).encode("utf-8"))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
-            return
-
-        # 5c. API: Test Market Provider Connection
-        if path == "/api/providers/test":
-            try:
-                from .market_api import market_manager
-                p_id = str(payload.get("provider", "twelvedata")).strip()
-                res = market_manager.test_provider(p_id)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("X-Paper-Trading-Only", "true")
-                self.end_headers()
-                self.wfile.write(json.dumps(res).encode("utf-8"))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
             return
 
         # 6. API: License Verification (Single-Device Enforcement)
