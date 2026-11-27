@@ -173,6 +173,16 @@ def evaluate_confluence_signal(
             htf_trend = "BULLISH"
             bullish_score += 20
             bullish_factors.append(f"15m HTF Macro Trend is BULLISH (Price {current_price:.2f} > 15m EMA-21 {ema21_15m:.2f})")
+        elif ema9_15m and current_price < ema9_15m:
+            htf_bearish = True
+            htf_trend = "BEARISH"
+            bearish_score += 15
+            bearish_factors.append(f"15m HTF Macro Bias is BEARISH (Price {current_price:.2f} < 15m EMA-9 {ema9_15m:.2f})")
+        elif ema9_15m and current_price > ema9_15m:
+            htf_bullish = True
+            htf_trend = "BULLISH"
+            bullish_score += 15
+            bullish_factors.append(f"15m HTF Macro Bias is BULLISH (Price {current_price:.2f} > 15m EMA-9 {ema9_15m:.2f})")
         elif trend_15m == "BEARISH":
             htf_bearish = True
             htf_trend = "BEARISH"
@@ -631,6 +641,50 @@ def evaluate_confluence_signal(
             active_factors = ["[OUTSIDE ENTRY ZONE] Price is outside valid entry zones (OB/FVG/OTE/Sweep). Waiting for entry zone."] + base_factors
         else:
             active_factors = base_factors
+
+    # HARD FAIL-SAFE INTEGRITY SHIELD:
+    # Double-check that signal_side strictly meets every institutional requirement.
+    # If any invariant is violated, immediately force signal_side to NEUTRAL.
+    if signal_side in ("BUY", "SELL"):
+        is_vetoed = False
+        veto_reason = ""
+
+        # 1. Physical zone check: active_entry_zone must be an actual price zone
+        if not active_entry_zone:
+            is_vetoed = True
+            veto_reason = "No active entry zone"
+        elif any(forbidden in active_entry_zone for forbidden in ["Killzone", "RSI Divergence"]):
+            is_vetoed = True
+            veto_reason = f"Forbidden non-physical entry zone: {active_entry_zone}"
+
+        # 2. HTF Macro Trend check
+        if signal_side == "BUY" and htf_bearish and not has_bullish_reversal:
+            is_vetoed = True
+            veto_reason = "Counter-trend BUY against 15m HTF Bearish trend without confirmed displacement CHoCH or sweep"
+        elif signal_side == "SELL" and htf_bullish and not has_bearish_reversal:
+            is_vetoed = True
+            veto_reason = "Counter-trend SELL against 15m HTF Bullish trend without confirmed displacement CHoCH or sweep"
+
+        # 3. Candlestick pressure check
+        if signal_side == "BUY" and c_close < c_open and (c_open - c_close) >= (c_rng * 0.45) and (l_wick / c_rng) < 0.35:
+            is_vetoed = True
+            veto_reason = "BUY rejected on strong bearish dump candle"
+        elif signal_side == "SELL" and c_close > c_open and (c_close - c_open) >= (c_rng * 0.45) and (u_wick / c_rng) < 0.35:
+            is_vetoed = True
+            veto_reason = "SELL rejected on strong bullish pump candle"
+
+        # 4. Dealing Range sanity check
+        if signal_side == "BUY" and zone == "PREMIUM" and not (latest_bos and latest_bos.get("direction") == "BULLISH"):
+            is_vetoed = True
+            veto_reason = "BUY prohibited in Premium Dealing Range without confirmed breakout expansion"
+        elif signal_side == "SELL" and zone == "DISCOUNT" and not (latest_bos and latest_bos.get("direction") == "BEARISH"):
+            is_vetoed = True
+            veto_reason = "SELL prohibited in Discount Dealing Range without confirmed breakdown expansion"
+
+        if is_vetoed:
+            signal_side = "NEUTRAL"
+            confluence_score = min(confluence_score, 45)
+            active_factors = [f"[FAIL-SAFE VETO] Signal blocked: {veto_reason}"] + active_factors
 
     if confluence_score >= 80:
         grade = "A+ (Elite Institutional)"

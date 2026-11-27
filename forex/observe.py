@@ -416,17 +416,20 @@ class SignalStateManager:
             if is_sl_hit or is_tp2_hit or is_struct_break or is_price_insane or is_trend_reversed or is_time_expired:
                 # Signal is INVALIDATED! (Req 4: never switch directly from BUY to SELL. First invalidate, transition to waiting)
                 is_be_hit = bool(active.get("is_breakeven_protected") or active.get("tp1_hit"))
+                is_t1_hit = bool(active.get("tp1_hit"))
                 with self._lock:
                     self._active_signals.pop(canon, None)
                     self._cooldown[canon] = {
                         "invalidated_side": side,
                         "invalidated_at": now_utc.timestamp(),
                         "candle_ts": candles[-1].get("timestamp", 0) if candles else 0,
-                        "reason": "BE_HIT" if (is_sl_hit and is_be_hit) else ("SL_HIT" if is_sl_hit else "INVALIDATED"),
+                        "reason": "TP1_HIT" if is_t1_hit else ("BE_HIT" if (is_sl_hit and is_be_hit) else ("SL_HIT" if is_sl_hit else "INVALIDATED")),
                     }
                 inv_text = "Cross-asset anomaly invalidated" if is_price_insane else (
                     f"Take Profit 2 target completed at {tp2}" if is_tp2_hit else (
-                        (f"Trailing Stop / Breakeven hit at {sl} (Capital protected)" if is_be_hit else f"Stop Loss hit at {sl}") if is_sl_hit else (
+                        (f"Take Profit 1 completed (Trailing profit locked at {sl})" if is_t1_hit else (
+                            f"Trailing Stop / Breakeven hit at {sl} (Capital protected)" if is_be_hit else f"Stop Loss hit at {sl}"
+                        )) if is_sl_hit else (
                             f"Technical bias turned {scan_dir}" if is_trend_reversed else (
                                 "Intraday session expired (90m timeout)" if is_time_expired else "Market structure invalidated"
                             )
@@ -604,11 +607,15 @@ class SignalStateManager:
                 candidate_action = None
             elif htf_dir == "BEARISH" and not is_elite_setup:
                 candidate_action = None
+            elif htf_dir == "BEARISH" and scan_dir == "BEARISH":
+                candidate_action = None
         elif candidate_action == "SELL":
             # If Technical Bias or HTF Macro Trend is actively BULLISH, block counter-trend SELL unless Elite A+
             if scan_dir == "BULLISH" and not is_elite_setup:
                 candidate_action = None
             elif htf_dir == "BULLISH" and not is_elite_setup:
+                candidate_action = None
+            elif htf_dir == "BULLISH" and scan_dir == "BULLISH":
                 candidate_action = None
 
         if candidate_action in ("BUY", "SELL") and candle_is_closed:
