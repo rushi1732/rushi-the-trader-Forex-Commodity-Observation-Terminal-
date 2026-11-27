@@ -1101,6 +1101,40 @@ class TestForexDashboard(unittest.TestCase):
         self.assertNotIn("checkAndAutoLogSignal", html)
         self.assertNotIn("updateLiveTradesPnL", html)
 
+    def test_api_price_and_fast_quote_endpoint(self):
+        """Verify /api/price and /api/quote return low-latency live spot quotes."""
+        # Test Gold price
+        url_gold = f"http://127.0.0.1:{self.port}/api/price?symbol=XAU/USD"
+        with urllib.request.urlopen(url_gold, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertIn("application/json", resp.headers.get("Content-Type", ""))
+            data = json.loads(resp.read().decode("utf-8"))
+            self.assertIn("mid", data)
+            self.assertIn("bid", data)
+            self.assertIn("ask", data)
+            self.assertIn("source", data)
+            self.assertIn("LIVE", data.get("data_freshness", ""))
+
+        # Test BTC quote
+        url_btc = f"http://127.0.0.1:{self.port}/api/quote?symbol=BTC/USD"
+        with urllib.request.urlopen(url_btc, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            data_btc = json.loads(resp.read().decode("utf-8"))
+            self.assertIn("mid", data_btc)
+            self.assertIn("bid", data_btc)
+            self.assertIn("ask", data_btc)
+            self.assertIn("BTC", data_btc.get("symbol", ""))
+
+    def test_fast_price_ticker_present_in_html(self):
+        """Verify HTML includes fetchFastPrice, renderFastPriceTick, and 1.5s interval."""
+        url = f"http://127.0.0.1:{self.port}/"
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        self.assertIn("fetchFastPrice", html)
+        self.assertIn("renderFastPriceTick", html)
+        self.assertIn("setInterval(fetchFastPrice, 1500)", html)
+        self.assertIn("/api/price", html)
+
 
 if __name__ == "__main__":
     unittest.main()

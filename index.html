@@ -2545,6 +2545,93 @@
             return (s || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
         }
 
+        let lastRenderedPrice = null;
+
+        async function fetchFastPrice() {
+            const sym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
+            try {
+                const res = await fetch('/api/price?symbol=' + encodeURIComponent(sym));
+                if (!res.ok) return;
+                const quote = await res.json();
+                if (quote && (quote.mid || quote.last)) {
+                    renderFastPriceTick(quote);
+                }
+            } catch (e) {}
+        }
+
+        function renderFastPriceTick(quote) {
+            if (!quote || !quote.symbol) return;
+            const sym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
+            if (normalizeSym(quote.symbol) !== normalizeSym(sym)) return;
+
+            const isGold = sym.includes('XAU');
+            const isBtc = sym.includes('BTC');
+            const isJpy = sym.includes('JPY');
+            const decimals = (isGold || isBtc) ? 2 : (isJpy ? 2 : 4);
+
+            const priceMid = document.getElementById('priceMid');
+            const priceBid = document.getElementById('priceBid');
+            const priceAsk = document.getElementById('priceAsk');
+            const spreadDisplay = document.getElementById('spreadDisplay');
+            const sourceDisplay = document.getElementById('sourceDisplay');
+            const freshnessDisplay = document.getElementById('freshnessDisplay');
+            const timeDisplay = document.getElementById('timeDisplay');
+            const marketBadge = document.getElementById('marketBadge');
+
+            const mid = quote.mid || quote.last;
+            if (priceMid && mid !== undefined && mid !== null) {
+                const newPrice = Number(mid);
+                const prevPrice = lastRenderedPrice;
+                priceMid.textContent = newPrice.toFixed(decimals);
+
+                // Flash color change on tick
+                if (prevPrice !== null && newPrice !== prevPrice) {
+                    priceMid.style.transition = 'color 0.15s ease';
+                    priceMid.style.color = newPrice > prevPrice ? '#34d399' : '#f87171';
+                    setTimeout(() => { if (priceMid) priceMid.style.color = 'var(--text-primary)'; }, 250);
+                }
+                lastRenderedPrice = newPrice;
+            }
+
+            if (priceBid && quote.bid !== undefined) priceBid.textContent = Number(quote.bid).toFixed(decimals);
+            if (priceAsk && quote.ask !== undefined) priceAsk.textContent = Number(quote.ask).toFixed(decimals);
+
+            if (spreadDisplay && quote.spread_pips !== undefined) {
+                const diffUsd = Math.abs((quote.ask || mid) - (quote.bid || mid));
+                spreadDisplay.textContent = Number(quote.spread_pips).toFixed(1) + ' pips ($' + diffUsd.toFixed(decimals) + ')';
+            }
+            if (sourceDisplay && quote.source) {
+                sourceDisplay.textContent = quote.source;
+            }
+            if (freshnessDisplay) {
+                freshnessDisplay.innerHTML = '<span style="color:var(--accent-green); font-weight:700;">● LIVE (0s ago)</span>';
+            }
+            if (timeDisplay) {
+                timeDisplay.textContent = new Date().toLocaleTimeString() + ' (Live Spot)';
+            }
+            if (marketBadge) {
+                marketBadge.className = 'badge badge-green';
+                marketBadge.textContent = 'LIVE / ACTIVE';
+            }
+
+            // Sync candle close on canvas chart in real time
+            if (currentChartData && currentChartData.candles && currentChartData.candles.length) {
+                const curSym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : '';
+                if (normalizeSym(quote.symbol) === normalizeSym(curSym)) {
+                    const candles = currentChartData.candles;
+                    const lastCandle = candles[candles.length - 1];
+                    if (lastCandle) {
+                        lastCandle.close = mid;
+                        if (mid > lastCandle.high) lastCandle.high = mid;
+                        if (mid < lastCandle.low) lastCandle.low = mid;
+                        renderCanvasChart();
+                    }
+                }
+            }
+        }
+
+
+
         function renderLiveRealtimeTick(tick) {
             if (!tick || !tick.symbol) return;
             const sym = document.getElementById('pairSelect') ? document.getElementById('pairSelect').value : 'XAU/USD';
@@ -2674,6 +2761,7 @@
             if (tdLiveTick) {
                 renderLiveRealtimeTick(tdLiveTick);
             }
+            fetchFastPrice();
             subscribeActiveSymbols();
             fetchHealth();
             fetchObservation();
@@ -6197,10 +6285,18 @@
                 }
             });
 
-            // Polling interval 12 seconds
+            // High-speed real-time price updates (every 1.5 seconds) for Indicative Market Price
+            fetchFastPrice();
+            setInterval(fetchFastPrice, 1500);
+
+            // Polling interval 6 seconds for signals and market health
             setInterval(() => {
                 fetchHealth();
                 fetchObservation();
+            }, 6000);
+
+            // Chart refresh every 12 seconds
+            setInterval(() => {
                 fetchChart();
             }, 12000);
         });

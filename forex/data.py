@@ -113,9 +113,9 @@ def fetch_twelve_data_quote(symbol: str, api_key: str = "", timeout: int = 4) ->
     canon = normalize_symbol(symbol)
     now_t = time.time()
     
-    # Check fresh in-memory quote cache (15s validity to prevent 429 rate limit)
+    # Check fresh in-memory quote cache (2.5s validity for ultra-low latency while preventing 429 rate limit)
     cached = _TD_QUOTE_CACHE.get(canon)
-    if cached and (now_t - cached[0] < 15):
+    if cached and (now_t - cached[0] < 2.5):
         return dict(cached[1])
 
     if not api_key:
