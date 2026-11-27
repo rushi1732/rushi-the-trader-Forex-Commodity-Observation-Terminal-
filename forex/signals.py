@@ -445,56 +445,44 @@ def evaluate_confluence_signal(
     if recent_bsl and abs(current_price - recent_bsl[-1]["level_price"]) <= sweep_entry_buffer:
         bearish_entry_zones.append(f"Turtle Soup BSL Sweep Zone at {recent_bsl[-1]['level_price']:.{decimals}f}")
 
-    # E. RSI Hidden & Regular Divergence Reversal / Continuation Zone
-    if div_data.get("detected"):
-        div_bias = div_data.get("bias", "NEUTRAL")
-        if div_bias == "BUY":
-            bullish_entry_zones.append(f"RSI Bullish Divergence Reversal Zone at {current_price:.{decimals}f}")
-        elif div_bias == "SELL":
-            bearish_entry_zones.append(f"RSI Bearish Divergence Reversal Zone at {current_price:.{decimals}f}")
-
-    # F. Market Structure Breakout (BOS / CHoCH) & Trend Continuation Zone
+    # E. Market Structure Breakout Retest (BOS / CHoCH) & Trend Continuation Zone
+    # Price MUST be actively retesting the broken structure level within institutional proximity buffer
     choch_bars_ago = (len(candles) - 1 - latest_choch.get("broken_at_index", 0)) if latest_choch else 999
     bos_bars_ago = (len(candles) - 1 - latest_bos.get("broken_at_index", 0)) if latest_bos else 999
-    if latest_bos and bos_bars_ago <= 8:
-        if latest_bos.get("direction") == "BULLISH":
-            bullish_entry_zones.append(f"Bullish BOS Breakout & Continuation Zone at {latest_bos['price']:.{decimals}f}")
-        elif latest_bos.get("direction") == "BEARISH":
-            bearish_entry_zones.append(f"Bearish BOS Breakdown & Continuation Zone at {latest_bos['price']:.{decimals}f}")
-    elif latest_choch and choch_bars_ago <= 8:
-        if latest_choch.get("direction") == "BULLISH":
-            bullish_entry_zones.append(f"Bullish CHoCH Reversal Zone at {latest_choch['price']:.{decimals}f}")
-        elif latest_choch.get("direction") == "BEARISH":
-            bearish_entry_zones.append(f"Bearish CHoCH Reversal Zone at {latest_choch['price']:.{decimals}f}")
+    bos_retest_buf = max(100.0, current_price * 0.0015) if "BTC" in canon else max(pip_size * 10, from_pips(canon, 12.0))
 
-    # G. Dynamic Institutional Trend Support / EMA-9/21 Value Area
+    if latest_bos and bos_bars_ago <= 8:
+        if latest_bos.get("direction") == "BULLISH" and abs(current_price - latest_bos["price"]) <= bos_retest_buf:
+            bullish_entry_zones.append(f"Bullish BOS Retest & Continuation Zone at {latest_bos['price']:.{decimals}f}")
+        elif latest_bos.get("direction") == "BEARISH" and abs(current_price - latest_bos["price"]) <= bos_retest_buf:
+            bearish_entry_zones.append(f"Bearish BOS Retest & Continuation Zone at {latest_bos['price']:.{decimals}f}")
+    elif latest_choch and choch_bars_ago <= 8:
+        if latest_choch.get("direction") == "BULLISH" and abs(current_price - latest_choch["price"]) <= bos_retest_buf:
+            bullish_entry_zones.append(f"Bullish CHoCH Retest & Reversal Zone at {latest_choch['price']:.{decimals}f}")
+        elif latest_choch.get("direction") == "BEARISH" and abs(current_price - latest_choch["price"]) <= bos_retest_buf:
+            bearish_entry_zones.append(f"Bearish CHoCH Retest & Reversal Zone at {latest_choch['price']:.{decimals}f}")
+
+    # F. Dynamic Institutional Trend Support / EMA-9/21 Value Area (Must not buy in Premium or sell in Discount)
     ema_val_buf = max(50.0, current_price * 0.0008) if "BTC" in canon else max(pip_size * 6, from_pips(canon, 8.0))
-    if is_bullish_momentum and ema9 and ema21:
+    if is_bullish_momentum and ema9 and ema21 and zone != "PREMIUM":
         if current_price >= ema21 and abs(current_price - ema9) <= ema_val_buf:
             bullish_entry_zones.append(f"Dynamic Institutional EMA-9/21 Support Zone ({ema9:.{decimals}f})")
-    elif is_bearish_momentum and ema9 and ema21:
+    elif is_bearish_momentum and ema9 and ema21 and zone != "DISCOUNT":
         if current_price <= ema21 and abs(current_price - ema9) <= ema_val_buf:
             bearish_entry_zones.append(f"Dynamic Institutional EMA-9/21 Resistance Zone ({ema9:.{decimals}f})")
-
-    # H. Active Session Killzone Expansion (High-probability institutional volume window)
-    if kz_data.get("is_killzone_active"):
-        kz_name = kz_data.get("primary_session", "Session Killzone")
-        if bullish_score >= 50:
-            bullish_entry_zones.append(f"Institutional Killzone Expansion Zone ({kz_name})")
-        elif bearish_score >= 50:
-            bearish_entry_zones.append(f"Institutional Killzone Expansion Zone ({kz_name})")
 
     # Hard Trend Filter & Veto check:
     # 1. HARD HTF MACRO TREND VETO:
     # Prohibit blind counter-trend entries when 15m HTF Trend is opposing, UNLESS a verified
-    # Institutional Reversal setup forms (SSL/BSL Liquidity Sweep, Demand/Supply OB, Bullish/Bearish CHoCH, or Divergence).
-    rev_buf = max(80.0, current_price * 0.0012) if "BTC" in canon else max(pip_size * 8, from_pips(canon, 12.0))
+    # Institutional Displacement Reversal forms (displacement CHoCH or confirmed liquidity sweep).
+    c_last = candles[-1] if candles else {}
+    c_rng = max(0.0001, c_last.get("high", 0) - c_last.get("low", 0))
+    u_wick = c_last.get("high", 0) - max(c_last.get("open", 0), c_last.get("close", 0))
+    l_wick = min(c_last.get("open", 0), c_last.get("close", 0)) - c_last.get("low", 0)
+
     has_bullish_reversal = bool(
-        inside_ob and inside_ob.get("type") == "BULLISH_OB" or
-        (nearest_demand and abs(current_price - nearest_demand.get("top", 0)) <= rev_buf) or
-        inside_fvg and inside_fvg.get("type") == "BULLISH_FVG" or
-        (latest_choch and latest_choch.get("direction") == "BULLISH" and choch_bars_ago <= 8) or
-        (div_data.get("detected") and div_data.get("bias") == "BUY")
+        (latest_choch and latest_choch.get("direction") == "BULLISH" and choch_bars_ago <= 6 and (u_wick / c_rng) < 0.35) or
+        (recent_ssl and (l_wick / c_rng) >= 0.40 and c_last.get("close", 0) > c_last.get("open", 0))
     )
 
     if htf_bearish and not has_bullish_reversal:
@@ -503,11 +491,8 @@ def evaluate_confluence_signal(
         bullish_factors.append("[HTF TREND VETO] BUY prohibited: 15m HTF Macro Trend is BEARISH (15m EMA-21 < EMA-50). Never buy into macro selloffs.")
 
     has_bearish_reversal = bool(
-        inside_ob and inside_ob.get("type") == "BEARISH_OB" or
-        (nearest_supply and abs(current_price - nearest_supply.get("bottom", 0)) <= rev_buf) or
-        inside_fvg and inside_fvg.get("type") == "BEARISH_FVG" or
-        (latest_choch and latest_choch.get("direction") == "BEARISH" and choch_bars_ago <= 8) or
-        (div_data.get("detected") and div_data.get("bias") == "SELL")
+        (latest_choch and latest_choch.get("direction") == "BEARISH" and choch_bars_ago <= 6 and (l_wick / c_rng) < 0.35) or
+        (recent_bsl and (u_wick / c_rng) >= 0.40 and c_last.get("close", 0) < c_last.get("open", 0))
     )
 
     if htf_bullish and not has_bearish_reversal:
@@ -517,14 +502,8 @@ def evaluate_confluence_signal(
 
     # 2. Local 5m Trend & Momentum Veto:
     # Counter-trend trades into a 5m cascade are prohibited unless confirmed institutional reversal / CHoCH is present
-    c_last = candles[-1] if candles else {}
-    c_rng = max(0.0001, c_last.get("high", 0) - c_last.get("low", 0))
-    u_wick = c_last.get("high", 0) - max(c_last.get("open", 0), c_last.get("close", 0))
-    l_wick = min(c_last.get("open", 0), c_last.get("close", 0)) - c_last.get("low", 0)
-
     has_bullish_choch = bool(
-        has_bullish_reversal or
-        (latest_choch and latest_choch.get("direction") == "BULLISH" and choch_bars_ago <= 12 and (u_wick / c_rng) < 0.40)
+        latest_choch and latest_choch.get("direction") == "BULLISH" and choch_bars_ago <= 8 and (u_wick / c_rng) < 0.40
     )
     if (is_bearish_momentum or trend == "BEARISH") and not has_bullish_choch:
         bullish_entry_zones = []
@@ -532,8 +511,7 @@ def evaluate_confluence_signal(
         bullish_factors.append("[TREND VETO] Counter-trend BUY prohibited: Bearish momentum/structure active without confirmed displacement Bullish CHoCH")
 
     has_bearish_choch = bool(
-        has_bearish_reversal or
-        (latest_choch and latest_choch.get("direction") == "BEARISH" and choch_bars_ago <= 12 and (l_wick / c_rng) < 0.40)
+        latest_choch and latest_choch.get("direction") == "BEARISH" and choch_bars_ago <= 8 and (l_wick / c_rng) < 0.40
     )
     if (is_bullish_momentum or trend == "BULLISH") and not has_bearish_choch:
         bearish_entry_zones = []
@@ -584,6 +562,19 @@ def evaluate_confluence_signal(
         if c_close > c_open and (c_close - c_open) > (c_rng * 0.90):
             bearish_entry_zones = []
             bearish_factors.append("[SPIKE GUARD] Waiting for high-velocity upward spike candle to exhaust")
+
+    # Candlestick Confirmation & Pressure Verification:
+    # A confirmed BUY requires buying presence - reject strong red dump bars closing near the low
+    if c_close < c_open and (c_open - c_close) >= (c_rng * 0.45) and (l_wick / c_rng) < 0.35:
+        bullish_entry_zones = []
+        bullish_score = min(bullish_score, 35)
+        bullish_factors.append("[CANDLE GUARD] BUY blocked: Current candle printed a heavy bearish body. Waiting for bullish price rejection.")
+
+    # A confirmed SELL requires selling presence - reject strong green pump bars closing near the high
+    if c_close > c_open and (c_close - c_open) >= (c_rng * 0.45) and (u_wick / c_rng) < 0.35:
+        bearish_entry_zones = []
+        bearish_score = min(bearish_score, 35)
+        bearish_factors.append("[CANDLE GUARD] SELL blocked: Current candle printed a heavy bullish body. Waiting for bearish price rejection.")
 
     # Spread Guardrail: For XAU/USD, block automatic signal generation if live spread exceeds 4.5 pips. For BTC, block if > 50.0 pips.
     is_gold = "XAU" in canon
